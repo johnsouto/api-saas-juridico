@@ -77,3 +77,28 @@ jobs:
             git pull --ff-only; \
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build traefik api web; \
             docker compose ps"
+
+      - name: Health check (API)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          URL="https://elementojuris.cloud/api/health"
+          echo "Health check: ${URL}"
+
+          for i in {1..30}; do
+            if BODY="$(curl -fsS --max-time 10 "${URL}")"; then
+              echo "Response: ${BODY}"
+              if echo "${BODY}" | grep -q '"status"' && echo "${BODY}" | grep -q 'ok'; then
+                echo "API is healthy."
+                exit 0
+              fi
+            fi
+
+            echo "Waiting for API... attempt ${i}/30"
+            sleep 2
+          done
+
+          echo "Health check failed."
+          curl -vk --max-time 10 "${URL}" || true
+          exit 1
