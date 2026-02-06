@@ -35,6 +35,8 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const NICHOS = [
+  { value: "Militar", label: "Militar" },
+  { value: "Bancário", label: "Bancário" },
   { value: "trabalhista", label: "Trabalhista" },
   { value: "civel", label: "Cível" },
   { value: "familia", label: "Família" },
