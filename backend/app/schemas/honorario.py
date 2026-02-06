@@ -11,7 +11,8 @@ from app.schemas.common import APIModel
 
 
 class HonorarioCreate(APIModel):
-    process_id: uuid.UUID
+    client_id: uuid.UUID
+    process_id: uuid.UUID | None = None
     valor: Decimal
     data_vencimento: date
     qtd_parcelas: int = Field(default=1, ge=1, le=120)
@@ -21,6 +22,8 @@ class HonorarioCreate(APIModel):
 
 
 class HonorarioUpdate(APIModel):
+    client_id: uuid.UUID | None = None
+    process_id: uuid.UUID | None = None
     valor: Decimal | None = None
     data_vencimento: date | None = None
     qtd_parcelas: int | None = Field(default=None, ge=1, le=120)
@@ -32,7 +35,8 @@ class HonorarioUpdate(APIModel):
 class HonorarioOut(APIModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
-    process_id: uuid.UUID
+    client_id: uuid.UUID
+    process_id: uuid.UUID | None
     valor: Decimal
     data_vencimento: date
     qtd_parcelas: int

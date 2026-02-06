@@ -22,7 +22,7 @@ type Doc = {
 };
 type Proc = { id: string; numero: string };
 type Client = { id: string; nome: string };
-type Honorario = { id: string; process_id: string; status: string };
+type Honorario = { id: string; client_id: string; process_id?: string | null; status: string };
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
@@ -90,12 +90,42 @@ export default function DocumentsPage() {
   });
 
   const download = useMutation({
-    mutationFn: async (documentId: string) => {
-      const r = await api.get<{ url: string }>("/v1/documents/" + documentId + "/download");
-      return r.data.url;
-    },
-    onSuccess: (url) => {
-      window.open(url, "_blank", "noopener,noreferrer");
+    mutationFn: async (doc: Doc) => {
+      const r = await api.get(`/v1/documents/${doc.id}/content`, {
+        params: { disposition: "attachment" },
+        responseType: "blob"
+      });
+      const blob = r.data as Blob;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.filename || "arquivo";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+
+  const view = useMutation({
+    mutationFn: async (doc: Doc) => {
+      // Open a window synchronously to avoid popup blockers, then set its URL after the blob is ready.
+      const w = window.open("about:blank", "_blank", "noopener,noreferrer");
+      const r = await api.get(`/v1/documents/${doc.id}/content`, {
+        params: { disposition: "inline" },
+        responseType: "blob"
+      });
+      const blob = r.data as Blob;
+      const url = window.URL.createObjectURL(blob);
+
+      if (w) {
+        w.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+
+      // Give the browser some time to load the blob URL before revoking it.
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
     }
   });
 
@@ -321,8 +351,11 @@ export default function DocumentsPage() {
                     <TableCell>{Math.round(d.size_bytes / 1024)} KB</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => download.mutate(d.id)} type="button">
-                          Baixar
+                        <Button size="sm" variant="outline" onClick={() => view.mutate(d)} type="button" disabled={view.isPending}>
+                          Visualizar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => download.mutate(d)} type="button" disabled={download.isPending}>
+                          {download.isPending ? "Baixando..." : "Baixar"}
                         </Button>
                         <Button
                           size="sm"
@@ -343,6 +376,12 @@ export default function DocumentsPage() {
         ) : null}
         {list.isError ? (
           <p className="mt-2 text-sm text-red-600">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar documentos"}</p>
+        ) : null}
+        {view.isError ? (
+          <p className="mt-2 text-sm text-red-600">{(view.error as any)?.response?.data?.detail ?? "Erro ao visualizar documento"}</p>
+        ) : null}
+        {download.isError ? (
+          <p className="mt-2 text-sm text-red-600">{(download.error as any)?.response?.data?.detail ?? "Erro ao baixar documento"}</p>
         ) : null}
         {remove.isError ? (
           <p className="mt-2 text-sm text-red-600">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir documento"}</p>

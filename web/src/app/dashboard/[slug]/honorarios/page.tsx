@@ -15,10 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-type Proc = { id: string; numero: string };
+type Client = { id: string; nome: string; cpf: string };
+type Proc = { id: string; client_id: string; numero: string };
 type Honorario = {
   id: string;
-  process_id: string;
+  client_id: string;
+  process_id?: string | null;
   valor: string;
   data_vencimento: string;
   qtd_parcelas: number;
@@ -32,7 +34,8 @@ type Honorario = {
 };
 
 const schema = z.object({
-  process_id: z.string().uuid(),
+  client_id: z.string().uuid(),
+  process_id: z.string().uuid().or(z.literal("")).default(""),
   valor: z.string().min(1),
   data_vencimento: z.string().min(8),
   qtd_parcelas: z.coerce.number().int().min(1).max(120).default(1),
@@ -51,6 +54,11 @@ export default function HonorariosPage() {
   const [valorPago, setValorPago] = useState<string>("");
   const [pagoEm, setPagoEm] = useState<string>("");
 
+  const clients = useQuery({
+    queryKey: ["clients"],
+    queryFn: async () => (await api.get<Client[]>("/v1/clients")).data
+  });
+
   const processes = useQuery({
     queryKey: ["processes"],
     queryFn: async () => (await api.get<Proc[]>("/v1/processes")).data
@@ -64,6 +72,7 @@ export default function HonorariosPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      client_id: "",
       process_id: "",
       valor: "",
       data_vencimento: "",
@@ -79,6 +88,7 @@ export default function HonorariosPage() {
       const valorCents = parseCurrencyToCents(values.valor);
       const payload = {
         ...values,
+        process_id: values.process_id ? values.process_id : null,
         valor: centsToDecimalString(valorCents)
       };
       if (editingId) {
@@ -89,6 +99,7 @@ export default function HonorariosPage() {
     onSuccess: async () => {
       setEditingId(null);
       form.reset({
+        client_id: "",
         process_id: "",
         valor: "",
         data_vencimento: "",
@@ -137,13 +148,26 @@ export default function HonorariosPage() {
 
   const downloadComprovante = useMutation({
     mutationFn: async (documentId: string) => {
-      const r = await api.get<{ url: string }>(`/v1/documents/${documentId}/download`);
-      return r.data.url;
+      const r = await api.get(`/v1/documents/${documentId}/content`, {
+        params: { disposition: "attachment" },
+        responseType: "blob"
+      });
+      return r.data as Blob;
     },
-    onSuccess: (url) => {
-      window.open(url, "_blank", "noopener,noreferrer");
+    onSuccess: (blob, documentId) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `comprovante-${documentId}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
     }
   });
+
+  const selectedClientId = form.watch("client_id");
+  const processesForClient = (processes.data ?? []).filter((p) => p.client_id === selectedClientId);
 
   return (
     <div className="space-y-4">
@@ -161,15 +185,35 @@ export default function HonorariosPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-6" onSubmit={form.handleSubmit((v) => create.mutate(v))}>
             <div className="space-y-1 md:col-span-2">
-              <Label>Processo</Label>
-              <Select {...form.register("process_id")}>
-                <option value="">Selecione o processo</option>
-                {processes.data?.map((p) => (
+              <Label>Cliente</Label>
+              <Select
+                {...form.register("client_id")}
+                onChange={(e) => {
+                  form.setValue("client_id", e.target.value);
+                  // When switching client, clear process selection.
+                  form.setValue("process_id", "");
+                }}
+              >
+                <option value="">Selecione o cliente</option>
+                {clients.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome} ({c.cpf})
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <Label>Processo (opcional)</Label>
+              <Select {...form.register("process_id")} disabled={!selectedClientId}>
+                <option value="">(sem processo)</option>
+                {processesForClient.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.numero}
                   </option>
                 ))}
               </Select>
+              {!selectedClientId ? <p className="text-xs text-zinc-600">Selecione um cliente para listar os processos.</p> : null}
             </div>
 
             <div className="space-y-1">
@@ -236,6 +280,7 @@ export default function HonorariosPage() {
                   onClick={() => {
                     setEditingId(null);
                     form.reset({
+                      client_id: "",
                       process_id: "",
                       valor: "",
                       data_vencimento: "",
@@ -287,10 +332,15 @@ export default function HonorariosPage() {
                 />
               </div>
 
-            <div className="space-y-1 md:col-span-2">
-              <Label>Pago em</Label>
-                <Input className="min-w-[260px]" type="datetime-local" value={pagoEm} onChange={(e) => setPagoEm(e.target.value)} />
-            </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label>Pago em</Label>
+                <Input
+                  className="min-w-[260px]"
+                  type="datetime-local"
+                  value={pagoEm}
+                  onChange={(e) => setPagoEm(e.target.value)}
+                />
+              </div>
 
               <div className="space-y-1">
                 <Label>Comprovante</Label>
@@ -337,6 +387,7 @@ export default function HonorariosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Cliente</TableHead>
                     <TableHead>Processo</TableHead>
                     <TableHead>Valor Inicial</TableHead>
                     <TableHead>Início</TableHead>
@@ -350,7 +401,12 @@ export default function HonorariosPage() {
                 <TableBody>
                   {list.data.map((h) => (
                     <TableRow key={h.id}>
-                      <TableCell>{processes.data?.find((p) => p.id === h.process_id)?.numero ?? h.process_id}</TableCell>
+                      <TableCell>{clients.data?.find((c) => c.id === h.client_id)?.nome ?? h.client_id}</TableCell>
+                      <TableCell>
+                        {h.process_id
+                          ? processes.data?.find((p) => p.id === h.process_id)?.numero ?? h.process_id
+                          : "(sem processo)"}
+                      </TableCell>
                       <TableCell>{h.valor}</TableCell>
                       <TableCell>{h.data_vencimento}</TableCell>
                       <TableCell>{h.qtd_parcelas ?? 1}</TableCell>
@@ -382,7 +438,8 @@ export default function HonorariosPage() {
                             onClick={() => {
                               setEditingId(h.id);
                               form.reset({
-                                process_id: h.process_id,
+                                client_id: h.client_id,
+                                process_id: h.process_id ?? "",
                                 valor: maskCurrencyBRL(String(h.valor)),
                                 data_vencimento: h.data_vencimento,
                                 qtd_parcelas: h.qtd_parcelas ?? 1,

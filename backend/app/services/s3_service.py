@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from typing import BinaryIO
+from typing import Any
 
 import boto3
 
@@ -40,6 +41,12 @@ class S3Service:
             ClientMethod="get_object",
             Params={"Bucket": settings.S3_BUCKET_NAME, "Key": key},
             ExpiresIn=expires_in,
+        )
+
+    def get_object(self, *, key: str) -> dict[str, Any]:
+        return self._client(endpoint_url=settings.S3_ENDPOINT_URL).get_object(
+            Bucket=settings.S3_BUCKET_NAME,
+            Key=key,
         )
 
     def delete_object(self, *, key: str) -> None:

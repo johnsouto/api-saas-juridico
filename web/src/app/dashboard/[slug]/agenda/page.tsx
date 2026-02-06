@@ -169,14 +169,15 @@ export default function AgendaPage() {
               </Select>
             </div>
 
-            <div className="space-y-1 md:col-span-2">
-              <Label>Início</Label>
-              <Input className="min-w-[260px]" type="datetime-local" {...form.register("inicio_em")} />
-            </div>
-
-            <div className="space-y-1 md:col-span-2">
-              <Label>Fim (opcional)</Label>
-              <Input className="min-w-[260px]" type="datetime-local" {...form.register("fim_em")} />
+            <div className="grid grid-cols-1 gap-3 md:col-span-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Início</Label>
+                <Input className="min-w-[260px]" type="datetime-local" {...form.register("inicio_em")} />
+              </div>
+              <div className="space-y-1">
+                <Label>Fim (opcional)</Label>
+                <Input className="min-w-[260px]" type="datetime-local" {...form.register("fim_em")} />
+              </div>
             </div>
 
             <div className="flex items-end">
@@ -244,4 +245,3 @@ export default function AgendaPage() {
     </div>
   );
 }
-

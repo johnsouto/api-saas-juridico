@@ -6,6 +6,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import iterate_in_threadpool
+from starlette.responses import StreamingResponse
 
 from app.api.deps import get_current_user
 from app.core.exceptions import NotFoundError, PlanLimitExceeded
@@ -119,6 +121,52 @@ async def download_document(
         raise NotFoundError("Documento não encontrado")
     url = _s3.generate_presigned_get_url(key=doc.s3_key, expires_in=3600)
     return PresignedUrlOut(url=url, expires_in=3600)
+
+
+@router.get("/{document_id}/content")
+async def get_document_content(
+    document_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    disposition: str = "attachment",
+):
+    """
+    Download/visualize a document through the API (proxy).
+
+    This avoids relying on S3_PUBLIC_ENDPOINT_URL / public MinIO exposure.
+    Use `?disposition=inline` to hint the browser to preview (PDF/JPEG) instead of downloading.
+    """
+    stmt = select(Document).where(Document.id == document_id).where(Document.tenant_id == user.tenant_id)
+    doc = (await db.execute(stmt)).scalar_one_or_none()
+    if not doc:
+        raise NotFoundError("Documento não encontrado")
+
+    if disposition not in ("attachment", "inline"):
+        disposition = "attachment"
+
+    resp = _s3.get_object(key=doc.s3_key)
+    body = resp["Body"]
+
+    def iter_chunks(chunk_size: int = 1024 * 1024):
+        try:
+            while True:
+                chunk = body.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            try:
+                body.close()
+            except Exception:
+                pass
+
+    safe_filename = (doc.filename or "arquivo").replace('"', "").replace("\n", " ").replace("\r", " ")
+    headers = {
+        "Content-Disposition": f'{disposition}; filename="{safe_filename}"',
+        "Cache-Control": "no-store",
+    }
+    media_type = doc.mime_type or resp.get("ContentType") or "application/octet-stream"
+    return StreamingResponse(iterate_in_threadpool(iter_chunks()), media_type=media_type, headers=headers)
 
 
 @router.delete("/{document_id}")

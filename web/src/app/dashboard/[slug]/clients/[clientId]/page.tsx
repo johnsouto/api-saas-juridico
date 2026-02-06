@@ -65,12 +65,40 @@ export default function ClientDetailPage() {
   });
 
   const download = useMutation({
-    mutationFn: async (documentId: string) => {
-      const r = await api.get<{ url: string }>(`/v1/documents/${documentId}/download`);
-      return r.data.url;
-    },
-    onSuccess: (url) => {
-      window.open(url, "_blank", "noopener,noreferrer");
+    mutationFn: async (doc: Doc) => {
+      const r = await api.get(`/v1/documents/${doc.id}/content`, {
+        params: { disposition: "attachment" },
+        responseType: "blob"
+      });
+      const blob = r.data as Blob;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.filename || "arquivo";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+
+  const view = useMutation({
+    mutationFn: async (doc: Doc) => {
+      const w = window.open("about:blank", "_blank", "noopener,noreferrer");
+      const r = await api.get(`/v1/documents/${doc.id}/content`, {
+        params: { disposition: "inline" },
+        responseType: "blob"
+      });
+      const blob = r.data as Blob;
+      const url = window.URL.createObjectURL(blob);
+
+      if (w) {
+        w.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
     }
   });
 
@@ -148,6 +176,16 @@ export default function ClientDetailPage() {
               {(upload.error as any)?.response?.data?.detail ?? (upload.error as Error).message}
             </p>
           ) : null}
+          {view.isError ? (
+            <p className="mt-3 text-sm text-red-600">
+              {(view.error as any)?.response?.data?.detail ?? "Erro ao visualizar documento"}
+            </p>
+          ) : null}
+          {download.isError ? (
+            <p className="mt-3 text-sm text-red-600">
+              {(download.error as any)?.response?.data?.detail ?? "Erro ao baixar documento"}
+            </p>
+          ) : null}
 
           <div className="mt-4 space-y-3">
             {documents.isLoading ? <p className="text-sm text-zinc-600">Carregando documentos…</p> : null}
@@ -176,8 +214,11 @@ export default function ClientDetailPage() {
                           <TableCell>{Math.round(d.size_bytes / 1024)} KB</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button variant="outline" size="sm" type="button" onClick={() => download.mutate(d.id)}>
-                                Baixar
+                              <Button variant="outline" size="sm" type="button" onClick={() => view.mutate(d)} disabled={view.isPending}>
+                                Visualizar
+                              </Button>
+                              <Button variant="outline" size="sm" type="button" onClick={() => download.mutate(d)} disabled={download.isPending}>
+                                {download.isPending ? "Baixando..." : "Baixar"}
                               </Button>
                               <Button
                                 variant="destructive"

@@ -10,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.exceptions import NotFoundError, PlanLimitExceeded
+from app.core.exceptions import BadRequestError, NotFoundError, PlanLimitExceeded
 from app.db.session import get_db
+from app.models.client import Client
 from app.models.document import Document
 from app.models.enums import HonorarioStatus
 from app.models.honorario import Honorario
@@ -36,10 +37,13 @@ async def list_honorarios(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
     process_id: uuid.UUID | None = None,
+    client_id: uuid.UUID | None = None,
 ):
     stmt = select(Honorario).where(Honorario.tenant_id == user.tenant_id).order_by(Honorario.criado_em.desc())
     if process_id:
         stmt = stmt.where(Honorario.process_id == process_id)
+    if client_id:
+        stmt = stmt.where(Honorario.client_id == client_id)
     return list((await db.execute(stmt)).scalars().all())
 
 
@@ -49,13 +53,22 @@ async def create_honorario(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    proc_stmt = select(Process).where(Process.id == payload.process_id).where(Process.tenant_id == user.tenant_id)
-    proc = (await db.execute(proc_stmt)).scalar_one_or_none()
-    if not proc:
-        raise NotFoundError("Processo não encontrado")
+    client_stmt = select(Client).where(Client.id == payload.client_id).where(Client.tenant_id == user.tenant_id)
+    client = (await db.execute(client_stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    if payload.process_id is not None:
+        proc_stmt = select(Process).where(Process.id == payload.process_id).where(Process.tenant_id == user.tenant_id)
+        proc = (await db.execute(proc_stmt)).scalar_one_or_none()
+        if not proc:
+            raise NotFoundError("Processo não encontrado")
+        if proc.client_id != payload.client_id:
+            raise BadRequestError("O processo informado não pertence ao cliente selecionado")
 
     hon = Honorario(
         tenant_id=user.tenant_id,
+        client_id=payload.client_id,
         process_id=payload.process_id,
         valor=payload.valor,
         data_vencimento=payload.data_vencimento,
@@ -81,6 +94,31 @@ async def update_honorario(
     hon = (await db.execute(stmt)).scalar_one_or_none()
     if not hon:
         raise NotFoundError("Honorário não encontrado")
+
+    fields = payload.model_fields_set
+
+    # Validate new client/process references (when provided).
+    new_client_id = hon.client_id
+    if "client_id" in fields:
+        if payload.client_id is None:
+            raise BadRequestError("client_id é obrigatório")
+        client_stmt = select(Client).where(Client.id == payload.client_id).where(Client.tenant_id == user.tenant_id)
+        client = (await db.execute(client_stmt)).scalar_one_or_none()
+        if not client:
+            raise NotFoundError("Cliente não encontrado")
+        new_client_id = payload.client_id
+
+    new_process_id = hon.process_id
+    if "process_id" in fields:
+        new_process_id = payload.process_id
+
+    if new_process_id is not None:
+        proc_stmt = select(Process).where(Process.id == new_process_id).where(Process.tenant_id == user.tenant_id)
+        proc = (await db.execute(proc_stmt)).scalar_one_or_none()
+        if not proc:
+            raise NotFoundError("Processo não encontrado")
+        if proc.client_id != new_client_id:
+            raise BadRequestError("O processo informado não pertence ao cliente selecionado")
 
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(hon, key, value)

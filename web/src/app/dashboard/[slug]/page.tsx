@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 type Proc = { id: string; status: "ativo" | "inativo" | "outros"; criado_em: string };
 
 export default function DashboardHome() {
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug;
+
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
@@ -120,7 +124,7 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{stats.data?.clients ?? "—"}</div>
-            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href="./clients">
+            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href={`/dashboard/${slug}/clients`}>
               Abrir clientes
             </Link>
           </CardContent>
@@ -132,7 +136,7 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{stats.data?.processes ?? "—"}</div>
-            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href="./processes">
+            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href={`/dashboard/${slug}/processes`}>
               Abrir processos
             </Link>
           </CardContent>
@@ -145,7 +149,7 @@ export default function DashboardHome() {
           <CardContent>
             <div className="text-2xl font-semibold">{stats.data?.honorariosAbertos ?? "—"}</div>
             <div className="text-xs text-zinc-600">Total: {stats.data?.honorarios ?? "—"}</div>
-            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href="./honorarios">
+            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href={`/dashboard/${slug}/honorarios`}>
               Abrir honorários
             </Link>
           </CardContent>
@@ -156,13 +160,13 @@ export default function DashboardHome() {
             <CardTitle className="text-sm">Atalhos</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-1 text-sm">
-            <Link className="text-zinc-700 underline" href="./agenda">
+            <Link className="text-zinc-700 underline" href={`/dashboard/${slug}/agenda`}>
               Agenda
             </Link>
-            <Link className="text-zinc-700 underline" href="./tarefas">
+            <Link className="text-zinc-700 underline" href={`/dashboard/${slug}/tarefas`}>
               Tarefas
             </Link>
-            <Link className="text-zinc-700 underline" href="./documents">
+            <Link className="text-zinc-700 underline" href={`/dashboard/${slug}/documents`}>
               Documentos
             </Link>
             <Button
