@@ -31,6 +31,9 @@ async def seed(db: AsyncSession) -> None:
     await db.commit()
 
     # Default tenant/admin (dev convenience)
+    if settings.ENV != "dev":
+        return
+
     demo_slug = "demo"
     demo_stmt = select(Tenant).where(Tenant.slug == demo_slug)
     tenant = (await db.execute(demo_stmt)).scalar_one_or_none()
