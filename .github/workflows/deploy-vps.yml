@@ -79,6 +79,8 @@ jobs:
             docker compose ps"
 
       - name: Health check (API)
+        id: health
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -102,3 +104,35 @@ jobs:
           echo "Health check failed."
           curl -vk --max-time 10 "${URL}" || true
           exit 1
+
+      - name: Collect VPS logs (only if health check failed)
+        if: steps.health.outcome == 'failure'
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PATH: ${{ secrets.VPS_PATH }}
+        run: |
+          set -euo pipefail
+
+          echo "Collecting docker compose logs from VPS..."
+
+          ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+            cd '${VPS_PATH}'; \
+            echo '--- docker compose ps ---'; \
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true; \
+            echo '--- traefik logs (tail=200) ---'; \
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 traefik || true; \
+            echo '--- api logs (tail=200) ---'; \
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 api || true; \
+            echo '--- web logs (tail=200) ---'; \
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 web || true; \
+            echo '--- postgres logs (tail=200) ---'; \
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 postgres || true; \
+            echo '--- minio logs (tail=200) ---'; \
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 minio || true"
+
+      - name: Fail deploy if API is unhealthy
+        if: steps.health.outcome == 'failure'
+        shell: bash
+        run: exit 1
