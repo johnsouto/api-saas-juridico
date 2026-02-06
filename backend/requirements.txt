@@ -12,7 +12,10 @@ python-dotenv>=1.0
 python-multipart>=0.0.9
 email-validator>=2.1
 
-python-jose[cryptography]>=3.3
+# NOTE: We intentionally use PyJWT instead of python-jose because the python-jose
+# dependency tree currently pulls `ecdsa`, which has a known CVE with no fixed
+# version available at the time of writing (and it breaks pip-audit in CI).
+PyJWT[crypto]>=2.9
 passlib==1.7.4
 bcrypt==4.0.1
 
