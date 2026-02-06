@@ -130,17 +130,36 @@ class PlatformService:
         if not tenant:
             raise NotFoundError("Tenant não encontrado")
 
-        raw_token = secrets.token_urlsafe(32)
-        inv = UserInvitation(
-            tenant_id=tenant_id,
-            nome=nome,
-            email=email,
-            role=UserRole.admin,
-            token_hash=sha256_hex(raw_token),
-            expires_at=_utcnow() + timedelta(days=7),
-            accepted_at=None,
+        # If there is a pending invite for the same tenant/email, rotate its token instead of creating a new row.
+        # This avoids the unique constraint (tenant_id, email) and provides a true "resend" behavior.
+        pending_stmt = (
+            select(UserInvitation)
+            .where(UserInvitation.tenant_id == tenant_id)
+            .where(UserInvitation.email == email)
+            .where(UserInvitation.accepted_at.is_(None))
         )
-        db.add(inv)
+        inv = (await db.execute(pending_stmt)).scalar_one_or_none()
+
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = sha256_hex(raw_token)
+
+        if inv:
+            inv.nome = nome
+            inv.role = UserRole.admin
+            inv.token_hash = token_hash
+            inv.expires_at = _utcnow() + timedelta(days=7)
+            db.add(inv)
+        else:
+            inv = UserInvitation(
+                tenant_id=tenant_id,
+                nome=nome,
+                email=email,
+                role=UserRole.admin,
+                token_hash=token_hash,
+                expires_at=_utcnow() + timedelta(days=7),
+                accepted_at=None,
+            )
+            db.add(inv)
 
         try:
             await db.commit()

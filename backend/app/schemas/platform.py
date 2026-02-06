@@ -52,3 +52,8 @@ class PlatformTenantListItem(APIModel):
     subscription_status: str | None
     subscription_ativo: bool | None
     subscription_validade: datetime | None
+
+
+class PlatformResendInviteOut(APIModel):
+    message: str
+    email: EmailStr

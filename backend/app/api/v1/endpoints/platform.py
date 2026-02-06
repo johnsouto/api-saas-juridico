@@ -1,16 +1,26 @@
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import NotFoundError
 from app.db.session import get_db
 from app.models.plan import Plan
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
-from app.schemas.platform import PlatformTenantCreate, PlatformTenantCreatedOut, PlatformTenantListItem, PlatformTrialTenantCreate
+from app.models.user import User
+from app.models.enums import UserRole
+from app.schemas.platform import (
+    PlatformResendInviteOut,
+    PlatformTenantCreate,
+    PlatformTenantCreatedOut,
+    PlatformTenantListItem,
+    PlatformTrialTenantCreate,
+)
 from app.schemas.tenant import TenantOut
 from app.schemas.token import TokenPair
 from app.schemas.user import UserOut
@@ -137,3 +147,41 @@ async def create_trial_tenant(
         admin_user=UserOut.model_validate(admin_user),
         tokens=TokenPair(access_token="", refresh_token=""),
     )
+
+
+@router.post("/tenants/{tenant_id}/resend-invite", response_model=PlatformResendInviteOut)
+async def resend_first_access_invite(
+    tenant_id: uuid.UUID,
+    request: Request,
+    background: BackgroundTasks,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Resend the first-access invite link to the tenant admin.
+
+    This is useful when the operator created a trial tenant and the email was not delivered
+    or the link expired.
+    """
+    app_base_url = request.headers.get("origin") or f"{request.url.scheme}://{request.headers.get('host')}"
+
+    # Pick the oldest admin user for the tenant as the default recipient.
+    admin_stmt = (
+        select(User)
+        .where(User.tenant_id == tenant_id)
+        .where(User.role == UserRole.admin)
+        .order_by(User.criado_em.asc())
+        .limit(1)
+    )
+    admin_user = (await db.execute(admin_stmt)).scalar_one_or_none()
+    if not admin_user:
+        raise NotFoundError("Admin do tenant não encontrado")
+
+    await _platform_service.resend_first_access(
+        db,
+        background,
+        tenant_id=tenant_id,
+        email=admin_user.email,
+        nome=admin_user.nome,
+        app_base_url=app_base_url,
+    )
+    return PlatformResendInviteOut(message="Convite reenviado", email=admin_user.email)

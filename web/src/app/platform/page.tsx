@@ -36,6 +36,11 @@ type PlatformTenantCreatedOut = {
   tokens: { access_token: string; refresh_token: string };
 };
 
+type PlatformResendInviteOut = {
+  message: string;
+  email: string;
+};
+
 const createSchema = z.object({
   tenant_nome: z.string().min(2),
   tenant_tipo_documento: z.enum(["cpf", "cnpj"]).default("cnpj"),
@@ -51,6 +56,7 @@ type CreateValues = z.infer<typeof createSchema>;
 export default function PlatformAdminPage() {
   const qc = useQueryClient();
   const [keyInput, setKeyInput] = useState("");
+  const [resendInfo, setResendInfo] = useState<string | null>(null);
   const storedKey = useMemo(() => getPlatformAdminKey(), []);
 
   const tenants = useQuery({
@@ -86,6 +92,14 @@ export default function PlatformAdminPage() {
       (await api.post<PlatformTenantCreatedOut>("/v1/platform/tenants/trial", values)).data,
     onSuccess: async () => {
       form.reset();
+      await qc.invalidateQueries({ queryKey: ["platform-tenants"] });
+    }
+  });
+
+  const resendInvite = useMutation({
+    mutationFn: async (tenantId: string) => (await api.post<PlatformResendInviteOut>(`/v1/platform/tenants/${tenantId}/resend-invite`)).data,
+    onSuccess: async (data) => {
+      setResendInfo(`Convite reenviado para ${data.email}`);
       await qc.invalidateQueries({ queryKey: ["platform-tenants"] });
     }
   });
@@ -267,6 +281,12 @@ export default function PlatformAdminPage() {
         <CardContent>
           {!storedKey ? <p className="text-sm text-zinc-600">Informe a chave para carregar a lista.</p> : null}
           {tenants.isLoading ? <p className="text-sm text-zinc-600">Carregando…</p> : null}
+          {resendInfo ? <p className="mt-2 text-sm text-emerald-700">{resendInfo}</p> : null}
+          {resendInvite.isError ? (
+            <p className="mt-2 text-sm text-red-600">
+              {(resendInvite.error as any)?.response?.data?.detail ?? "Erro ao reenviar convite"}
+            </p>
+          ) : null}
           {tenants.data ? (
             <div className="mt-3 overflow-x-auto">
               <Table>
@@ -277,7 +297,7 @@ export default function PlatformAdminPage() {
                     <TableHead>Doc</TableHead>
                     <TableHead>Plano</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Acessar</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -291,9 +311,20 @@ export default function PlatformAdminPage() {
                       <TableCell>{t.plan_nome ?? "—"}</TableCell>
                       <TableCell>{t.subscription_status ?? "—"}</TableCell>
                       <TableCell className="text-right">
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/dashboard/${t.slug}`}>Dashboard</Link>
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={!storedKey || resendInvite.isPending}
+                            type="button"
+                            onClick={() => resendInvite.mutate(t.id)}
+                          >
+                            {resendInvite.isPending ? "Enviando..." : "Reenviar convite"}
+                          </Button>
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={`/dashboard/${t.slug}`}>Dashboard</Link>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
