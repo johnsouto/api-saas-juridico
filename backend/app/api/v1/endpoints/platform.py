@@ -1,24 +1,35 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import case, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.db.session import get_db
+from app.models.audit_log import AuditLog
+from app.models.client import Client
+from app.models.document import Document
+from app.models.honorario import Honorario
+from app.models.password_reset import PasswordReset
+from app.models.parceria import Parceria
 from app.models.plan import Plan
+from app.models.process import Process
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.user_invitation import UserInvitation
 from app.models.enums import UserRole
 from app.schemas.platform import (
     PlatformResendInviteOut,
     PlatformTenantCreate,
     PlatformTenantCreatedOut,
+    PlatformTenantDeletedOut,
     PlatformTenantListItem,
+    PlatformTenantStatusOut,
     PlatformTrialTenantCreate,
 )
 from app.schemas.tenant import TenantOut
@@ -28,6 +39,7 @@ from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
 from app.services.platform_service import PlatformService
+from app.services.s3_service import S3Service
 
 
 router = APIRouter()
@@ -35,58 +47,138 @@ router = APIRouter()
 _auth_service = AuthService(email_service=EmailService(), plan_limit_service=PlanLimitService())
 _platform_service = PlatformService(email_service=EmailService())
 
+logger = logging.getLogger(__name__)
+
 
 @router.get("/tenants", response_model=list[PlatformTenantListItem])
-async def list_tenants(db: Annotated[AsyncSession, Depends(get_db)]):
+async def list_tenants(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    q: str | None = None,
+    documento: str | None = None,
+    admin_email: str | None = None,
+    is_active: bool | None = None,
+):
     """
     List tenants for the SaaS operator.
 
     Note: this endpoint is protected by PLATFORM_ADMIN_KEY.
     """
-    tenants = list((await db.execute(select(Tenant).order_by(Tenant.criado_em.desc()))).scalars().all())
+    stmt = select(Tenant).order_by(Tenant.criado_em.desc())
+
+    if is_active is not None:
+        stmt = stmt.where(Tenant.is_active.is_(is_active))
+
+    if documento:
+        doc = documento.strip()
+        if doc:
+            stmt = stmt.where(Tenant.documento.ilike(f"%{doc}%"))
+
+    if admin_email:
+        email = admin_email.strip()
+        if email:
+            stmt = stmt.where(
+                Tenant.id.in_(
+                    select(User.tenant_id)
+                    .where(User.role == UserRole.admin)
+                    .where(User.email.ilike(f"%{email}%"))
+                )
+            )
+
+    if q:
+        qv = q.strip()
+        if qv:
+            pattern = f"%{qv}%"
+            stmt = stmt.where(
+                or_(
+                    Tenant.nome.ilike(pattern),
+                    Tenant.slug.ilike(pattern),
+                    Tenant.documento.ilike(pattern),
+                    Tenant.cnpj.ilike(pattern),
+                    Tenant.id.in_(select(User.tenant_id).where(User.email.ilike(pattern))),
+                )
+            )
+
+    tenants = list((await db.execute(stmt)).scalars().all())
+    if not tenants:
+        return []
+
+    tenant_ids = [t.id for t in tenants]
+
+    # Latest subscription + plan per tenant
+    sub_stmt = (
+        select(Subscription, Plan)
+        .join(Plan, Plan.id == Subscription.plan_id)
+        .where(Subscription.tenant_id.in_(tenant_ids))
+        .order_by(Subscription.tenant_id.asc(), Subscription.criado_em.desc())
+    )
+    latest_sub: dict[uuid.UUID, tuple[Subscription, Plan]] = {}
+    for sub, plan in (await db.execute(sub_stmt)).all():
+        if sub.tenant_id not in latest_sub:
+            latest_sub[sub.tenant_id] = (sub, plan)
+
+    # Oldest admin per tenant (default contact)
+    admin_stmt = (
+        select(User)
+        .where(User.tenant_id.in_(tenant_ids))
+        .where(User.role == UserRole.admin)
+        .order_by(User.tenant_id.asc(), User.criado_em.asc())
+    )
+    admin_by_tenant: dict[uuid.UUID, User] = {}
+    for u in (await db.execute(admin_stmt)).scalars().all():
+        if u.tenant_id not in admin_by_tenant:
+            admin_by_tenant[u.tenant_id] = u
+
+    # User counts
+    users_stmt = (
+        select(
+            User.tenant_id,
+            func.count(User.id).label("users_total"),
+            func.coalesce(func.sum(case((User.is_active.is_(True), 1), else_=0)), 0).label("users_active"),
+        )
+        .where(User.tenant_id.in_(tenant_ids))
+        .group_by(User.tenant_id)
+    )
+    users_counts: dict[uuid.UUID, tuple[int, int]] = {}
+    for tenant_id, total, active in (await db.execute(users_stmt)).all():
+        users_counts[tenant_id] = (int(total), int(active))
+
+    # Storage usage (sum of documents)
+    storage_stmt = (
+        select(Document.tenant_id, func.coalesce(func.sum(Document.size_bytes), 0).label("storage_used"))
+        .where(Document.tenant_id.in_(tenant_ids))
+        .group_by(Document.tenant_id)
+    )
+    storage_by_tenant: dict[uuid.UUID, int] = {tid: int(sz) for tid, sz in (await db.execute(storage_stmt)).all()}
+
     items: list[PlatformTenantListItem] = []
     for t in tenants:
-        sub_stmt = (
-            select(Subscription, Plan)
-            .join(Plan, Plan.id == Subscription.plan_id)
-            .where(Subscription.tenant_id == t.id)
-            .order_by(Subscription.criado_em.desc())
-            .limit(1)
+        sub, plan = latest_sub.get(t.id, (None, None))  # type: ignore[assignment]
+        admin = admin_by_tenant.get(t.id)
+        total_users, active_users = users_counts.get(t.id, (0, 0))
+        storage_used = storage_by_tenant.get(t.id, 0)
+
+        items.append(
+            PlatformTenantListItem(
+                id=t.id,
+                nome=t.nome,
+                cnpj=t.cnpj,
+                tipo_documento=t.tipo_documento.value if hasattr(t.tipo_documento, "value") else str(t.tipo_documento),
+                documento=t.documento,
+                slug=t.slug,
+                criado_em=t.criado_em,
+                is_active=t.is_active,
+                admin_email=admin.email if admin else None,
+                admin_nome=admin.nome if admin else None,
+                admin_is_active=admin.is_active if admin else None,
+                users_total=total_users,
+                users_active=active_users,
+                storage_used_bytes=storage_used,
+                plan_nome=plan.nome if plan else None,
+                subscription_status=sub.status.value if sub and hasattr(sub.status, "value") else (str(sub.status) if sub else None),
+                subscription_ativo=sub.ativo if sub else None,
+                subscription_validade=sub.validade if sub else None,
+            )
         )
-        row = (await db.execute(sub_stmt)).first()
-        if row:
-            sub, plan = row
-            items.append(
-                PlatformTenantListItem(
-                    id=t.id,
-                    nome=t.nome,
-                    cnpj=t.cnpj,
-                    tipo_documento=t.tipo_documento.value if hasattr(t.tipo_documento, "value") else str(t.tipo_documento),
-                    documento=t.documento,
-                    slug=t.slug,
-                    criado_em=t.criado_em,
-                    plan_nome=plan.nome,
-                    subscription_status=sub.status.value if hasattr(sub.status, "value") else str(sub.status),
-                    subscription_ativo=sub.ativo,
-                    subscription_validade=sub.validade,
-                )
-            )
-        else:
-            items.append(
-                PlatformTenantListItem(
-                    id=t.id,
-                    nome=t.nome,
-                    cnpj=t.cnpj,
-                    tipo_documento=t.tipo_documento.value if hasattr(t.tipo_documento, "value") else str(t.tipo_documento),
-                    documento=t.documento,
-                    slug=t.slug,
-                    criado_em=t.criado_em,
-                    plan_nome=None,
-                    subscription_status=None,
-                    subscription_ativo=None,
-                    subscription_validade=None,
-                )
-            )
     return items
 
 
@@ -185,3 +277,101 @@ async def resend_first_access_invite(
         app_base_url=app_base_url,
     )
     return PlatformResendInviteOut(message="Convite reenviado", email=admin_user.email)
+
+
+@router.post("/tenants/{tenant_id}/deactivate", response_model=PlatformTenantStatusOut)
+async def deactivate_tenant(
+    tenant_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise NotFoundError("Tenant não encontrado")
+
+    if tenant.is_active:
+        tenant.is_active = False
+        db.add(tenant)
+        await db.commit()
+
+    return PlatformTenantStatusOut(message="Tenant desativado", tenant_id=tenant.id, is_active=tenant.is_active)
+
+
+@router.post("/tenants/{tenant_id}/activate", response_model=PlatformTenantStatusOut)
+async def activate_tenant(
+    tenant_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise NotFoundError("Tenant não encontrado")
+
+    if not tenant.is_active:
+        tenant.is_active = True
+        db.add(tenant)
+        await db.commit()
+
+    return PlatformTenantStatusOut(message="Tenant ativado", tenant_id=tenant.id, is_active=tenant.is_active)
+
+
+@router.delete("/tenants/{tenant_id}", response_model=PlatformTenantDeletedOut)
+async def delete_tenant(
+    tenant_id: uuid.UUID,
+    confirm: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise NotFoundError("Tenant não encontrado")
+
+    if confirm != tenant.slug:
+        raise BadRequestError("Confirmação inválida. Envie ?confirm=<slug> para excluir.")
+
+    if tenant.is_active:
+        raise ForbiddenError("Desative o tenant antes de excluir.")
+
+    # Collect S3 keys before deleting DB rows (best-effort cleanup after commit).
+    keys = [k for (k,) in (await db.execute(select(Document.s3_key).where(Document.tenant_id == tenant_id))).all()]
+
+    # Collect user IDs for dependent cleanup (password resets).
+    user_ids = [uid for (uid,) in (await db.execute(select(User.id).where(User.tenant_id == tenant_id))).all()]
+
+    # Break circular FK: honorarios.comprovante_document_id -> documents.id
+    await db.execute(
+        update(Honorario)
+        .where(Honorario.tenant_id == tenant_id)
+        .values(comprovante_document_id=None)
+    )
+
+    if user_ids:
+        await db.execute(delete(PasswordReset).where(PasswordReset.user_id.in_(user_ids)))
+
+    await db.execute(delete(UserInvitation).where(UserInvitation.tenant_id == tenant_id))
+
+    # Business modules
+    from app.models.agenda_evento import AgendaEvento  # local import to avoid circulars
+    from app.models.tarefa import Tarefa  # local import to avoid circulars
+
+    await db.execute(delete(Tarefa).where(Tarefa.tenant_id == tenant_id))
+    await db.execute(delete(AgendaEvento).where(AgendaEvento.tenant_id == tenant_id))
+
+    await db.execute(delete(Document).where(Document.tenant_id == tenant_id))
+    await db.execute(delete(Honorario).where(Honorario.tenant_id == tenant_id))
+    await db.execute(delete(Process).where(Process.tenant_id == tenant_id))
+    await db.execute(delete(Parceria).where(Parceria.tenant_id == tenant_id))
+    await db.execute(delete(Client).where(Client.tenant_id == tenant_id))
+    await db.execute(delete(Subscription).where(Subscription.tenant_id == tenant_id))
+    await db.execute(delete(User).where(User.tenant_id == tenant_id))
+    await db.execute(delete(AuditLog).where(AuditLog.tenant_id == tenant_id))
+    await db.execute(delete(Tenant).where(Tenant.id == tenant_id))
+
+    await db.commit()
+
+    # Best-effort S3 cleanup (do not fail the request if storage is unavailable).
+    s3 = S3Service()
+    for key in keys:
+        try:
+            s3.delete_object(key=key)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("S3 delete failed for key=%s: %s", key, exc)
+
+    return PlatformTenantDeletedOut(message="Tenant excluído", tenant_id=tenant_id)

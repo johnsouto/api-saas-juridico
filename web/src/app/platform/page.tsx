@@ -24,6 +24,16 @@ type PlatformTenantListItem = {
   documento: string;
   slug: string;
   criado_em: string;
+  is_active: boolean;
+
+  admin_email: string | null;
+  admin_nome: string | null;
+  admin_is_active: boolean | null;
+
+  users_total: number;
+  users_active: number;
+  storage_used_bytes: number;
+
   plan_nome?: string | null;
   subscription_status?: string | null;
   subscription_ativo?: boolean | null;
@@ -41,6 +51,17 @@ type PlatformResendInviteOut = {
   email: string;
 };
 
+type PlatformTenantStatusOut = {
+  message: string;
+  tenant_id: string;
+  is_active: boolean;
+};
+
+type PlatformTenantDeletedOut = {
+  message: string;
+  tenant_id: string;
+};
+
 const createSchema = z.object({
   tenant_nome: z.string().min(2),
   tenant_tipo_documento: z.enum(["cpf", "cnpj"]).default("cnpj"),
@@ -53,15 +74,36 @@ const createSchema = z.object({
 });
 type CreateValues = z.infer<typeof createSchema>;
 
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const idx = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, idx);
+  const decimals = idx === 0 ? 0 : value < 10 ? 2 : 1;
+  return `${value.toFixed(decimals)} ${units[idx]}`;
+}
+
 export default function PlatformAdminPage() {
   const qc = useQueryClient();
   const [keyInput, setKeyInput] = useState("");
-  const [resendInfo, setResendInfo] = useState<string | null>(null);
+  const [actionInfo, setActionInfo] = useState<string | null>(null);
   const storedKey = useMemo(() => getPlatformAdminKey(), []);
 
+  const [q, setQ] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [ativo, setAtivo] = useState<"all" | "active" | "inactive">("all");
+
   const tenants = useQuery({
-    queryKey: ["platform-tenants"],
-    queryFn: async () => (await api.get<PlatformTenantListItem[]>("/v1/platform/tenants")).data,
+    queryKey: ["platform-tenants", { q, documento, adminEmail, ativo }],
+    queryFn: async () => {
+      const params: Record<string, any> = {};
+      if (q.trim()) params.q = q.trim();
+      if (documento.trim()) params.documento = documento.trim();
+      if (adminEmail.trim()) params.admin_email = adminEmail.trim();
+      if (ativo !== "all") params.is_active = ativo === "active";
+      return (await api.get<PlatformTenantListItem[]>("/v1/platform/tenants", { params })).data;
+    },
     enabled: !!storedKey,
     retry: false
   });
@@ -99,7 +141,29 @@ export default function PlatformAdminPage() {
   const resendInvite = useMutation({
     mutationFn: async (tenantId: string) => (await api.post<PlatformResendInviteOut>(`/v1/platform/tenants/${tenantId}/resend-invite`)).data,
     onSuccess: async (data) => {
-      setResendInfo(`Convite reenviado para ${data.email}`);
+      setActionInfo(`Convite reenviado para ${data.email}`);
+      await qc.invalidateQueries({ queryKey: ["platform-tenants"] });
+    }
+  });
+
+  const setTenantActive = useMutation({
+    mutationFn: async ({ tenantId, active }: { tenantId: string; active: boolean }) => {
+      const url = active
+        ? `/v1/platform/tenants/${tenantId}/activate`
+        : `/v1/platform/tenants/${tenantId}/deactivate`;
+      return (await api.post<PlatformTenantStatusOut>(url)).data;
+    },
+    onSuccess: async (data) => {
+      setActionInfo(data.message);
+      await qc.invalidateQueries({ queryKey: ["platform-tenants"] });
+    }
+  });
+
+  const deleteTenant = useMutation({
+    mutationFn: async ({ tenantId, confirm }: { tenantId: string; confirm: string }) =>
+      (await api.delete<PlatformTenantDeletedOut>(`/v1/platform/tenants/${tenantId}`, { params: { confirm } })).data,
+    onSuccess: async (data) => {
+      setActionInfo(data.message);
       await qc.invalidateQueries({ queryKey: ["platform-tenants"] });
     }
   });
@@ -281,22 +345,62 @@ export default function PlatformAdminPage() {
         <CardContent>
           {!storedKey ? <p className="text-sm text-zinc-600">Informe a chave para carregar a lista.</p> : null}
           {tenants.isLoading ? <p className="text-sm text-zinc-600">Carregando…</p> : null}
-          {resendInfo ? <p className="mt-2 text-sm text-emerald-700">{resendInfo}</p> : null}
+          {actionInfo ? <p className="mt-2 text-sm text-emerald-700">{actionInfo}</p> : null}
           {resendInvite.isError ? (
             <p className="mt-2 text-sm text-red-600">
               {(resendInvite.error as any)?.response?.data?.detail ?? "Erro ao reenviar convite"}
             </p>
           ) : null}
+          {setTenantActive.isError ? (
+            <p className="mt-2 text-sm text-red-600">
+              {(setTenantActive.error as any)?.response?.data?.detail ?? "Erro ao alterar status do tenant"}
+            </p>
+          ) : null}
+          {deleteTenant.isError ? (
+            <p className="mt-2 text-sm text-red-600">
+              {(deleteTenant.error as any)?.response?.data?.detail ?? "Erro ao excluir tenant"}
+            </p>
+          ) : null}
           {tenants.data ? (
             <div className="mt-3 overflow-x-auto">
+              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+                <div className="space-y-1">
+                  <Label>Busca geral</Label>
+                  <Input
+                    placeholder="Nome, slug, documento ou email"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Documento (CPF/CNPJ)</Label>
+                  <Input placeholder="Ex: 12345678900" value={documento} onChange={(e) => setDocumento(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Email (admin)</Label>
+                  <Input placeholder="Ex: admin@dominio.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Ativo</Label>
+                  <Select value={ativo} onChange={(e) => setAtivo(e.target.value as any)}>
+                    <option value="all">Todos</option>
+                    <option value="active">Ativos</option>
+                    <option value="inactive">Inativos</option>
+                  </Select>
+                </div>
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Slug</TableHead>
                     <TableHead>Doc</TableHead>
+                    <TableHead>Admin</TableHead>
+                    <TableHead>Usuários</TableHead>
+                    <TableHead>Armazenamento</TableHead>
                     <TableHead>Plano</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Ativo</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -308,8 +412,14 @@ export default function PlatformAdminPage() {
                       <TableCell className="font-mono text-xs">
                         {t.tipo_documento}:{t.documento}
                       </TableCell>
+                      <TableCell className="font-mono text-xs">{t.admin_email ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {t.users_active}/{t.users_total}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{formatBytes(t.storage_used_bytes)}</TableCell>
                       <TableCell>{t.plan_nome ?? "—"}</TableCell>
                       <TableCell>{t.subscription_status ?? "—"}</TableCell>
+                      <TableCell className={t.is_active ? "text-emerald-700" : "text-red-700"}>{t.is_active ? "ativo" : "inativo"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -321,10 +431,39 @@ export default function PlatformAdminPage() {
                           >
                             {resendInvite.isPending ? "Enviando..." : "Reenviar convite"}
                           </Button>
+                          <Button
+                            size="sm"
+                            variant={t.is_active ? "outline" : "secondary"}
+                            disabled={!storedKey || setTenantActive.isPending}
+                            type="button"
+                            onClick={() => setTenantActive.mutate({ tenantId: t.id, active: !t.is_active })}
+                          >
+                            {setTenantActive.isPending ? "Salvando..." : t.is_active ? "Desativar" : "Ativar"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={!storedKey || t.is_active || deleteTenant.isPending}
+                            type="button"
+                            onClick={() => {
+                              const typed = window.prompt(
+                                `Para EXCLUIR este tenant, digite o slug exatamente como aparece:\n\n${t.slug}\n\n(ação irreversível)`
+                              );
+                              if (!typed) return;
+                              if (typed.trim() !== t.slug) {
+                                window.alert("Slug não confere. Exclusão cancelada.");
+                                return;
+                              }
+                              deleteTenant.mutate({ tenantId: t.id, confirm: typed.trim() });
+                            }}
+                          >
+                            Excluir
+                          </Button>
                           <Button asChild size="sm" variant="outline">
                             <Link href={`/dashboard/${t.slug}`}>Dashboard</Link>
                           </Button>
                         </div>
+                        {t.is_active ? <p className="mt-1 text-xs text-zinc-500">Para excluir, desative primeiro.</p> : null}
                       </TableCell>
                     </TableRow>
                   ))}

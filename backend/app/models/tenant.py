@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Enum, String
+from sqlalchemy import Boolean, Enum, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +14,7 @@ class Tenant(UUIDBaseMixin, Base):
     __tablename__ = "tenants"
 
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Legacy (kept for backward-compatibility / existing DBs). New tenants may not have CNPJ.
     cnpj: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True, index=True)
     tipo_documento: Mapped[TenantDocumentoTipo] = mapped_column(

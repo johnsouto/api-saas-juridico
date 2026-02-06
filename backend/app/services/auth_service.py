@@ -41,12 +41,17 @@ class AuthService:
     plan_limit_service: PlanLimitService
 
     async def authenticate(self, db: AsyncSession, *, email: str, password: str) -> tuple[User, str, str]:
-        stmt = select(User).where(User.email == email)
-        user = (await db.execute(stmt)).scalar_one_or_none()
-        if not user or not user.is_active:
+        stmt = select(User, Tenant.is_active).join(Tenant, Tenant.id == User.tenant_id).where(User.email == email)
+        row = (await db.execute(stmt)).first()
+        if not row:
+            raise AuthError("Credenciais inválidas")
+        user, tenant_is_active = row
+        if not user.is_active:
             raise AuthError("Credenciais inválidas")
         if not verify_password(password, user.senha_hash):
             raise AuthError("Credenciais inválidas")
+        if not tenant_is_active:
+            raise AuthError("Escritório desativado")
 
         access = create_access_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role.value)
         refresh = create_refresh_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role.value)
@@ -58,9 +63,12 @@ class AuthService:
             raise AuthError("Refresh token inválido")
 
         user_id = payload.get("sub")
-        stmt = select(User).where(User.id == uuid.UUID(user_id))
-        user = (await db.execute(stmt)).scalar_one_or_none()
-        if not user or not user.is_active:
+        stmt = select(User, Tenant.is_active).join(Tenant, Tenant.id == User.tenant_id).where(User.id == uuid.UUID(user_id))
+        row = (await db.execute(stmt)).first()
+        if not row:
+            raise AuthError("Usuário inválido")
+        user, tenant_is_active = row
+        if not user.is_active or not tenant_is_active:
             raise AuthError("Usuário inválido")
 
         access = create_access_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role.value)
@@ -175,6 +183,12 @@ class AuthService:
         if inv.expires_at < _utcnow():
             raise AuthError("Convite expirado")
 
+        tenant_active = (await db.execute(select(Tenant.is_active).where(Tenant.id == inv.tenant_id))).scalar_one_or_none()
+        if tenant_active is False:
+            raise AuthError("Escritório desativado")
+        if tenant_active is None:
+            raise AuthError("Convite inválido")
+
         # Enforce plan limit again at accept time (race-safe).
         await self.plan_limit_service.enforce_user_limit(db, tenant_id=inv.tenant_id)
 
@@ -224,9 +238,12 @@ class AuthService:
         email: str,
         app_base_url: str,
     ) -> None:
-        stmt = select(User).where(User.email == email)
-        user = (await db.execute(stmt)).scalar_one_or_none()
-        if not user or not user.is_active:
+        stmt = select(User, Tenant.is_active).join(Tenant, Tenant.id == User.tenant_id).where(User.email == email)
+        row = (await db.execute(stmt)).first()
+        if not row:
+            return
+        user, tenant_is_active = row
+        if not user.is_active or not tenant_is_active:
             # Intentionally do not reveal whether the email exists.
             return
 

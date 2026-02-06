@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.models.enums import UserRole
+from app.models.tenant import Tenant
 from app.models.user import User
 
 
@@ -38,9 +39,12 @@ async def get_current_user(
     if not user_id:
         raise AuthError("Token inválido")
 
-    stmt = select(User).where(User.id == uuid.UUID(str(user_id)))
-    user = (await db.execute(stmt)).scalar_one_or_none()
-    if not user or not user.is_active:
+    stmt = select(User, Tenant.is_active).join(Tenant, Tenant.id == User.tenant_id).where(User.id == uuid.UUID(str(user_id)))
+    row = (await db.execute(stmt)).first()
+    if not row:
+        raise AuthError("Token inválido")
+    user, tenant_is_active = row
+    if not user.is_active or not tenant_is_active:
         raise AuthError("Token inválido")
 
     # Make actor / tenant available to the audit listener via the sync session.

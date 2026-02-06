@@ -48,6 +48,16 @@ class PlatformTenantListItem(APIModel):
     documento: str
     slug: str
     criado_em: datetime
+    is_active: bool
+
+    admin_email: EmailStr | None = None
+    admin_nome: str | None = None
+    admin_is_active: bool | None = None
+
+    users_total: int = 0
+    users_active: int = 0
+    storage_used_bytes: int = 0
+
     plan_nome: str | None
     subscription_status: str | None
     subscription_ativo: bool | None
@@ -57,3 +67,14 @@ class PlatformTenantListItem(APIModel):
 class PlatformResendInviteOut(APIModel):
     message: str
     email: EmailStr
+
+
+class PlatformTenantStatusOut(APIModel):
+    message: str
+    tenant_id: uuid.UUID
+    is_active: bool
+
+
+class PlatformTenantDeletedOut(APIModel):
+    message: str
+    tenant_id: uuid.UUID
