@@ -40,7 +40,16 @@ jobs:
           mkdir -p ~/.ssh
           if [ -n "${VPS_SSH_KEY_B64:-}" ]; then
             # Recommended: store the SSH key as a single-line base64 secret to avoid newline issues.
-            printf "%s" "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
+            # We also strip whitespace because some copy/paste flows introduce spaces/newlines.
+            CLEAN_B64="$(printf "%s" "$VPS_SSH_KEY_B64" | tr -d ' \n\t\r')"
+            if ! printf "%s" "$CLEAN_B64" | base64 -d > ~/.ssh/id_ed25519; then
+              echo "Warning: VPS_SSH_KEY_B64 is invalid base64. Falling back to VPS_SSH_KEY."
+              if [ -z "${VPS_SSH_KEY:-}" ]; then
+                echo "VPS_SSH_KEY is missing; cannot continue."
+                exit 1
+              fi
+              printf "%s\n" "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+            fi
           else
             # Fallback: multiline key (can be fragile depending on copy/paste).
             printf "%s\n" "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
