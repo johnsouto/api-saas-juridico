@@ -84,7 +84,7 @@ export default function LoginPage() {
       <Card>
         <CardHeader>
           <CardTitle>Entrar</CardTitle>
-          <CardDescription>Use o usuário seed: admin@demo.local / admin12345</CardDescription>
+          <CardDescription>Acesso restrito e criptografado para profissionais autorizados</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-3" onSubmit={form.handleSubmit((v) => login.mutate(v))}>
