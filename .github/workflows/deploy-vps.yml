@@ -56,12 +56,30 @@ jobs:
           fi
           chmod 600 ~/.ssh/id_ed25519
 
+          echo "Validating SSH private key format..."
           # Validate the key format early to avoid a confusing ssh exit code 255 later.
-          ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null
+          # Never print the key contents in logs.
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+            echo "SSH key validation failed. Please re-check the VPS_SSH_KEY secret (must be an OpenSSH private key)."
+            exit 1
+          fi
 
           # Add VPS host key (simple approach).
           # If you want stricter security, replace this with a pinned known_hosts entry.
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          echo "Fetching VPS host key via ssh-keyscan..."
+          for i in {1..5}; do
+            if ssh-keyscan -T 10 -H "$VPS_HOST" >> ~/.ssh/known_hosts; then
+              break
+            fi
+            echo "ssh-keyscan failed (attempt ${i}/5). Retrying..."
+            sleep 2
+          done
+
+          # Ensure we actually recorded a host key; otherwise SSH will fail with StrictHostKeyChecking=yes.
+          if ! ssh-keygen -F "$VPS_HOST" >/dev/null 2>&1; then
+            echo "Failed to add VPS host key to known_hosts. Check that port 22 is reachable from GitHub Actions."
+            exit 1
+          fi
 
       - name: Deploy
         shell: bash
