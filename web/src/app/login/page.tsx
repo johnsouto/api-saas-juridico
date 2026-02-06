@@ -83,8 +83,8 @@ export default function LoginPage() {
     <main className="mx-auto max-w-md p-6">
       <Card>
         <CardHeader>
-          <CardTitle>Entrar</CardTitle>
-          <CardDescription>Acesso restrito e criptografado para profissionais autorizados</CardDescription>
+          <CardTitle>Login</CardTitle>
+          <CardDescription>Seu escritório seguro em qualquer lugar</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-3" onSubmit={form.handleSubmit((v) => login.mutate(v))}>
