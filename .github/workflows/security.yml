@@ -4,6 +4,10 @@ on:
   push:
     branches: ["main"]
   pull_request: {}
+  schedule:
+    # Daily safety net: catches new CVEs even when nobody pushes code.
+    - cron: "17 3 * * *" # 03:17 UTC
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -44,6 +48,35 @@ jobs:
           set -euo pipefail
           pip-audit -r backend/requirements.txt
 
+  node-security:
+    name: Dependency Audit (Node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        shell: bash
+        working-directory: web
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: npm audit (production only)
+        shell: bash
+        working-directory: web
+        run: |
+          set -euo pipefail
+          npm audit --omit=dev --audit-level=high
+
   secret-scanning:
     name: Secret Scanning (gitleaks)
     runs-on: ubuntu-latest
@@ -58,6 +91,38 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Keep logs safe: redact any detected secrets.
-          # (The action reads args from env rather than `with:` inputs.)
-          GITLEAKS_ARGS: --redact --verbose --no-banner
+          # Avoid needing extra permissions (PR comments) and reduce noise.
+          GITLEAKS_ENABLE_COMMENTS: "false"
+
+  container-scan:
+    name: Container Image Scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build images
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -t juridico-saas-api:ci ./backend
+          docker build -t juridico-saas-web:ci ./web
+
+      - name: Trivy scan (API image)
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: juridico-saas-api:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Trivy scan (Web image)
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: juridico-saas-web:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
