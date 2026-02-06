@@ -117,6 +117,8 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
+          # OS scan complements pip-audit; avoids duplicating Python dep checks here.
+          vuln-type: os
 
       - name: Trivy scan (Web image)
         uses: aquasecurity/trivy-action@0.30.0
@@ -126,3 +128,5 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
+          # OS scan complements npm audit; avoids duplicating Node dep checks here.
+          vuln-type: os
