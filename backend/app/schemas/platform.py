@@ -50,7 +50,8 @@ class PlatformTenantListItem(APIModel):
     criado_em: datetime
     is_active: bool
 
-    admin_email: EmailStr | None = None
+    # Output should not 500 if legacy/seed data uses a non-deliverable domain (e.g. *.local).
+    admin_email: str | None = None
     admin_nome: str | None = None
     admin_is_active: bool | None = None
 
@@ -66,7 +67,8 @@ class PlatformTenantListItem(APIModel):
 
 class PlatformResendInviteOut(APIModel):
     message: str
-    email: EmailStr
+    # Output should not 500 if legacy/seed data uses a non-deliverable domain (e.g. *.local).
+    email: str
 
 
 class PlatformTenantStatusOut(APIModel):
