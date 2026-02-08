@@ -18,7 +18,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models.enums import SubscriptionStatus, TenantDocumentoTipo, UserRole
+from app.models.enums import BillingProvider, PlanCode, SubscriptionStatus, TenantDocumentoTipo, UserRole
 from app.models.password_reset import PasswordReset
 from app.models.plan import Plan
 from app.models.subscription import Subscription
@@ -90,7 +90,7 @@ class AuthService:
     ) -> tuple[Tenant, User, str, str]:
         tenant_slug = normalize_slug(tenant_slug)
 
-        plan_stmt = select(Plan).where(Plan.nome == "Free")
+        plan_stmt = select(Plan).where(Plan.code == PlanCode.FREE)
         free_plan = (await db.execute(plan_stmt)).scalar_one_or_none()
         if not free_plan:
             raise NotFoundError("Plano Free não encontrado. Rode o seed.")
@@ -114,10 +114,15 @@ class AuthService:
         )
         sub = Subscription(
             tenant_id=tenant.id,
-            plan_id=free_plan.id,
-            status=SubscriptionStatus.active,
-            ativo=True,
-            validade=None,
+            plan_code=free_plan.code,
+            status=SubscriptionStatus.free,
+            provider=BillingProvider.FAKE,
+            current_period_start=None,
+            current_period_end=None,
+            grace_period_end=None,
+            cancel_at_period_end=False,
+            last_payment_at=None,
+            last_payment_status=None,
         )
 
         db.add_all([admin, sub])

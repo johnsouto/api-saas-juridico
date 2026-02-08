@@ -6,6 +6,8 @@ from app.api.deps import require_platform_admin
 from app.api.v1.endpoints import (
     agenda_eventos,
     auth,
+    billing,
+    billing_webhooks,
     clients,
     documents,
     honorarios,
@@ -23,10 +25,12 @@ from app.api.v1.endpoints import (
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(billing_webhooks.router, prefix="/billing", tags=["billing-webhooks"])
 api_router.include_router(platform.router, prefix="/platform", tags=["platform"], dependencies=[Depends(require_platform_admin)])
 api_router.include_router(tenants.router, prefix="/tenants", tags=["tenants"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(users.router, prefix="/users", tags=["users"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(plans.router, prefix="/plans", tags=["plans"], dependencies=[Depends(get_tenant_context)])
+api_router.include_router(billing.router, prefix="/billing", tags=["billing"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(clients.router, prefix="/clients", tags=["clients"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(parcerias.router, prefix="/parcerias", tags=["parcerias"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(processes.router, prefix="/processes", tags=["processes"], dependencies=[Depends(get_tenant_context)])

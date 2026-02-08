@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import EmailStr
 
@@ -10,7 +11,8 @@ from app.schemas.common import APIModel
 from app.schemas.tenant import TenantOut
 from app.schemas.token import TokenPair
 from app.schemas.user import UserOut
-from app.models.enums import TenantDocumentoTipo
+from app.schemas.subscription import SubscriptionOut
+from app.models.enums import PlanCode, SubscriptionStatus, TenantDocumentoTipo
 
 
 class PlatformTenantCreate(TenantRegisterRequest):
@@ -59,10 +61,12 @@ class PlatformTenantListItem(APIModel):
     users_active: int = 0
     storage_used_bytes: int = 0
 
-    plan_nome: str | None
-    subscription_status: str | None
-    subscription_ativo: bool | None
-    subscription_validade: datetime | None
+    plan_code: PlanCode | None = None
+    plan_nome: str | None = None
+    subscription_status: SubscriptionStatus | None = None
+    current_period_end: datetime | None = None
+    grace_period_end: datetime | None = None
+    provider: str | None = None
 
 
 class PlatformResendInviteOut(APIModel):
@@ -80,3 +84,19 @@ class PlatformTenantStatusOut(APIModel):
 class PlatformTenantDeletedOut(APIModel):
     message: str
     tenant_id: uuid.UUID
+
+
+class PlatformBillingEventOut(APIModel):
+    id: uuid.UUID
+    criado_em: datetime
+    provider: str
+    event_type: str
+    external_id: str | None = None
+    payload_json: dict[str, Any]
+
+
+class PlatformTenantDetailOut(APIModel):
+    tenant: TenantOut
+    admin_users: list[UserOut]
+    subscription: SubscriptionOut | None = None
+    billing_events: list[PlatformBillingEventOut] = []

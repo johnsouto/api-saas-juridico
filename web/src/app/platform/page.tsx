@@ -34,10 +34,12 @@ type PlatformTenantListItem = {
   users_active: number;
   storage_used_bytes: number;
 
+  plan_code?: "FREE" | "PLUS_MONTHLY_CARD" | "PLUS_ANNUAL_PIX" | null;
   plan_nome?: string | null;
   subscription_status?: string | null;
-  subscription_ativo?: boolean | null;
-  subscription_validade?: string | null;
+  current_period_end?: string | null;
+  grace_period_end?: string | null;
+  provider?: string | null;
 };
 
 type PlatformTenantCreatedOut = {
@@ -81,6 +83,13 @@ function formatBytes(bytes: number): string {
   const value = bytes / Math.pow(1024, idx);
   const decimals = idx === 0 ? 0 : value < 10 ? 2 : 1;
   return `${value.toFixed(decimals)} ${units[idx]}`;
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR");
 }
 
 export default function PlatformAdminPage() {
@@ -399,7 +408,8 @@ export default function PlatformAdminPage() {
                     <TableHead>Usuários</TableHead>
                     <TableHead>Armazenamento</TableHead>
                     <TableHead>Plano</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Billing</TableHead>
+                    <TableHead>Datas</TableHead>
                     <TableHead>Ativo</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -417,8 +427,24 @@ export default function PlatformAdminPage() {
                         {t.users_active}/{t.users_total}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{formatBytes(t.storage_used_bytes)}</TableCell>
-                      <TableCell>{t.plan_nome ?? "—"}</TableCell>
-                      <TableCell>{t.subscription_status ?? "—"}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span>{t.plan_nome ?? t.plan_code ?? "—"}</span>
+                          {t.plan_code ? <span className="font-mono text-xs text-zinc-500">{t.plan_code}</span> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <div className="flex flex-col">
+                          <span>{t.subscription_status ?? "—"}</span>
+                          <span className="text-zinc-500">{t.provider ?? "—"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <div className="flex flex-col">
+                          <span>Vence: {formatDateTime(t.current_period_end)}</span>
+                          <span className="text-zinc-500">Carência: {formatDateTime(t.grace_period_end)}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className={t.is_active ? "text-emerald-700" : "text-red-700"}>{t.is_active ? "ativo" : "inativo"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

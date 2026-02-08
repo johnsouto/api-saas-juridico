@@ -66,3 +66,14 @@ class EmailService:
         subject = "Redefinição de senha"
         body = f"Para redefinir sua senha, acesse:\n{reset_link}\n\nSe não foi você, ignore."
         self._enqueue_or_log(background, subject, [to_email], body)
+
+    def send_generic_email(self, background: BackgroundTasks, *, to_emails: list[str], subject: str, body: str) -> None:
+        """
+        Generic transactional email helper (plain text).
+
+        Used by billing notifications and other operator flows.
+        """
+        recipients = [e for e in to_emails if e]
+        if not recipients:
+            return
+        self._enqueue_or_log(background, subject, recipients, body)

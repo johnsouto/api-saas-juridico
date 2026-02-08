@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
+from app.models.billing_event import BillingEvent
 from app.models.client import Client
 from app.models.document import Document
 from app.models.honorario import Honorario
@@ -24,10 +25,12 @@ from app.models.user import User
 from app.models.user_invitation import UserInvitation
 from app.models.enums import UserRole
 from app.schemas.platform import (
+    PlatformBillingEventOut,
     PlatformResendInviteOut,
     PlatformTenantCreate,
     PlatformTenantCreatedOut,
     PlatformTenantDeletedOut,
+    PlatformTenantDetailOut,
     PlatformTenantListItem,
     PlatformTenantStatusOut,
     PlatformTrialTenantCreate,
@@ -36,9 +39,11 @@ from app.schemas.tenant import TenantOut
 from app.schemas.token import TokenPair
 from app.schemas.user import UserOut
 from app.services.auth_service import AuthService
+from app.services.billing_service import BillingService
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
 from app.services.platform_service import PlatformService
+from app.services.payment_service import get_payment_provider
 from app.services.s3_service import S3Service
 
 
@@ -104,17 +109,15 @@ async def list_tenants(
 
     tenant_ids = [t.id for t in tenants]
 
-    # Latest subscription + plan per tenant
+    # Subscription + plan per tenant (1 row per tenant)
     sub_stmt = (
         select(Subscription, Plan)
-        .join(Plan, Plan.id == Subscription.plan_id)
+        .join(Plan, Plan.code == Subscription.plan_code)
         .where(Subscription.tenant_id.in_(tenant_ids))
-        .order_by(Subscription.tenant_id.asc(), Subscription.criado_em.desc())
     )
-    latest_sub: dict[uuid.UUID, tuple[Subscription, Plan]] = {}
+    sub_by_tenant: dict[uuid.UUID, tuple[Subscription, Plan]] = {}
     for sub, plan in (await db.execute(sub_stmt)).all():
-        if sub.tenant_id not in latest_sub:
-            latest_sub[sub.tenant_id] = (sub, plan)
+        sub_by_tenant[sub.tenant_id] = (sub, plan)
 
     # Oldest admin per tenant (default contact)
     admin_stmt = (
@@ -152,7 +155,7 @@ async def list_tenants(
 
     items: list[PlatformTenantListItem] = []
     for t in tenants:
-        sub, plan = latest_sub.get(t.id, (None, None))  # type: ignore[assignment]
+        sub, plan = sub_by_tenant.get(t.id, (None, None))  # type: ignore[assignment]
         admin = admin_by_tenant.get(t.id)
         total_users, active_users = users_counts.get(t.id, (0, 0))
         storage_used = storage_by_tenant.get(t.id, 0)
@@ -173,13 +176,70 @@ async def list_tenants(
                 users_total=total_users,
                 users_active=active_users,
                 storage_used_bytes=storage_used,
+                plan_code=sub.plan_code if sub else None,
                 plan_nome=plan.nome if plan else None,
-                subscription_status=sub.status.value if sub and hasattr(sub.status, "value") else (str(sub.status) if sub else None),
-                subscription_ativo=sub.ativo if sub else None,
-                subscription_validade=sub.validade if sub else None,
+                subscription_status=sub.status if sub else None,
+                current_period_end=sub.current_period_end if sub else None,
+                grace_period_end=sub.grace_period_end if sub else None,
+                provider=sub.provider.value if sub else None,
             )
         )
     return items
+
+
+@router.get("/tenants/{tenant_id}", response_model=PlatformTenantDetailOut)
+async def tenant_detail(
+    tenant_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Tenant details for support (includes recent billing events).
+    """
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise NotFoundError("Tenant não encontrado")
+
+    admins = (
+        await db.execute(
+            select(User)
+            .where(User.tenant_id == tenant_id)
+            .where(User.role == UserRole.admin)
+            .order_by(User.criado_em.asc())
+        )
+    ).scalars().all()
+
+    sub = (await db.execute(select(Subscription).where(Subscription.tenant_id == tenant_id))).scalar_one_or_none()
+
+    events = (
+        await db.execute(
+            select(BillingEvent)
+            .where(BillingEvent.tenant_id == tenant_id)
+            .order_by(BillingEvent.criado_em.desc())
+            .limit(20)
+        )
+    ).scalars().all()
+
+    return PlatformTenantDetailOut(
+        tenant=TenantOut.model_validate(tenant),
+        admin_users=[UserOut.model_validate(u) for u in admins],
+        subscription=sub,  # parsed via from_attributes
+        billing_events=[PlatformBillingEventOut.model_validate(e) for e in events],
+    )
+
+
+@router.post("/billing/maintenance")
+async def billing_maintenance(
+    background: BackgroundTasks,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Scheduled billing maintenance (expiration/grace handling + emails).
+
+    This is intentionally under /platform and protected by PLATFORM_ADMIN_KEY
+    so a cron job can call it.
+    """
+    billing = BillingService(provider=get_payment_provider(), email_service=EmailService())
+    return await billing.run_scheduled_maintenance(db, background)
 
 
 @router.post("/tenants", response_model=PlatformTenantCreatedOut)

@@ -99,6 +99,9 @@ services:
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SaaS Juridico}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
       PLATFORM_ADMIN_KEY: ${PLATFORM_ADMIN_KEY:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}
+      BILLING_PROVIDER: ${BILLING_PROVIDER:-FAKE}
+      BILLING_WEBHOOK_SECRET: ${BILLING_WEBHOOK_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy

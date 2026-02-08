@@ -26,7 +26,7 @@ class Tenant(UUIDBaseMixin, Base):
     slug: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
 
     users: Mapped[list["User"]] = relationship(back_populates="tenant")
-    subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="tenant")
+    subscription: Mapped["Subscription" | None] = relationship(back_populates="tenant", uselist=False)
 
 
 from app.models.subscription import Subscription  # noqa: E402

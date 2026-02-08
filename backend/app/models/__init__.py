@@ -1,8 +1,9 @@
 from app.models.agenda_evento import AgendaEvento
 from app.models.audit_log import AuditLog
+from app.models.billing_event import BillingEvent
 from app.models.client import Client
 from app.models.document import Document
-from app.models.enums import HonorarioStatus, SubscriptionStatus, TarefaStatus, UserRole
+from app.models.enums import BillingPeriod, BillingProvider, HonorarioStatus, PlanCode, SubscriptionStatus, TarefaStatus, UserRole
 from app.models.honorario import Honorario
 from app.models.parceria import Parceria
 from app.models.password_reset import PasswordReset
@@ -17,6 +18,9 @@ from app.models.user_invitation import UserInvitation
 __all__ = [
     "AgendaEvento",
     "AuditLog",
+    "BillingEvent",
+    "BillingPeriod",
+    "BillingProvider",
     "Client",
     "Document",
     "Honorario",
@@ -24,6 +28,7 @@ __all__ = [
     "Parceria",
     "PasswordReset",
     "Plan",
+    "PlanCode",
     "Process",
     "Subscription",
     "SubscriptionStatus",

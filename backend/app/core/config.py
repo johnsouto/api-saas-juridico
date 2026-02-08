@@ -42,9 +42,17 @@ class Settings(BaseSettings):
 
     SEED_ON_STARTUP: bool = True
 
+    # Public URL of the web app (used to build email links).
+    # Example (prod): https://elementojuris.cloud
+    PUBLIC_APP_URL: str = "http://localhost"
+
     # Platform-level super-admin key (for provisioning tenants).
     # If empty/None, platform endpoints will be disabled.
     PLATFORM_ADMIN_KEY: str | None = None
+
+    # Billing
+    BILLING_PROVIDER: str = "FAKE"  # FAKE | STRIPE | MERCADOPAGO
+    BILLING_WEBHOOK_SECRET: str | None = None
 
     def cors_origins_list(self) -> list[str]:
         try:

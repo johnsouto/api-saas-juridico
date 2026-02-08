@@ -20,7 +20,7 @@ router = APIRouter()
 
 @router.get("", response_model=list[PlanOut])
 async def list_plans(db: Annotated[AsyncSession, Depends(get_db)]):
-    stmt = select(Plan).order_by(Plan.price.asc())
+    stmt = select(Plan).order_by(Plan.price_cents.asc())
     return list((await db.execute(stmt)).scalars().all())
 
 
@@ -29,13 +29,6 @@ async def current_subscription(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    stmt = (
-        select(Subscription)
-        .where(Subscription.tenant_id == user.tenant_id)
-        .where(Subscription.ativo.is_(True))
-        .order_by(Subscription.criado_em.desc())
-        .limit(1)
-    )
+    stmt = select(Subscription).where(Subscription.tenant_id == user.tenant_id)
     sub = (await db.execute(stmt)).scalar_one()
     return sub
-
