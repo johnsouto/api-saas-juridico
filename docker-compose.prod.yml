@@ -1,0 +1,33 @@
+services:
+  traefik:
+    # Production-only Traefik settings:
+    # - HTTP -> HTTPS redirect
+    # - Let's Encrypt certificates (HTTP-01 challenge)
+    #
+    # IMPORTANT:
+    # We intentionally do NOT override the `api`/`web` router labels here.
+    # Those live in `docker-compose.yml` and ensure `/api/*` routes to FastAPI.
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      # Use the `le` resolver by default for all TLS routers.
+      - --entrypoints.websecure.http.tls.certresolver=le
+      - --accesslog=true
+      - --log.level=INFO
+      - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+
+volumes:
+  traefik_letsencrypt:
+
