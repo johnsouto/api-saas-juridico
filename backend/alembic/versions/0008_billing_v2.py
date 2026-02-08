@@ -110,11 +110,19 @@ def upgrade() -> None:
     op.execute(
         f"""
         INSERT INTO plans (id, criado_em, atualizado_em, code, nome, max_users, max_storage_mb, price, price_cents, currency, billing_period)
-        SELECT '{monthly_id}'::uuid, NOW(), NOW(),
-               'PLUS_MONTHLY_CARD', 'Plus Mensal (Cartão)',
-               20, 5000,
-               47.00, 4700, 'BRL', 'MONTHLY'
-        WHERE NOT EXISTS (SELECT 1 FROM plans WHERE code = 'PLUS_MONTHLY_CARD')
+        VALUES ('{monthly_id}'::uuid, NOW(), NOW(),
+                'PLUS_MONTHLY_CARD', 'Plus Mensal (Cartão)',
+                20, 5000,
+                47.00, 4700, 'BRL', 'MONTHLY')
+        ON CONFLICT (nome) DO UPDATE
+          SET code = EXCLUDED.code,
+              max_users = EXCLUDED.max_users,
+              max_storage_mb = EXCLUDED.max_storage_mb,
+              price = EXCLUDED.price,
+              price_cents = EXCLUDED.price_cents,
+              currency = EXCLUDED.currency,
+              billing_period = EXCLUDED.billing_period,
+              atualizado_em = NOW()
         """
     )
 
@@ -123,11 +131,19 @@ def upgrade() -> None:
     op.execute(
         f"""
         INSERT INTO plans (id, criado_em, atualizado_em, code, nome, max_users, max_storage_mb, price, price_cents, currency, billing_period)
-        SELECT '{annual_id}'::uuid, NOW(), NOW(),
-               'PLUS_ANNUAL_PIX', 'Plus Anual (Pix)',
-               30, 8000,
-               499.00, 49900, 'BRL', 'YEARLY'
-        WHERE NOT EXISTS (SELECT 1 FROM plans WHERE code = 'PLUS_ANNUAL_PIX')
+        VALUES ('{annual_id}'::uuid, NOW(), NOW(),
+                'PLUS_ANNUAL_PIX', 'Plus Anual (Pix)',
+                30, 8000,
+                499.00, 49900, 'BRL', 'YEARLY')
+        ON CONFLICT (nome) DO UPDATE
+          SET code = EXCLUDED.code,
+              max_users = EXCLUDED.max_users,
+              max_storage_mb = EXCLUDED.max_storage_mb,
+              price = EXCLUDED.price,
+              price_cents = EXCLUDED.price_cents,
+              currency = EXCLUDED.currency,
+              billing_period = EXCLUDED.billing_period,
+              atualizado_em = NOW()
         """
     )
 
