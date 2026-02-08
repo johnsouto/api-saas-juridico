@@ -24,10 +24,13 @@ services:
       - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.le.acme.httpchallenge=true
       - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      # Domains for which Traefik should request certificates.
+      # This avoids having to hardcode Host() rules in routers for production.
+      - --certificatesresolvers.le.acme.domains[0].main=${TRAEFIK_DOMAIN:-elementojuris.cloud}
+      - --certificatesresolvers.le.acme.domains[0].sans=www.${TRAEFIK_DOMAIN:-elementojuris.cloud}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_letsencrypt:/letsencrypt
 
 volumes:
   traefik_letsencrypt:
-
