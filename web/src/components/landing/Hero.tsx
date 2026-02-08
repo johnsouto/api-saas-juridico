@@ -37,7 +37,7 @@ export function Hero() {
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link
-                href="/login?mode=register"
+                href="/login?mode=register&next=/dashboard"
                 className={cn(
                   "inline-flex items-center justify-center gap-2 rounded-md bg-[#234066] px-5 py-3 text-sm font-semibold text-white",
                   "shadow-[0_0_44px_rgba(35,64,102,0.35)] hover:bg-[#234066]/90 hover:shadow-[0_0_64px_rgba(35,64,102,0.48)]",
@@ -100,4 +100,3 @@ export function Hero() {
     </Section>
   );
 }
-

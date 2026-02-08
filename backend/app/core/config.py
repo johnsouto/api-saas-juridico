@@ -13,7 +13,8 @@ class Settings(BaseSettings):
 
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Kept short on purpose. Access tokens are refreshed using the HttpOnly refresh cookie.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 20
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS_ORIGINS can be a JSON array string: ["http://localhost","https://localhost"]

@@ -1,56 +1,74 @@
 import axios from "axios";
 
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "@/lib/auth";
 import { getPlatformAdminKey } from "@/lib/platformAuth";
 
-export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api"
-});
+const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+
+export const api = axios.create({ baseURL });
+
+// Used for auth-only requests to avoid interceptor recursion.
+const authClient = axios.create({ baseURL });
+
+function isAuthEndpoint(url: string | undefined): boolean {
+  if (!url) return false;
+  // Do not attempt refresh loops on these endpoints.
+  return (
+    url.includes("/v1/auth/login") ||
+    url.includes("/v1/auth/refresh") ||
+    url.includes("/v1/auth/logout") ||
+    url.includes("/v1/auth/register-tenant") ||
+    url.includes("/v1/auth/accept-invite")
+  );
+}
+
+function emitAuthFailed() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("authFailed"));
+}
 
 api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
   // Platform (super-admin) key used only by /v1/platform/* endpoints.
   const platformKey = getPlatformAdminKey();
-  if (platformKey) {
+  const url = config.url ?? "";
+  const isPlatform = url.startsWith("/v1/platform") || url.startsWith("v1/platform");
+  if (platformKey && isPlatform) {
     config.headers = config.headers ?? {};
     (config.headers as any)["x-platform-admin-key"] = platformKey;
   }
   return config;
 });
 
-// Minimal refresh-token flow (best-effort)
+// Cookie-based session refresh (single-flight)
+let refreshPromise: Promise<void> | null = null;
+
+async function ensureRefreshed(): Promise<void> {
+  if (!refreshPromise) {
+    refreshPromise = authClient
+      .post("/v1/auth/refresh")
+      .then(() => undefined)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (!original || original.__isRetryRequest) {
-      throw error;
-    }
+    if (!original || original.__isRetryRequest) throw error;
 
-    if (error.response?.status === 401) {
-      const refresh = getRefreshToken();
-      if (!refresh) {
-        clearTokens();
-        throw error;
-      }
+    const status = error.response?.status;
+    const url = original.url as string | undefined;
 
+    if (status === 401 && !isAuthEndpoint(url)) {
       try {
         original.__isRetryRequest = true;
-        const r = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api"}/v1/auth/refresh`,
-          { refresh_token: refresh }
-        );
-        setTokens(r.data);
-        original.headers = original.headers ?? {};
-        original.headers.Authorization = `Bearer ${r.data.access_token}`;
+        await ensureRefreshed();
         return api.request(original);
       } catch {
-        clearTokens();
+        emitAuthFailed();
         throw error;
       }
     }

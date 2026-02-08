@@ -40,7 +40,7 @@ export function HowItWorks() {
           </div>
 
           <Link
-            href="/login?mode=register"
+            href="/login?mode=register&next=/dashboard"
             className={cn(
               "inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 backdrop-blur",
               "hover:bg-white/10 transition-colors duration-300",
@@ -87,4 +87,3 @@ export function HowItWorks() {
     </Section>
   );
 }
-

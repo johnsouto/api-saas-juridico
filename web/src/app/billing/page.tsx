@@ -56,7 +56,7 @@ export default function BillingPage() {
             <p className="mt-1 text-3xl font-semibold text-white">R$47/mês</p>
             <p className="mt-2 text-sm text-white/70">Mais limites, prioridade no suporte e recursos avançados.</p>
             <Link
-              href="/login"
+              href="/login?next=/dashboard"
               className={cn(
                 "mt-6 inline-flex w-full items-center justify-center rounded-md bg-[#234066] px-4 py-3 text-sm font-semibold text-white",
                 "hover:bg-[#234066]/90 transition-colors duration-300",
@@ -71,4 +71,3 @@ export default function BillingPage() {
     </div>
   );
 }
-

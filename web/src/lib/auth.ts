@@ -1,29 +1,48 @@
-export type TokenPair = {
-  access_token: string;
-  refresh_token: string;
-  token_type: "bearer";
-};
+import { api } from "@/lib/api";
 
-const ACCESS_KEY = "saas_access_token";
-const REFRESH_KEY = "saas_refresh_token";
+// Legacy localStorage keys used by the old JWT-in-localStorage implementation.
+// We keep a cleanup step to avoid confusion when upgrading deployments.
+const LEGACY_ACCESS_KEY = "saas_access_token";
+const LEGACY_REFRESH_KEY = "saas_refresh_token";
 
-export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(ACCESS_KEY);
+export function cleanupLegacySaaSTokens(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(LEGACY_ACCESS_KEY);
+    window.localStorage.removeItem(LEGACY_REFRESH_KEY);
+  } catch {
+    // ignore
+  }
 }
 
-export function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(REFRESH_KEY);
+export async function loginWithEmailSenha(input: { email: string; senha: string }): Promise<void> {
+  const body = new URLSearchParams();
+  body.set("username", input.email);
+  body.set("password", input.senha);
+  body.set("grant_type", "password");
+
+  await api.post("/v1/auth/login", body, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" }
+  });
 }
 
-export function setTokens(tokens: TokenPair) {
-  window.localStorage.setItem(ACCESS_KEY, tokens.access_token);
-  window.localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+export async function registerTenant(input: {
+  tenant_nome: string;
+  tenant_tipo_documento: "cpf" | "cnpj";
+  tenant_documento: string;
+  tenant_slug: string;
+  admin_nome: string;
+  admin_email: string;
+  admin_senha: string;
+}): Promise<void> {
+  await api.post("/v1/auth/register-tenant", input);
 }
 
-export function clearTokens() {
-  window.localStorage.removeItem(ACCESS_KEY);
-  window.localStorage.removeItem(REFRESH_KEY);
+export async function logout(): Promise<void> {
+  try {
+    await api.post("/v1/auth/logout");
+  } finally {
+    cleanupLegacySaaSTokens();
+  }
 }
 

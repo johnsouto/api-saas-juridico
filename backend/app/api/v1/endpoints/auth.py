@@ -4,9 +4,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_roles
+from app.core.config import settings
+from app.core.exceptions import AuthError
 from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.user import User
@@ -17,7 +20,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     TenantRegisterRequest,
 )
-from app.schemas.token import RefreshRequest, TokenPair
+from app.schemas.token import RefreshRequest
 from app.schemas.user import UserOut
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
@@ -27,6 +30,9 @@ from app.services.plan_limit_service import PlanLimitService
 router = APIRouter()
 
 _auth_service = AuthService(email_service=EmailService(), plan_limit_service=PlanLimitService())
+
+ACCESS_COOKIE_NAME = "saas_access"
+REFRESH_COOKIE_NAME = "saas_refresh"
 
 
 def _app_base_url(request: Request) -> str:
@@ -38,7 +44,60 @@ def _app_base_url(request: Request) -> str:
     return f"{scheme}://{host}"
 
 
-@router.post("/register-tenant", response_model=TokenPair)
+def _set_auth_cookies(*, response: JSONResponse, access_token: str, refresh_token: str) -> None:
+    """
+    Emit auth cookies for the browser (same-origin).
+
+    - saas_access: short-lived, sent to all paths.
+    - saas_refresh: long-lived, scoped to the refresh endpoint only.
+    """
+    secure = settings.ENV == "prod"
+    response.set_cookie(
+        key=ACCESS_COOKIE_NAME,
+        value=access_token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/api/v1/auth/refresh",
+    )
+
+
+def _clear_auth_cookies(*, response: JSONResponse) -> None:
+    secure = settings.ENV == "prod"
+    # Important: use the same Path values used when setting cookies.
+    response.set_cookie(
+        key=ACCESS_COOKIE_NAME,
+        value="",
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=0,
+        expires=0,
+        path="/",
+    )
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value="",
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=0,
+        expires=0,
+        path="/api/v1/auth/refresh",
+    )
+
+
+@router.post("/register-tenant")
 async def register_tenant(
     payload: TenantRegisterRequest,
     request: Request,
@@ -56,23 +115,46 @@ async def register_tenant(
         admin_email=str(payload.admin_email),
         admin_senha=payload.admin_senha,
     )
-    return TokenPair(access_token=access, refresh_token=refresh)
+    response = JSONResponse({"ok": True})
+    _set_auth_cookies(response=response, access_token=access, refresh_token=refresh)
+    return response
 
 
-@router.post("/login", response_model=TokenPair)
+@router.post("/login")
 async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # OAuth2PasswordRequestForm uses "username" - we treat it as email.
     _, access, refresh = await _auth_service.authenticate(db, email=form.username, password=form.password)
-    return TokenPair(access_token=access, refresh_token=refresh)
+    response = JSONResponse({"ok": True})
+    _set_auth_cookies(response=response, access_token=access, refresh_token=refresh)
+    return response
 
 
-@router.post("/refresh", response_model=TokenPair)
-async def refresh(payload: RefreshRequest, db: Annotated[AsyncSession, Depends(get_db)]):
-    access, refresh_token = await _auth_service.refresh(db, refresh_token=payload.refresh_token)
-    return TokenPair(access_token=access, refresh_token=refresh_token)
+@router.post("/refresh")
+async def refresh(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    payload: RefreshRequest | None = None,
+):
+    # Prefer HttpOnly cookie; keep payload as a fallback for compatibility.
+    refresh_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
+    raw_refresh = refresh_cookie or (payload.refresh_token if payload else None)
+    if not raw_refresh:
+        raise AuthError("Refresh token ausente")
+
+    access, refresh_token = await _auth_service.refresh(db, refresh_token=raw_refresh)
+    response = JSONResponse({"ok": True})
+    _set_auth_cookies(response=response, access_token=access, refresh_token=refresh_token)
+    return response
+
+
+@router.post("/logout")
+async def logout():
+    response = JSONResponse({"ok": True})
+    _clear_auth_cookies(response=response)
+    return response
 
 
 @router.get("/me", response_model=UserOut)
@@ -101,10 +183,12 @@ async def invite_user(
     return {"message": "Convite enviado"}
 
 
-@router.post("/accept-invite", response_model=TokenPair)
+@router.post("/accept-invite")
 async def accept_invite(payload: AcceptInviteRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     _, access, refresh = await _auth_service.accept_invite(db, token=payload.token, password=payload.senha)
-    return TokenPair(access_token=access, refresh_token=refresh)
+    response = JSONResponse({"ok": True})
+    _set_auth_cookies(response=response, access_token=access, refresh_token=refresh)
+    return response
 
 
 @router.post("/reset-password")

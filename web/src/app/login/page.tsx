@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 
 import { api } from "@/lib/api";
-import { getAccessToken, setTokens, type TokenPair } from "@/lib/auth";
+import { cleanupLegacySaaSTokens, loginWithEmailSenha, registerTenant as registerTenantApi } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,16 +69,28 @@ export default function LoginPage() {
   const initializedFromQuery = useRef(false);
   const [showReset, setShowReset] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [nextPath, setNextPath] = useState("/dashboard");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterPasswordConfirm, setShowRegisterPasswordConfirm] = useState(false);
   const [registerSlugEdited, setRegisterSlugEdited] = useState(false);
 
+  function safeNext(raw: string | null): string {
+    if (!raw) return "/dashboard";
+    const v = raw.trim();
+    if (!v.startsWith("/") || v.startsWith("//")) return "/dashboard";
+    return v;
+  }
+
   useEffect(() => {
     if (initializedFromQuery.current) return;
     initializedFromQuery.current = true;
 
-    const mode = new URLSearchParams(window.location.search).get("mode");
+    cleanupLegacySaaSTokens();
+
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+    setNextPath(safeNext(params.get("next")));
     if (mode === "register") {
       setShowRegister(true);
       setShowReset(false);
@@ -89,16 +101,14 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (getAccessToken()) {
-      // best-effort redirect if already logged in
-      api
-        .get<{ slug: string }>("/v1/tenants/me")
-        .then((r) => router.replace(`/dashboard/${r.data.slug}`))
-        .catch(() => {
-          // ignore
-        });
-    }
-  }, [router]);
+    // Best-effort redirect if already logged in (session via cookie).
+    api
+      .get("/v1/auth/me")
+      .then(() => router.replace(nextPath))
+      .catch(() => {
+        // ignore (not logged in)
+      });
+  }, [router, nextPath]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -136,19 +146,8 @@ export default function LoginPage() {
 
   const login = useMutation({
     mutationFn: async (values: FormValues) => {
-      const body = new URLSearchParams();
-      body.set("username", values.email);
-      body.set("password", values.senha);
-      // OAuth2PasswordRequestForm requires this field sometimes
-      body.set("grant_type", "password");
-
-      const r = await api.post<TokenPair>("/v1/auth/login", body, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" }
-      });
-      setTokens(r.data);
-
-      const t = await api.get<{ slug: string }>("/v1/tenants/me");
-      router.replace(`/dashboard/${t.data.slug}`);
+      await loginWithEmailSenha(values);
+      router.replace(nextPath);
     }
   });
 
@@ -173,11 +172,8 @@ export default function LoginPage() {
         admin_senha: values.admin_senha
       };
 
-      const r = await api.post<TokenPair>("/v1/auth/register-tenant", payload);
-      setTokens(r.data);
-
-      const t = await api.get<{ slug: string }>("/v1/tenants/me");
-      router.replace(`/dashboard/${t.data.slug}`);
+      await registerTenantApi(payload);
+      router.replace(nextPath);
     }
   });
 

@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated, Callable
 
-from fastapi import Depends
+from fastapi import Cookie, Depends
 from fastapi import Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
@@ -19,7 +19,10 @@ from app.models.tenant import Tenant
 from app.models.user import User
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# We support both:
+# - Authorization: Bearer <token> (compat / API clients)
+# - HttpOnly cookie "saas_access" (browser session, same-origin)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 @dataclass(frozen=True)
@@ -29,9 +32,14 @@ class TenantContext:
 
 async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+    saas_access: Annotated[str | None, Cookie(alias="saas_access")] = None,
 ) -> User:
-    payload = decode_token(token)
+    raw_token = token or saas_access
+    if not raw_token:
+        raise AuthError("Token ausente")
+
+    payload = decode_token(raw_token)
     if payload.get("type") != "access":
         raise AuthError("Token inválido")
 

@@ -38,7 +38,7 @@ export function LandingHeader() {
 
         <nav className="hidden items-center gap-3 md:flex">
           <Link
-            href="/login"
+            href="/login?next=/dashboard"
             className={cn(
               "rounded-md px-3 py-2 text-sm font-medium text-white/85 hover:text-white hover:bg-white/5 transition-colors duration-200",
               focusRing
@@ -47,7 +47,7 @@ export function LandingHeader() {
             Login
           </Link>
           <Link
-            href="/login?mode=register"
+            href="/login?mode=register&next=/dashboard"
             className={cn(
               "rounded-md bg-[#234066] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_30px_rgba(35,64,102,0.35)]",
               "hover:bg-[#234066]/90 hover:shadow-[0_0_44px_rgba(35,64,102,0.45)] transition-all duration-300",
@@ -85,7 +85,7 @@ export function LandingHeader() {
         <Container className="py-3">
           <div className="flex flex-col gap-2">
             <Link
-              href="/login"
+              href="/login?next=/dashboard"
               onClick={() => setOpen(false)}
               className={cn(
                 "rounded-md px-3 py-2 text-sm font-medium text-white/90 hover:text-white hover:bg-white/5 transition-colors duration-200",
@@ -95,7 +95,7 @@ export function LandingHeader() {
               Login
             </Link>
             <Link
-              href="/login?mode=register"
+              href="/login?mode=register&next=/dashboard"
               onClick={() => setOpen(false)}
               className={cn(
                 "rounded-md bg-[#234066] px-3 py-2 text-sm font-semibold text-white shadow-[0_0_30px_rgba(35,64,102,0.35)]",

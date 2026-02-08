@@ -8,7 +8,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
-import { setTokens, type TokenPair } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,6 +26,7 @@ export default function AcceptInviteClient() {
   const sp = useSearchParams();
   const router = useRouter();
   const token = sp.get("token") ?? "";
+  const next = sp.get("next") ?? "/dashboard";
 
   useEffect(() => {
     if (!token) router.replace("/login");
@@ -39,10 +39,8 @@ export default function AcceptInviteClient() {
 
   const accept = useMutation({
     mutationFn: async (values: FormValues) => {
-      const r = await api.post<TokenPair>("/v1/auth/accept-invite", { token, senha: values.senha });
-      setTokens(r.data);
-      const t = await api.get<{ slug: string }>("/v1/tenants/me");
-      router.replace(`/dashboard/${t.data.slug}`);
+      await api.post("/v1/auth/accept-invite", { token, senha: values.senha });
+      router.replace(next);
     }
   });
 
@@ -86,4 +84,3 @@ export default function AcceptInviteClient() {
     </main>
   );
 }
-

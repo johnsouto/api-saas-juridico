@@ -58,7 +58,7 @@ export function Pricing() {
 
             <div className="mt-7">
               <Link
-                href="/login?mode=register"
+                href="/login?mode=register&next=/dashboard"
                 className={cn(
                   "inline-flex w-full items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white/90 backdrop-blur",
                   "hover:bg-white/10 transition-colors duration-300",
@@ -108,7 +108,7 @@ export function Pricing() {
 
             <div className="relative mt-7">
               <Link
-                href="/billing?plan=plus"
+                href="/billing?plan=plus&next=/dashboard"
                 className={cn(
                   "inline-flex w-full items-center justify-center rounded-md bg-[#234066] px-4 py-3 text-sm font-semibold text-white",
                   "shadow-[0_0_44px_rgba(35,64,102,0.45)] hover:bg-[#234066]/90 hover:shadow-[0_0_64px_rgba(35,64,102,0.6)]",
@@ -128,4 +128,3 @@ export function Pricing() {
     </Section>
   );
 }
-
