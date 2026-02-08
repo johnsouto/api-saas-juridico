@@ -1,0 +1,72 @@
+<svg width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Imagem hero abstrata em estilo premium jurídico">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0E1E2B"/>
+      <stop offset="0.55" stop-color="#1E1C1E"/>
+      <stop offset="1" stop-color="#0E1E2B"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1180 270) rotate(132) scale(680 520)">
+      <stop stop-color="#234066" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#234066" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stroke" x1="300" y1="220" x2="1300" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="0.5" stop-color="#234066" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.12"/>
+    </linearGradient>
+    <filter id="soft" x="-50" y="-50" width="1700" height="1100" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+  <rect width="1600" height="1000" fill="url(#glow)"/>
+
+  <!-- Decorative lines -->
+  <path d="M80 740C280 620 420 600 640 640C860 680 1040 580 1520 410" stroke="url(#stroke)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M120 820C320 690 470 670 690 710C910 750 1100 640 1520 470" stroke="url(#stroke)" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Abstract 'courthouse' silhouette -->
+  <g opacity="0.95">
+    <path d="M530 720H1070" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="12" stroke-linecap="round"/>
+    <path d="M600 700V520" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="14" stroke-linecap="round"/>
+    <path d="M740 700V490" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="14" stroke-linecap="round"/>
+    <path d="M880 700V490" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1020 700V520" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="14" stroke-linecap="round"/>
+    <path d="M560 520L800 400L1040 520" stroke="#234066" stroke-opacity="0.55" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Scales of justice (minimal) -->
+  <g transform="translate(0,0)">
+    <path d="M800 290V430" stroke="#FFFFFF" stroke-opacity="0.20" stroke-width="10" stroke-linecap="round"/>
+    <path d="M720 330H880" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="8" stroke-linecap="round"/>
+    <path d="M720 330C704 366 690 388 662 405C634 422 610 428 590 430" stroke="#234066" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round"/>
+    <path d="M880 330C896 366 910 388 938 405C966 422 990 428 1010 430" stroke="#234066" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round"/>
+    <path d="M555 430H625" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="6" stroke-linecap="round"/>
+    <path d="M975 430H1045" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <!-- Soft highlight blobs -->
+  <g filter="url(#soft)" opacity="0.35">
+    <circle cx="320" cy="260" r="140" fill="#234066"/>
+    <circle cx="1320" cy="760" r="160" fill="#234066"/>
+  </g>
+
+  <!-- Subtle grid -->
+  <g opacity="0.10">
+    <path d="M200 140H1400" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M200 240H1400" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M200 340H1400" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M200 440H1400" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M200 540H1400" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M200 640H1400" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M200 740H1400" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M320 120V840" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M520 120V840" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M720 120V840" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M920 120V840" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M1120 120V840" stroke="#FFFFFF" stroke-width="1"/>
+    <path d="M1320 120V840" stroke="#FFFFFF" stroke-width="1"/>
+  </g>
+</svg>
+

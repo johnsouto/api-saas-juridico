@@ -1,0 +1,51 @@
+<svg width="1400" height="900" viewBox="0 0 1400 900" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mock de tela do produto Elemento Juris">
+  <defs>
+    <linearGradient id="psBg" x1="0" y1="0" x2="1400" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E1E2B"/>
+      <stop offset="0.55" stop-color="#1E1C1E"/>
+      <stop offset="1" stop-color="#0E1E2B"/>
+    </linearGradient>
+    <radialGradient id="psGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(980 300) rotate(130) scale(700 560)">
+      <stop stop-color="#234066" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#234066" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1400" height="900" fill="url(#psBg)"/>
+  <rect width="1400" height="900" fill="url(#psGlow)"/>
+
+  <!-- Window -->
+  <rect x="140" y="140" width="1120" height="640" rx="22" fill="#FFFFFF" fill-opacity="0.06" stroke="#FFFFFF" stroke-opacity="0.12"/>
+  <rect x="140" y="140" width="1120" height="62" rx="22" fill="#FFFFFF" fill-opacity="0.05"/>
+  <circle cx="190" cy="171" r="8" fill="#FFFFFF" fill-opacity="0.20"/>
+  <circle cx="220" cy="171" r="8" fill="#FFFFFF" fill-opacity="0.16"/>
+  <circle cx="250" cy="171" r="8" fill="#FFFFFF" fill-opacity="0.12"/>
+
+  <!-- Sidebar -->
+  <rect x="170" y="230" width="230" height="520" rx="16" fill="#0E1E2B" fill-opacity="0.55" stroke="#FFFFFF" stroke-opacity="0.10"/>
+  <rect x="195" y="270" width="180" height="14" rx="7" fill="#FFFFFF" fill-opacity="0.22"/>
+  <rect x="195" y="312" width="150" height="12" rx="6" fill="#FFFFFF" fill-opacity="0.14"/>
+  <rect x="195" y="346" width="170" height="12" rx="6" fill="#FFFFFF" fill-opacity="0.12"/>
+  <rect x="195" y="380" width="130" height="12" rx="6" fill="#FFFFFF" fill-opacity="0.10"/>
+
+  <!-- Main content header -->
+  <rect x="430" y="230" width="800" height="86" rx="16" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.10"/>
+  <rect x="460" y="262" width="360" height="16" rx="8" fill="#FFFFFF" fill-opacity="0.22"/>
+  <rect x="460" y="290" width="260" height="12" rx="6" fill="#FFFFFF" fill-opacity="0.12"/>
+
+  <!-- KPI cards -->
+  <rect x="430" y="336" width="248" height="120" rx="16" fill="#234066" fill-opacity="0.30" stroke="#234066" stroke-opacity="0.65"/>
+  <rect x="702" y="336" width="248" height="120" rx="16" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.10"/>
+  <rect x="974" y="336" width="256" height="120" rx="16" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.10"/>
+  <rect x="462" y="366" width="120" height="12" rx="6" fill="#FFFFFF" fill-opacity="0.24"/>
+  <rect x="462" y="394" width="160" height="28" rx="10" fill="#FFFFFF" fill-opacity="0.16"/>
+
+  <!-- Table -->
+  <rect x="430" y="476" width="800" height="274" rx="16" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.10"/>
+  <rect x="460" y="510" width="740" height="18" rx="9" fill="#FFFFFF" fill-opacity="0.14"/>
+  <rect x="460" y="552" width="740" height="14" rx="7" fill="#FFFFFF" fill-opacity="0.10"/>
+  <rect x="460" y="590" width="740" height="14" rx="7" fill="#FFFFFF" fill-opacity="0.10"/>
+  <rect x="460" y="628" width="740" height="14" rx="7" fill="#FFFFFF" fill-opacity="0.10"/>
+  <rect x="460" y="666" width="740" height="14" rx="7" fill="#FFFFFF" fill-opacity="0.10"/>
+</svg>
+

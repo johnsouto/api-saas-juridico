@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -66,12 +66,27 @@ type RegisterValues = z.infer<typeof registerSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const initializedFromQuery = useRef(false);
   const [showReset, setShowReset] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterPasswordConfirm, setShowRegisterPasswordConfirm] = useState(false);
   const [registerSlugEdited, setRegisterSlugEdited] = useState(false);
+
+  useEffect(() => {
+    if (initializedFromQuery.current) return;
+    initializedFromQuery.current = true;
+
+    const mode = new URLSearchParams(window.location.search).get("mode");
+    if (mode === "register") {
+      setShowRegister(true);
+      setShowReset(false);
+    } else if (mode === "reset") {
+      setShowReset(true);
+      setShowRegister(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (getAccessToken()) {

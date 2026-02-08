@@ -1,0 +1,52 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ilustração abstrata de segurança e conformidade">
+  <defs>
+    <linearGradient id="secBg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E1E2B"/>
+      <stop offset="1" stop-color="#1E1C1E"/>
+    </linearGradient>
+    <radialGradient id="secGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(760 320) rotate(120) scale(520 420)">
+      <stop stop-color="#234066" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#234066" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="secStroke" x1="320" y1="210" x2="880" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.20"/>
+      <stop offset="0.5" stop-color="#234066" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.14"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="900" fill="url(#secBg)"/>
+  <rect width="1200" height="900" fill="url(#secGlow)"/>
+
+  <!-- Shield -->
+  <path
+    d="M600 160C660 210 750 230 840 244V430C840 586 725 716 600 760C475 716 360 586 360 430V244C450 230 540 210 600 160Z"
+    fill="#FFFFFF"
+    fill-opacity="0.06"
+    stroke="url(#secStroke)"
+    stroke-width="4"
+    stroke-linejoin="round"
+  />
+
+  <!-- Check -->
+  <path
+    d="M490 470L560 540L720 380"
+    stroke="#234066"
+    stroke-opacity="0.9"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Decorative dots -->
+  <g opacity="0.24">
+    <circle cx="210" cy="220" r="6" fill="#FFFFFF"/>
+    <circle cx="980" cy="280" r="6" fill="#FFFFFF"/>
+    <circle cx="1010" cy="610" r="6" fill="#FFFFFF"/>
+    <circle cx="250" cy="650" r="6" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Subtle frame -->
+  <rect x="90" y="90" width="1020" height="720" rx="24" stroke="#FFFFFF" stroke-opacity="0.10"/>
+</svg>
+
