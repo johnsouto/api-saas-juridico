@@ -79,7 +79,7 @@ export default function ParceriasPage() {
           <CardTitle>Parcerias</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-zinc-600">Cadastre parceiros e vincule processos a eles (opcional).</p>
+          <p className="text-sm text-muted-foreground">Cadastre parceiros e vincule processos a eles (opcional).</p>
         </CardContent>
       </Card>
 
@@ -131,7 +131,7 @@ export default function ParceriasPage() {
             </div>
           </form>
           {save.isError ? (
-            <p className="mt-2 text-sm text-red-600">{(save.error as any)?.response?.data?.detail ?? "Erro ao salvar parceria"}</p>
+            <p className="mt-2 text-sm text-destructive">{(save.error as any)?.response?.data?.detail ?? "Erro ao salvar parceria"}</p>
           ) : null}
         </CardContent>
       </Card>
@@ -141,7 +141,7 @@ export default function ParceriasPage() {
           <CardTitle className="text-sm">Lista</CardTitle>
         </CardHeader>
         <CardContent>
-          {list.isLoading ? <p className="text-sm text-zinc-600">Carregando…</p> : null}
+          {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
           {list.data ? (
             <div className="mt-3 overflow-x-auto">
               <Table>
@@ -200,14 +200,13 @@ export default function ParceriasPage() {
             </div>
           ) : null}
           {list.isError ? (
-            <p className="mt-2 text-sm text-red-600">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar parcerias"}</p>
+            <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar parcerias"}</p>
           ) : null}
           {remove.isError ? (
-            <p className="mt-2 text-sm text-red-600">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir parceria"}</p>
+            <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir parceria"}</p>
           ) : null}
         </CardContent>
       </Card>
     </div>
   );
 }
-

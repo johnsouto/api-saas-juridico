@@ -5,9 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
 import { cn } from "@/lib/utils";
-
-const focusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#234066] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e1e2b]";
+import { Button } from "@/components/ui/button";
 
 const steps = [
   {
@@ -33,22 +31,17 @@ export function HowItWorks() {
       <Container>
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <h2 className="text-2xl font-semibold text-white sm:text-3xl">Como funciona</h2>
-            <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
+            <h2 className="text-2xl font-semibold text-foreground sm:text-3xl">Como funciona</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
               Um fluxo simples para você sair do caos e entrar no controle.
             </p>
           </div>
 
-          <Link
-            href="/login?mode=register&next=/dashboard"
-            className={cn(
-              "inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 backdrop-blur",
-              "hover:bg-white/10 transition-colors duration-300",
-              focusRing
-            )}
-          >
-            Começar grátis <ArrowRight className="h-4 w-4" />
-          </Link>
+          <Button asChild variant="outline" className="border-white/15 bg-white/5 text-foreground/90 hover:bg-white/10">
+            <Link href="/login?mode=register&next=/dashboard">
+              Começar grátis <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -56,22 +49,22 @@ export function HowItWorks() {
             <div
               key={s.n}
               className={cn(
-                "rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur",
-                "transition-colors duration-300 hover:border-white/18"
+                "rounded-2xl border border-border/10 bg-card/30 p-6 backdrop-blur",
+                "transition-colors duration-300 hover:border-border/18"
               )}
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#234066] text-white shadow-[0_0_30px_rgba(35,64,102,0.35)]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-glow">
                   <span className="text-sm font-bold">{s.n}</span>
                 </div>
-                <h3 className="text-base font-semibold text-white">{s.title}</h3>
+                <h3 className="text-base font-semibold text-foreground">{s.title}</h3>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-white/70">{s.desc}</p>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
+        <div className="mt-10 overflow-hidden rounded-2xl border border-border/10 bg-card/30 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
           <div className="relative aspect-[16/9] w-full">
             <Image
               src="/images/product-shot-1.svg"
@@ -80,7 +73,7 @@ export function HowItWorks() {
               sizes="100vw"
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0e1e2b]/70 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
           </div>
         </div>
       </Container>

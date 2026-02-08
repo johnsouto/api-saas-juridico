@@ -14,7 +14,7 @@ const focusRing =
 
 export default function TermosPage() {
   return (
-    <div className="min-h-screen bg-[#0e1e2b] text-white">
+    <div className="theme-premium min-h-screen bg-background text-foreground">
       <Container className="py-10">
         <Link
           href="/"

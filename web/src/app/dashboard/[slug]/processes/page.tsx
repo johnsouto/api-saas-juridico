@@ -109,7 +109,7 @@ export default function ProcessesPage() {
           <CardTitle>Processos</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-zinc-600">Número é único por tenant.</p>
+          <p className="text-sm text-muted-foreground">Número é único por tenant.</p>
         </CardContent>
       </Card>
 
@@ -186,7 +186,7 @@ export default function ProcessesPage() {
           ) : null}
 
           {create.isError ? (
-            <p className="mt-2 text-sm text-red-600">{(create.error as any)?.response?.data?.detail ?? "Erro ao salvar processo"}</p>
+            <p className="mt-2 text-sm text-destructive">{(create.error as any)?.response?.data?.detail ?? "Erro ao salvar processo"}</p>
           ) : null}
         </CardContent>
       </Card>
@@ -196,7 +196,7 @@ export default function ProcessesPage() {
           <CardTitle className="text-sm">Lista</CardTitle>
         </CardHeader>
         <CardContent>
-        {list.isLoading ? <p className="mt-2 text-sm text-zinc-600">Carregando…</p> : null}
+        {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
         {list.data ? (
           <div className="mt-3 overflow-x-auto">
             <Table>
@@ -255,10 +255,10 @@ export default function ProcessesPage() {
           </div>
         ) : null}
         {list.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar processos"}</p>
+          <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar processos"}</p>
         ) : null}
         {remove.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir processo"}</p>
+          <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir processo"}</p>
         ) : null}
         </CardContent>
       </Card>

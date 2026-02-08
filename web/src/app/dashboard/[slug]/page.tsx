@@ -98,9 +98,9 @@ export default function DashboardHome() {
           <CardTitle>Dashboard</CardTitle>
         </CardHeader>
         <CardContent>
-          {me.isLoading ? <p className="text-sm text-zinc-600">Carregando…</p> : null}
+          {me.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
           {me.data ? (
-            <div className="text-sm text-zinc-700">
+            <div className="text-sm text-muted-foreground">
               <div className="flex flex-wrap items-center gap-2">
                 <div>
                   Logado como: <span className="font-medium">{me.data.nome}</span> ({me.data.email})
@@ -110,7 +110,7 @@ export default function DashboardHome() {
             </div>
           ) : null}
           {me.isError ? (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 text-sm text-destructive">
               {(me.error as any)?.response?.data?.detail ?? "Erro ao carregar usuário"}
             </p>
           ) : null}
@@ -124,7 +124,10 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{stats.data?.clients ?? "—"}</div>
-            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href={`/dashboard/${slug}/clients`}>
+            <Link
+              className="mt-2 inline-block text-sm text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
+              href={`/dashboard/${slug}/clients`}
+            >
               Abrir clientes
             </Link>
           </CardContent>
@@ -136,7 +139,10 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{stats.data?.processes ?? "—"}</div>
-            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href={`/dashboard/${slug}/processes`}>
+            <Link
+              className="mt-2 inline-block text-sm text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
+              href={`/dashboard/${slug}/processes`}
+            >
               Abrir processos
             </Link>
           </CardContent>
@@ -148,8 +154,11 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{stats.data?.honorariosAbertos ?? "—"}</div>
-            <div className="text-xs text-zinc-600">Total: {stats.data?.honorarios ?? "—"}</div>
-            <Link className="mt-2 inline-block text-sm text-zinc-700 underline" href={`/dashboard/${slug}/honorarios`}>
+            <div className="text-xs text-muted-foreground">Total: {stats.data?.honorarios ?? "—"}</div>
+            <Link
+              className="mt-2 inline-block text-sm text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
+              href={`/dashboard/${slug}/honorarios`}
+            >
               Abrir honorários
             </Link>
           </CardContent>
@@ -160,13 +169,13 @@ export default function DashboardHome() {
             <CardTitle className="text-sm">Atalhos</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-1 text-sm">
-            <Link className="text-zinc-700 underline" href={`/dashboard/${slug}/agenda`}>
+            <Link className="text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40" href={`/dashboard/${slug}/agenda`}>
               Agenda
             </Link>
-            <Link className="text-zinc-700 underline" href={`/dashboard/${slug}/tarefas`}>
+            <Link className="text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40" href={`/dashboard/${slug}/tarefas`}>
               Tarefas
             </Link>
-            <Link className="text-zinc-700 underline" href={`/dashboard/${slug}/documents`}>
+            <Link className="text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40" href={`/dashboard/${slug}/documents`}>
               Documentos
             </Link>
             <Button
@@ -215,10 +224,10 @@ export default function DashboardHome() {
       </div>
 
       {stats.isError ? (
-        <p className="text-sm text-red-600">{(stats.error as any)?.response?.data?.detail ?? "Erro ao carregar indicadores"}</p>
+        <p className="text-sm text-destructive">{(stats.error as any)?.response?.data?.detail ?? "Erro ao carregar indicadores"}</p>
       ) : null}
       {exportXlsx.isError ? (
-        <p className="text-sm text-red-600">{(exportXlsx.error as any)?.response?.data?.detail ?? "Erro ao exportar .xlsx"}</p>
+        <p className="text-sm text-destructive">{(exportXlsx.error as any)?.response?.data?.detail ?? "Erro ao exportar .xlsx"}</p>
       ) : null}
     </div>
   );
@@ -234,14 +243,14 @@ function StackedProgressBar({
 
   return (
     <div className="space-y-2">
-      <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100">
+      <div className="h-3 w-full overflow-hidden rounded-full bg-card/40">
         <div className="flex h-full w-full">
           {normalized.map((s) => (
             <div key={s.label} className={s.className} style={{ width: `${s.pct}%` }} />
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-1 text-xs text-zinc-700">
+      <div className="grid grid-cols-1 gap-1 text-xs text-muted-foreground">
         {normalized.map((s) => (
           <div key={s.label} className="flex items-center justify-between">
             <span>{s.label}</span>
@@ -293,8 +302,8 @@ function AreaChart({
         </defs>
 
         {/* axis */}
-        <line x1={padX} y1={padY + innerH} x2={padX + innerW} y2={padY + innerH} stroke="#E4E4E7" />
-        <line x1={padX} y1={padY} x2={padX} y2={padY + innerH} stroke="#E4E4E7" />
+        <line x1={padX} y1={padY + innerH} x2={padX + innerW} y2={padY + innerH} stroke="rgba(255,255,255,0.16)" />
+        <line x1={padX} y1={padY} x2={padX} y2={padY + innerH} stroke="rgba(255,255,255,0.16)" />
 
         {/* area + line */}
         <path d={areaD} fill="url(#areaFill)" />
@@ -307,17 +316,17 @@ function AreaChart({
 
         {/* x labels */}
         {points.map((p) => (
-          <text key={`l-${p.i}`} x={p.x} y={padY + innerH + 16} textAnchor="middle" fontSize="11" fill="#71717A">
+          <text key={`l-${p.i}`} x={p.x} y={padY + innerH + 16} textAnchor="middle" fontSize="11" fill="rgba(255,255,255,0.65)">
             {labels[p.i]}
           </text>
         ))}
 
         {/* y max */}
-        <text x={padX - 6} y={padY + 10} textAnchor="end" fontSize="11" fill="#71717A">
+        <text x={padX - 6} y={padY + 10} textAnchor="end" fontSize="11" fill="rgba(255,255,255,0.65)">
           {max}
         </text>
       </svg>
-      <p className="mt-2 text-xs text-zinc-600">Eixo X: meses do ano corrente. Eixo Y: quantidade de processos.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Eixo X: meses do ano corrente. Eixo Y: quantidade de processos.</p>
     </div>
   );
 }

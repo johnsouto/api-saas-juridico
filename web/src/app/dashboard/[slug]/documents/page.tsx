@@ -145,7 +145,7 @@ export default function DocumentsPage() {
           <CardTitle>Documentos (MinIO/S3)</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-zinc-600">Uploads contam para o limite do plano.</p>
+          <p className="text-sm text-muted-foreground">Uploads contam para o limite do plano.</p>
         </CardContent>
       </Card>
 
@@ -247,7 +247,7 @@ export default function DocumentsPage() {
           </div>
 
           {upload.isError ? (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 text-sm text-destructive">
               {(upload.error as any)?.response?.data?.detail ?? (upload.error as Error).message}
             </p>
           ) : null}
@@ -321,13 +321,13 @@ export default function DocumentsPage() {
                       ))
                     : null}
                 </Select>
-                <p className="mt-1 text-xs text-zinc-600">Dica: use o seletor acima para evitar erro de UUID.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Dica: use o seletor acima para evitar erro de UUID.</p>
               </div>
             ) : null}
           </div>
         </div>
 
-        {list.isLoading ? <p className="mt-2 text-sm text-zinc-600">Carregando…</p> : null}
+        {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
         {list.data ? (
           <div className="mt-3 overflow-x-auto">
             <Table>
@@ -375,16 +375,16 @@ export default function DocumentsPage() {
           </div>
         ) : null}
         {list.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar documentos"}</p>
+          <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar documentos"}</p>
         ) : null}
         {view.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(view.error as any)?.response?.data?.detail ?? "Erro ao visualizar documento"}</p>
+          <p className="mt-2 text-sm text-destructive">{(view.error as any)?.response?.data?.detail ?? "Erro ao visualizar documento"}</p>
         ) : null}
         {download.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(download.error as any)?.response?.data?.detail ?? "Erro ao baixar documento"}</p>
+          <p className="mt-2 text-sm text-destructive">{(download.error as any)?.response?.data?.detail ?? "Erro ao baixar documento"}</p>
         ) : null}
         {remove.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir documento"}</p>
+          <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir documento"}</p>
         ) : null}
         </CardContent>
       </Card>

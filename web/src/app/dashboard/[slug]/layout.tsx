@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
@@ -22,29 +23,47 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   }, [router, slug, tenant?.slug]);
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between p-4">
+    <div className="theme-premium min-h-screen bg-background text-foreground">
+      {/* Decorative background (matches landing) */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(35,64,102,0.30),transparent_45%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(255,255,255,0.08),transparent_45%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_60%_90%,rgba(35,64,102,0.20),transparent_50%)]" />
+      </div>
+
+      <header className="sticky top-0 z-40 border-b border-border/10 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 p-4">
           <div className="flex items-center gap-3">
-            <Link className="text-sm font-semibold" href={`/dashboard/${slug}`}>
+            <Link className="text-sm font-semibold text-foreground" href={`/dashboard/${slug}`}>
               Elemento Juris
             </Link>
-            <span className="text-xs text-zinc-500">Tenant: {slug}</span>
+            <span className="text-xs text-muted-foreground">Tenant: {slug}</span>
           </div>
-          <Button
-            variant="outline"
-            onClick={async () => {
-              await logout();
-              router.replace("/login?next=/dashboard");
-            }}
-            type="button"
-          >
-            Sair
-          </Button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Placeholder until billing/subscription endpoint is wired. */}
+            <Badge variant="secondary" className="border border-border/15 bg-card/40">
+              Plano: Free
+            </Badge>
+            <Button asChild size="sm" className="shadow-glow">
+              <Link href="/billing?plan=plus&next=/dashboard">Ativar Plus (R$47)</Link>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                await logout();
+                router.replace("/login?next=/dashboard");
+              }}
+              type="button"
+            >
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 p-4 md:grid-cols-4">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 p-4 md:grid-cols-4">
         <aside className="space-y-2 md:col-span-1">
           <NavLink href={`/dashboard/${slug}/clients`} label="Clientes" />
           <NavLink href={`/dashboard/${slug}/parcerias`} label="Parcerias" />
@@ -67,4 +86,3 @@ function NavLink({ href, label }: { href: string; label: string }) {
     </Button>
   );
 }
-

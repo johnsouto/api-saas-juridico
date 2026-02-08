@@ -5,9 +5,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
 import { cn } from "@/lib/utils";
-
-const focusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#234066] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e1e2b]";
+import { Button } from "@/components/ui/button";
 
 function TrustChip({ label }: { label: string }) {
   return (
@@ -36,27 +34,19 @@ export function Hero() {
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                href="/login?mode=register&next=/dashboard"
-                className={cn(
-                  "inline-flex items-center justify-center gap-2 rounded-md bg-[#234066] px-5 py-3 text-sm font-semibold text-white",
-                  "shadow-[0_0_44px_rgba(35,64,102,0.35)] hover:bg-[#234066]/90 hover:shadow-[0_0_64px_rgba(35,64,102,0.48)]",
-                  "transition-all duration-300",
-                  focusRing
-                )}
+              <Button asChild size="lg" className="h-auto px-5 py-3">
+                <Link href="/login?mode=register&next=/dashboard">
+                  Começar grátis <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="h-auto border-white/15 bg-white/5 px-5 py-3 text-foreground/90 hover:bg-white/8 hover:border-white/25"
               >
-                Começar grátis <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="#planos"
-                className={cn(
-                  "inline-flex items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/90 backdrop-blur",
-                  "hover:bg-white/8 hover:border-white/25 transition-all duration-300",
-                  focusRing
-                )}
-              >
-                Ver planos
-              </Link>
+                <Link href="#planos">Ver planos</Link>
+              </Button>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2">

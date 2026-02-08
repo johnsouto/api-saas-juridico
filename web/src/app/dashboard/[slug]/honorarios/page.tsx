@@ -213,7 +213,7 @@ export default function HonorariosPage() {
                   </option>
                 ))}
               </Select>
-              {!selectedClientId ? <p className="text-xs text-zinc-600">Selecione um cliente para listar os processos.</p> : null}
+              {!selectedClientId ? <p className="text-xs text-muted-foreground">Selecione um cliente para listar os processos.</p> : null}
             </div>
 
             <div className="space-y-1">
@@ -298,7 +298,7 @@ export default function HonorariosPage() {
           </form>
 
           {create.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(create.error as any)?.response?.data?.detail ?? "Erro ao salvar honorário"}
             </p>
           ) : null}
@@ -368,7 +368,7 @@ export default function HonorariosPage() {
             </div>
 
             {confirmPayment.isError ? (
-              <p className="mt-3 text-sm text-red-600">
+              <p className="mt-3 text-sm text-destructive">
                 {(confirmPayment.error as any)?.response?.data?.detail ?? (confirmPayment.error as Error).message}
               </p>
             ) : null}
@@ -381,7 +381,7 @@ export default function HonorariosPage() {
           <CardTitle className="text-base">Lista</CardTitle>
         </CardHeader>
         <CardContent>
-          {list.isLoading ? <p className="mt-2 text-sm text-zinc-600">Carregando…</p> : null}
+          {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
           {list.data ? (
             <div className="mt-3 overflow-x-auto">
               <Table>
@@ -429,7 +429,7 @@ export default function HonorariosPage() {
                               Comprovante
                             </Button>
                           ) : (
-                            <span className="self-center text-xs text-zinc-500">Pago</span>
+                            <span className="self-center text-xs text-muted-foreground">Pago</span>
                           )}
                           <Button
                             variant="outline"
@@ -469,7 +469,7 @@ export default function HonorariosPage() {
             </div>
           ) : null}
           {list.isError ? (
-            <p className="mt-3 text-sm text-red-600">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar honorários"}</p>
+            <p className="mt-3 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar honorários"}</p>
           ) : null}
         </CardContent>
       </Card>

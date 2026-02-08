@@ -126,7 +126,7 @@ export default function AgendaPage() {
                 <option value="video_conferencia">Video-conferência</option>
                 <option value="video_novo_cliente">Vídeo com novo cliente</option>
               </Select>
-              <p className="text-xs text-zinc-600">Atalhos fixos (separei do cliente para não poluir).</p>
+              <p className="text-xs text-muted-foreground">Atalhos fixos (separei do cliente para não poluir).</p>
             </div>
 
             <div className="space-y-1 md:col-span-2">
@@ -188,7 +188,7 @@ export default function AgendaPage() {
           </form>
 
           {create.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(create.error as any)?.response?.data?.detail ?? (create.error as Error).message ?? "Erro ao criar evento"}
             </p>
           ) : null}
@@ -200,7 +200,7 @@ export default function AgendaPage() {
           <CardTitle className="text-base">Próximos</CardTitle>
         </CardHeader>
         <CardContent>
-          {list.isLoading ? <p className="mt-2 text-sm text-zinc-600">Carregando…</p> : null}
+          {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
           {list.data ? (
             <div className="overflow-x-auto">
               <Table>
@@ -238,7 +238,7 @@ export default function AgendaPage() {
             </div>
           ) : null}
           {list.isError ? (
-            <p className="mt-2 text-sm text-red-600">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar eventos"}</p>
+            <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar eventos"}</p>
           ) : null}
         </CardContent>
       </Card>

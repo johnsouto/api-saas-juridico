@@ -4,9 +4,7 @@ import { Check, Crown, Sparkles } from "lucide-react";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
 import { cn } from "@/lib/utils";
-
-const focusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#234066] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e1e2b]";
+import { Button } from "@/components/ui/button";
 
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
@@ -37,7 +35,7 @@ export function Pricing() {
 
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* Free */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur transition-colors duration-300 hover:border-white/18">
+          <div className="rounded-2xl border border-border/10 bg-card/30 p-6 backdrop-blur transition-colors duration-300 hover:border-border/18">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-white">Plano Free</p>
@@ -57,23 +55,20 @@ export function Pricing() {
             </ul>
 
             <div className="mt-7">
-              <Link
-                href="/login?mode=register&next=/dashboard"
-                className={cn(
-                  "inline-flex w-full items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white/90 backdrop-blur",
-                  "hover:bg-white/10 transition-colors duration-300",
-                  focusRing
-                )}
+              <Button
+                asChild
+                variant="outline"
+                className="w-full border-white/15 bg-white/5 text-foreground/90 hover:bg-white/10"
               >
-                Criar conta
-              </Link>
+                <Link href="/login?mode=register&next=/dashboard">Criar conta</Link>
+              </Button>
             </div>
           </div>
 
           {/* Plus */}
           <div
             className={cn(
-              "relative overflow-hidden rounded-2xl border border-[#234066]/60 bg-gradient-to-b from-[#234066]/30 via-white/5 to-white/5 p-6 backdrop-blur",
+              "relative overflow-hidden rounded-2xl border border-primary/60 bg-gradient-to-b from-primary/30 via-white/5 to-white/5 p-6 backdrop-blur",
               "shadow-[0_0_0_1px_rgba(35,64,102,0.25),0_20px_90px_rgba(0,0,0,0.45)]",
               "transition-[transform,border-color,box-shadow] duration-300 ease-out",
               "hover:[transform:translateY(-6px)] hover:shadow-[0_0_0_1px_rgba(35,64,102,0.35),0_30px_120px_rgba(0,0,0,0.55)]",
@@ -107,17 +102,9 @@ export function Pricing() {
             </ul>
 
             <div className="relative mt-7">
-              <Link
-                href="/billing?plan=plus&next=/dashboard"
-                className={cn(
-                  "inline-flex w-full items-center justify-center rounded-md bg-[#234066] px-4 py-3 text-sm font-semibold text-white",
-                  "shadow-[0_0_44px_rgba(35,64,102,0.45)] hover:bg-[#234066]/90 hover:shadow-[0_0_64px_rgba(35,64,102,0.6)]",
-                  "transition-all duration-300",
-                  focusRing
-                )}
-              >
-                Assinar Plus
-              </Link>
+              <Button asChild className="w-full">
+                <Link href="/billing?plan=plus&next=/dashboard">Assinar Plus</Link>
+              </Button>
               <p className="mt-3 text-center text-xs text-white/65">
                 Checkout com Stripe e Mercado Pago (cartão de crédito e outras formas disponíveis).
               </p>

@@ -153,7 +153,7 @@ export default function TarefasPage() {
             </div>
 
             {create.isError ? (
-              <p className="text-sm text-red-600">{(create.error as any)?.response?.data?.detail ?? "Erro ao salvar tarefa"}</p>
+              <p className="text-sm text-destructive">{(create.error as any)?.response?.data?.detail ?? "Erro ao salvar tarefa"}</p>
             ) : null}
           </form>
         </CardContent>
@@ -164,28 +164,28 @@ export default function TarefasPage() {
           <CardTitle className="text-sm">Kanban simples</CardTitle>
         </CardHeader>
         <CardContent>
-        {list.isLoading ? <p className="mt-2 text-sm text-zinc-600">Carregando…</p> : null}
+        {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
         {list.data ? (
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
             {["pendente", "em_andamento", "concluido"].map((col) => (
-              <div key={col} className="rounded border p-3">
+              <div key={col} className="rounded-lg border border-border/15 bg-card/20 p-3 backdrop-blur">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-semibold text-zinc-600">{col}</div>
+                  <div className="text-xs font-semibold text-muted-foreground">{col}</div>
                   <Badge variant="secondary">{list.data.filter((t) => t.status === col).length}</Badge>
                 </div>
                 <div className="mt-2 space-y-2">
                   {list.data
                     .filter((t) => t.status === col)
                     .map((t) => (
-                      <div key={t.id} className="space-y-2 rounded border bg-white p-3 text-sm">
+                      <div key={t.id} className="space-y-2 rounded-lg border border-border/15 bg-card/40 p-3 text-sm">
                         <div className="font-medium">{t.titulo}</div>
                         {t.client_id ? (
-                          <div className="text-xs text-zinc-600">
+                          <div className="text-xs text-muted-foreground">
                             Cliente: {clients.data?.find((c) => c.id === t.client_id)?.nome ?? t.client_id}
                           </div>
                         ) : null}
-                        {t.descricao ? <div className="text-xs text-zinc-600">{t.descricao}</div> : null}
-                        {t.prazo_em ? <div className="text-xs text-zinc-600">Prazo: {formatDateTimeBR(t.prazo_em)}</div> : null}
+                        {t.descricao ? <div className="text-xs text-muted-foreground">{t.descricao}</div> : null}
+                        {t.prazo_em ? <div className="text-xs text-muted-foreground">Prazo: {formatDateTimeBR(t.prazo_em)}</div> : null}
 
                         <div className="flex flex-wrap gap-2">
                           <Button
@@ -238,13 +238,13 @@ export default function TarefasPage() {
           </div>
         ) : null}
         {list.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar tarefas"}</p>
+          <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar tarefas"}</p>
         ) : null}
         {update.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(update.error as any)?.response?.data?.detail ?? "Erro ao atualizar tarefa"}</p>
+          <p className="mt-2 text-sm text-destructive">{(update.error as any)?.response?.data?.detail ?? "Erro ao atualizar tarefa"}</p>
         ) : null}
         {remove.isError ? (
-          <p className="mt-2 text-sm text-red-600">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir tarefa"}</p>
+          <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir tarefa"}</p>
         ) : null}
         </CardContent>
       </Card>

@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[#0e1e2b] text-white">
+    <div className="theme-premium min-h-screen bg-background text-foreground">
       {/* Decorative background */}
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(35,64,102,0.35),transparent_45%)]" />

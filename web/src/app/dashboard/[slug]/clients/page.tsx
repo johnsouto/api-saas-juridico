@@ -103,7 +103,7 @@ export default function ClientsPage() {
             </div>
           </form>
           {create.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(create.error as any)?.response?.data?.detail ?? "Erro ao salvar cliente"}
             </p>
           ) : null}
@@ -126,7 +126,7 @@ export default function ClientsPage() {
             </Button>
           </div>
 
-          {list.isLoading ? <p className="mt-3 text-sm text-zinc-600">Carregando…</p> : null}
+          {list.isLoading ? <p className="mt-3 text-sm text-muted-foreground">Carregando…</p> : null}
           {list.data ? (
             <div className="mt-3 overflow-x-auto">
               <Table>
@@ -141,7 +141,10 @@ export default function ClientsPage() {
                   {list.data.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell>
-                        <Link className="underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-700" href={`./${c.id}`}>
+                        <Link
+                          className="underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
+                          href={`./${c.id}`}
+                        >
                           {c.nome}
                         </Link>
                       </TableCell>
@@ -181,12 +184,12 @@ export default function ClientsPage() {
           ) : null}
 
           {list.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(list.error as any)?.response?.data?.detail ?? "Erro ao listar clientes"}
             </p>
           ) : null}
           {remove.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir cliente"}
             </p>
           ) : null}

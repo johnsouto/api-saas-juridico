@@ -136,7 +136,7 @@ export default function ClientDetailPage() {
             </Button>
           </div>
           {client.isError ? (
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-destructive">
               {(client.error as any)?.response?.data?.detail ?? "Erro ao carregar cliente"}
             </p>
           ) : null}
@@ -172,30 +172,30 @@ export default function ClientDetailPage() {
           </div>
 
           {upload.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(upload.error as any)?.response?.data?.detail ?? (upload.error as Error).message}
             </p>
           ) : null}
           {view.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(view.error as any)?.response?.data?.detail ?? "Erro ao visualizar documento"}
             </p>
           ) : null}
           {download.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(download.error as any)?.response?.data?.detail ?? "Erro ao baixar documento"}
             </p>
           ) : null}
 
           <div className="mt-4 space-y-3">
-            {documents.isLoading ? <p className="text-sm text-zinc-600">Carregando documentos…</p> : null}
+            {documents.isLoading ? <p className="text-sm text-muted-foreground">Carregando documentos…</p> : null}
             {Object.keys(docsByCategoria).length === 0 && documents.isSuccess ? (
-              <p className="text-sm text-zinc-600">Nenhum documento ainda.</p>
+              <p className="text-sm text-muted-foreground">Nenhum documento ainda.</p>
             ) : null}
 
             {Object.entries(docsByCategoria).map(([cat, docs]) => (
-              <div key={cat} className="rounded-lg border p-3">
-                <div className="text-xs font-semibold text-zinc-600">
+              <div key={cat} className="rounded-lg border border-border/15 bg-card/20 p-3 backdrop-blur">
+                <div className="text-xs font-semibold text-muted-foreground">
                   {CATEGORIAS.find((c) => c.value === cat)?.label ?? cat}
                 </div>
                 <div className="mt-2 overflow-x-auto">
@@ -247,7 +247,7 @@ export default function ClientDetailPage() {
           <CardTitle className="text-base">Processos deste cliente</CardTitle>
         </CardHeader>
         <CardContent>
-          {processes.isLoading ? <p className="text-sm text-zinc-600">Carregando processos…</p> : null}
+          {processes.isLoading ? <p className="text-sm text-muted-foreground">Carregando processos…</p> : null}
           {processes.data?.length ? (
             <div className="overflow-x-auto">
               <Table>
@@ -263,15 +263,15 @@ export default function ClientDetailPage() {
                       <TableCell>{p.numero}</TableCell>
                       <TableCell>{p.status}</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           ) : processes.isSuccess ? (
-            <p className="text-sm text-zinc-600">Nenhum processo cadastrado para este cliente.</p>
+            <p className="text-sm text-muted-foreground">Nenhum processo cadastrado para este cliente.</p>
           ) : null}
           {processes.isError ? (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 text-sm text-destructive">
               {(processes.error as any)?.response?.data?.detail ?? "Erro ao carregar processos"}
             </p>
           ) : null}

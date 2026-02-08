@@ -3,11 +3,13 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium", {
+const badgeVariants = cva(
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+  {
   variants: {
     variant: {
-      default: "border-zinc-200 bg-white text-zinc-900",
-      secondary: "border-transparent bg-zinc-100 text-zinc-900",
+      default: "border-border/15 bg-card/40 text-foreground",
+      secondary: "border-border/10 bg-muted/10 text-foreground",
       success: "border-transparent bg-emerald-100 text-emerald-900",
       warning: "border-transparent bg-amber-100 text-amber-900",
       destructive: "border-transparent bg-red-100 text-red-900"
@@ -23,4 +25,3 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement>, Varia
 export function Badge({ className, variant, ...props }: BadgeProps) {
   return <span className={cn(badgeVariants({ variant, className }))} {...props} />;
 }
-
