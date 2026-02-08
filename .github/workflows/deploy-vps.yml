@@ -106,7 +106,9 @@ jobs:
           URL="https://elementojuris.cloud/api/health"
           echo "Health check: ${URL}"
 
-          for i in {1..30}; do
+          # TLS cert issuance (Let's Encrypt) can take a bit on first deploy.
+          # We wait up to ~2 minutes to reduce false negatives.
+          for i in {1..60}; do
             if BODY="$(curl -fsS --max-time 10 "${URL}")"; then
               echo "Response: ${BODY}"
               if echo "${BODY}" | grep -q '"status"' && echo "${BODY}" | grep -q 'ok'; then
@@ -115,7 +117,7 @@ jobs:
               fi
             fi
 
-            echo "Waiting for API... attempt ${i}/30"
+            echo "Waiting for API... attempt ${i}/60"
             sleep 2
           done
 

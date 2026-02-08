@@ -77,33 +77,26 @@ def upgrade() -> None:
         """
     )
 
-    # If we still have duplicate FREE codes (e.g., Free + Pro both mapped to FREE somehow),
-    # convert one extra row to PLUS_MONTHLY_CARD so the unique index can be created.
-    # Best-effort: pick the most recently updated non-free-ish row.
+    # Ensure FREE plan exists (some DBs might not have a legacy 'Free' row).
+    free_id = str(uuid.uuid4())
     op.execute(
-        """
-        WITH free_dups AS (
-          SELECT id
-          FROM plans
-          WHERE code = 'FREE'
-          ORDER BY
-            CASE WHEN (nome ILIKE 'free%' OR nome ILIKE '%free%') THEN 0 ELSE 1 END DESC,
-            atualizado_em DESC
-        )
-        UPDATE plans
-        SET code = 'PLUS_MONTHLY_CARD',
-            price = 47.00,
-            price_cents = 4700,
-            currency = 'BRL',
-            billing_period = 'MONTHLY'
-        WHERE id IN (
-          SELECT id FROM free_dups OFFSET 1 LIMIT 1
-        )
+        f"""
+        INSERT INTO plans (id, criado_em, atualizado_em, code, nome, max_users, max_storage_mb, price, price_cents, currency, billing_period)
+        VALUES ('{free_id}'::uuid, NOW(), NOW(),
+                'FREE', 'Free',
+                3, 100,
+                0.00, 0, 'BRL', 'NONE')
+        ON CONFLICT (nome) DO UPDATE
+          SET code = EXCLUDED.code,
+              max_users = EXCLUDED.max_users,
+              max_storage_mb = EXCLUDED.max_storage_mb,
+              price = EXCLUDED.price,
+              price_cents = EXCLUDED.price_cents,
+              currency = EXCLUDED.currency,
+              billing_period = EXCLUDED.billing_period,
+              atualizado_em = NOW()
         """
     )
-
-    # Enforce NOT NULL after backfill.
-    op.execute("ALTER TABLE plans ALTER COLUMN code SET NOT NULL")
 
     # Ensure monthly plan exists (some DBs might not have a legacy 'Pro' row to convert).
     monthly_id = str(uuid.uuid4())
@@ -147,6 +140,150 @@ def upgrade() -> None:
         """
     )
 
+    # If we have duplicate plan codes (e.g. legacy `Pro` + seeded `Plus Mensal`), we must deduplicate
+    # BEFORE creating the unique index. Otherwise the migration will fail.
+    #
+    # Strategy:
+    # - pick 1 "winner" row per code (FREE / PLUS_MONTHLY_CARD / PLUS_ANNUAL_PIX)
+    # - repoint legacy `subscriptions.plan_id` (or `subscriptions_old.plan_id`) to the winner
+    # - delete the duplicate plan rows
+    #
+    # This keeps the database consistent and makes the unique index creation deterministic.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+          -- Update legacy subscriptions table if present.
+          IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'subscriptions' AND column_name = 'plan_id'
+          ) THEN
+            WITH ranked AS (
+              SELECT
+                id,
+                code,
+                ROW_NUMBER() OVER (
+                  PARTITION BY code
+                  ORDER BY
+                    CASE
+                      WHEN code = 'FREE' AND (nome ILIKE 'free%' OR nome ILIKE '%free%') THEN 0
+                      WHEN code = 'PLUS_MONTHLY_CARD' AND (nome ILIKE 'plus mensal%' OR nome ILIKE 'pro%' OR nome ILIKE '%pro%') THEN 0
+                      WHEN code = 'PLUS_ANNUAL_PIX' AND (nome ILIKE 'plus anual%' OR nome ILIKE '%anual%' OR nome ILIKE '%pix%') THEN 0
+                      ELSE 1
+                    END,
+                    atualizado_em DESC
+                ) AS rn
+              FROM plans
+            ),
+            winners AS (
+              SELECT code, id AS winner_id
+              FROM ranked
+              WHERE rn = 1
+            ),
+            losers AS (
+              SELECT id AS loser_id, code
+              FROM ranked
+              WHERE rn > 1
+            ),
+            map AS (
+              SELECT losers.loser_id, winners.winner_id
+              FROM losers
+              JOIN winners USING (code)
+            )
+            UPDATE subscriptions s
+            SET plan_id = map.winner_id
+            FROM map
+            WHERE s.plan_id = map.loser_id;
+          END IF;
+
+          -- Update already-renamed legacy table if present (partial migration / crash recovery).
+          IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'subscriptions_old' AND column_name = 'plan_id'
+          ) THEN
+            WITH ranked AS (
+              SELECT
+                id,
+                code,
+                ROW_NUMBER() OVER (
+                  PARTITION BY code
+                  ORDER BY
+                    CASE
+                      WHEN code = 'FREE' AND (nome ILIKE 'free%' OR nome ILIKE '%free%') THEN 0
+                      WHEN code = 'PLUS_MONTHLY_CARD' AND (nome ILIKE 'plus mensal%' OR nome ILIKE 'pro%' OR nome ILIKE '%pro%') THEN 0
+                      WHEN code = 'PLUS_ANNUAL_PIX' AND (nome ILIKE 'plus anual%' OR nome ILIKE '%anual%' OR nome ILIKE '%pix%') THEN 0
+                      ELSE 1
+                    END,
+                    atualizado_em DESC
+                ) AS rn
+              FROM plans
+            ),
+            winners AS (
+              SELECT code, id AS winner_id
+              FROM ranked
+              WHERE rn = 1
+            ),
+            losers AS (
+              SELECT id AS loser_id, code
+              FROM ranked
+              WHERE rn > 1
+            ),
+            map AS (
+              SELECT losers.loser_id, winners.winner_id
+              FROM losers
+              JOIN winners USING (code)
+            )
+            UPDATE subscriptions_old s
+            SET plan_id = map.winner_id
+            FROM map
+            WHERE s.plan_id = map.loser_id;
+          END IF;
+
+          -- Now remove duplicate plan rows.
+          WITH ranked AS (
+            SELECT
+              id,
+              code,
+              ROW_NUMBER() OVER (
+                PARTITION BY code
+                ORDER BY
+                  CASE
+                    WHEN code = 'FREE' AND (nome ILIKE 'free%' OR nome ILIKE '%free%') THEN 0
+                    WHEN code = 'PLUS_MONTHLY_CARD' AND (nome ILIKE 'plus mensal%' OR nome ILIKE 'pro%' OR nome ILIKE '%pro%') THEN 0
+                    WHEN code = 'PLUS_ANNUAL_PIX' AND (nome ILIKE 'plus anual%' OR nome ILIKE '%anual%' OR nome ILIKE '%pix%') THEN 0
+                    ELSE 1
+                  END,
+                  atualizado_em DESC
+              ) AS rn
+            FROM plans
+          ),
+          winners AS (
+            SELECT code, id AS winner_id
+            FROM ranked
+            WHERE rn = 1
+          ),
+          losers AS (
+            SELECT id AS loser_id, code
+            FROM ranked
+            WHERE rn > 1
+          ),
+          map AS (
+            SELECT losers.loser_id, winners.winner_id
+            FROM losers
+            JOIN winners USING (code)
+          )
+          DELETE FROM plans p
+          USING map
+          WHERE p.id = map.loser_id;
+        END $$;
+        """
+    )
+
+    # Enforce NOT NULL after backfill/dedup.
+    op.execute("ALTER TABLE plans ALTER COLUMN code SET NOT NULL")
+
     # Unique index for plan code.
     op.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_plans_code ON plans (code)")
 
@@ -189,6 +326,7 @@ def upgrade() -> None:
         END $$;
         """
     )
+
 
     op.create_table(
         "subscriptions",

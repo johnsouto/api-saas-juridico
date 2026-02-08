@@ -3,10 +3,6 @@ services:
     # Production-only Traefik settings:
     # - HTTP -> HTTPS redirect
     # - Let's Encrypt certificates (HTTP-01 challenge)
-    #
-    # IMPORTANT:
-    # We intentionally do NOT override the `api`/`web` router labels here.
-    # Those live in `docker-compose.yml` and ensure `/api/*` routes to FastAPI.
     command:
       - --api.dashboard=true
       - --api.insecure=true
@@ -29,9 +25,6 @@ services:
       - traefik_letsencrypt:/letsencrypt
 
   # Production routing (same-origin: https://elementojuris.cloud + https://elementojuris.cloud/api/*)
-  #
-  # We override the router rules to include Host() so Traefik can request valid TLS certs
-  # from Let's Encrypt (and so the GitHub Actions health check can verify TLS).
   api:
     labels:
       - traefik.enable=true
