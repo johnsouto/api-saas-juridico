@@ -40,7 +40,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE plans ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'BRL'")
     op.execute("ALTER TABLE plans ADD COLUMN IF NOT EXISTS billing_period billing_period NOT NULL DEFAULT 'NONE'")
 
-    # Backfill existing rows (Free/Pro from seed).
+    # Backfill / normalize existing rows (legacy Free/Pro). We intentionally do NOT depend only on `code IS NULL`
+    # because some earlier iterations may have created the column with a default, leading to wrong values.
     op.execute(
         """
         UPDATE plans
@@ -49,8 +50,7 @@ def upgrade() -> None:
             price_cents = 0,
             currency = 'BRL',
             billing_period = 'NONE'
-        WHERE code IS NULL
-          AND (nome ILIKE 'free%' OR nome ILIKE '%free%')
+        WHERE (nome ILIKE 'free%' OR nome ILIKE '%free%')
         """
     )
     op.execute(
@@ -61,8 +61,7 @@ def upgrade() -> None:
             price_cents = 4700,
             currency = 'BRL',
             billing_period = 'MONTHLY'
-        WHERE code IS NULL
-          AND (nome ILIKE 'pro%' OR nome ILIKE '%pro%')
+        WHERE (nome ILIKE 'pro%' OR nome ILIKE '%pro%')
         """
     )
     # Any remaining legacy rows fall back to FREE.
@@ -78,8 +77,46 @@ def upgrade() -> None:
         """
     )
 
+    # If we still have duplicate FREE codes (e.g., Free + Pro both mapped to FREE somehow),
+    # convert one extra row to PLUS_MONTHLY_CARD so the unique index can be created.
+    # Best-effort: pick the most recently updated non-free-ish row.
+    op.execute(
+        """
+        WITH free_dups AS (
+          SELECT id
+          FROM plans
+          WHERE code = 'FREE'
+          ORDER BY
+            CASE WHEN (nome ILIKE 'free%' OR nome ILIKE '%free%') THEN 0 ELSE 1 END DESC,
+            atualizado_em DESC
+        )
+        UPDATE plans
+        SET code = 'PLUS_MONTHLY_CARD',
+            price = 47.00,
+            price_cents = 4700,
+            currency = 'BRL',
+            billing_period = 'MONTHLY'
+        WHERE id IN (
+          SELECT id FROM free_dups OFFSET 1 LIMIT 1
+        )
+        """
+    )
+
     # Enforce NOT NULL after backfill.
     op.execute("ALTER TABLE plans ALTER COLUMN code SET NOT NULL")
+
+    # Ensure monthly plan exists (some DBs might not have a legacy 'Pro' row to convert).
+    monthly_id = str(uuid.uuid4())
+    op.execute(
+        f"""
+        INSERT INTO plans (id, criado_em, atualizado_em, code, nome, max_users, max_storage_mb, price, price_cents, currency, billing_period)
+        SELECT '{monthly_id}'::uuid, NOW(), NOW(),
+               'PLUS_MONTHLY_CARD', 'Plus Mensal (Cartão)',
+               20, 5000,
+               47.00, 4700, 'BRL', 'MONTHLY'
+        WHERE NOT EXISTS (SELECT 1 FROM plans WHERE code = 'PLUS_MONTHLY_CARD')
+        """
+    )
 
     # Ensure yearly PIX plan exists.
     annual_id = str(uuid.uuid4())
@@ -98,6 +135,11 @@ def upgrade() -> None:
     op.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_plans_code ON plans (code)")
 
     # 4) Subscriptions: rebuild as 1 row per tenant with v2 columns.
+    # NOTE: The legacy table has constraints named using our naming convention, e.g. `pk_subscriptions`.
+    # If we rename `subscriptions` to `subscriptions_old` without renaming those constraints, creating the new
+    # `subscriptions` table will fail because Postgres requires constraint/index names to be unique.
+    #
+    # We rename the legacy constraints to `*_old` to avoid collisions.
     op.execute(
         """
         DO $$
@@ -111,6 +153,22 @@ def upgrade() -> None:
             WHERE table_schema = 'public' AND table_name = 'subscriptions_old'
           ) THEN
             ALTER TABLE subscriptions RENAME TO subscriptions_old;
+          END IF;
+
+          -- Best-effort: rename legacy constraints if they still exist.
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = 'subscriptions_old'
+          ) THEN
+            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'pk_subscriptions') THEN
+              EXECUTE 'ALTER TABLE subscriptions_old RENAME CONSTRAINT pk_subscriptions TO pk_subscriptions_old';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_subscriptions_tenant_id_tenants') THEN
+              EXECUTE 'ALTER TABLE subscriptions_old RENAME CONSTRAINT fk_subscriptions_tenant_id_tenants TO fk_subscriptions_old_tenant_id_tenants';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_subscriptions_plan_id_plans') THEN
+              EXECUTE 'ALTER TABLE subscriptions_old RENAME CONSTRAINT fk_subscriptions_plan_id_plans TO fk_subscriptions_old_plan_id_plans';
+            END IF;
           END IF;
         END $$;
         """
