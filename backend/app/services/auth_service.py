@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -34,6 +35,97 @@ from app.utils.validators import is_disposable_email, is_valid_cnpj, is_valid_cp
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+logger = logging.getLogger(__name__)
+
+
+def _extract_integrity_context(exc: IntegrityError) -> tuple[str | None, str | None, str | None, str | None]:
+    """
+    Best-effort extraction of useful info from an IntegrityError.
+
+    We intentionally avoid logging the full exception string because it may contain PII.
+    """
+    orig = getattr(exc, "orig", None)
+    diag = getattr(orig, "diag", None) if orig is not None else None
+
+    sqlstate = (
+        getattr(orig, "sqlstate", None)
+        or getattr(orig, "pgcode", None)
+        or getattr(diag, "sqlstate", None)
+        if diag is not None
+        else None
+    )
+    constraint = (
+        getattr(orig, "constraint_name", None)
+        or getattr(diag, "constraint_name", None)
+        if diag is not None
+        else None
+    )
+    column = (
+        getattr(orig, "column_name", None)
+        or getattr(diag, "column_name", None)
+        if diag is not None
+        else None
+    )
+    table = (
+        getattr(orig, "table_name", None)
+        or getattr(diag, "table_name", None)
+        if diag is not None
+        else None
+    )
+
+    return sqlstate, constraint, column, table
+
+
+def _register_tenant_integrity_message(
+    exc: IntegrityError,
+    *,
+    tenant_tipo_documento: TenantDocumentoTipo,
+) -> str:
+    sqlstate, constraint, column, table = _extract_integrity_context(exc)
+
+    # SQLSTATE reference (PostgreSQL):
+    # - 23505: unique_violation
+    # - 23502: not_null_violation
+    # - 23503: foreign_key_violation
+    if sqlstate == "23505":
+        c = (constraint or "").lower()
+        if "users_email" in c or c.endswith("_email_key"):
+            return "Email já cadastrado. Use outro email ou faça login."
+        if "tenants_slug" in c or c.endswith("_slug_key"):
+            return "Slug já cadastrado. Escolha outro (ex: seu-escritorio-2)."
+        if "uq_tenants_tipo_documento_documento" in c or ("tenants" in c and "documento" in c):
+            if tenant_tipo_documento == TenantDocumentoTipo.cpf:
+                return "CPF já cadastrado. Se esse escritório já existiu, procure pelo CPF na plataforma."
+            return "CNPJ já cadastrado. Se esse escritório já existiu, procure pelo CNPJ na plataforma."
+        if "tenants_cnpj" in c:
+            return "CNPJ já cadastrado. Se esse escritório já existiu, procure pelo CNPJ na plataforma."
+        return "Não foi possível registrar: documento, slug ou email já cadastrado."
+
+    if sqlstate == "23502":
+        # Not-null violations typically indicate schema mismatch or missing required fields.
+        col = (column or "").lower()
+        if col.endswith("cnpj"):
+            return "CNPJ é obrigatório para este cadastro (verifique o tipo de documento)."
+        if col.endswith("documento"):
+            return "Documento é obrigatório."
+        if col.endswith("slug"):
+            return "Slug é obrigatório."
+        if col.endswith("email"):
+            return "Email é obrigatório."
+        return "Não foi possível registrar: dados obrigatórios ausentes."
+
+    if sqlstate == "23503":
+        # Foreign key violations usually indicate a configuration error (e.g. missing plan seed).
+        return "Não foi possível registrar por configuração incompleta do sistema. Tente novamente em instantes."
+
+    # Fallback (do not leak internal DB details).
+    _tbl = table or "-"
+    _col = column or "-"
+    _con = constraint or "-"
+    logger.warning("register_tenant IntegrityError sqlstate=%s constraint=%s table=%s column=%s", sqlstate, _con, _tbl, _col)
+    return "Não foi possível registrar por um erro de integridade. Tente novamente ou contate o suporte."
 
 
 @dataclass(frozen=True)
@@ -106,6 +198,33 @@ class AuthService:
         if is_disposable_email(admin_email):
             raise BadRequestError("Email descartável não é permitido. Use um email real (Gmail/corporativo).")
 
+        # Pre-checks to return friendly messages without relying only on DB constraint errors.
+        # (We still keep IntegrityError handling for race conditions.)
+        slug_exists = (
+            await db.execute(select(Tenant.id).where(Tenant.slug == tenant_slug).limit(1))
+        ).scalar_one_or_none()
+        if slug_exists:
+            raise BadRequestError("Slug já cadastrado. Escolha outro (ex: seu-escritorio-2).")
+
+        doc_exists = (
+            await db.execute(
+                select(Tenant.id)
+                .where(Tenant.tipo_documento == tenant_tipo_documento)
+                .where(Tenant.documento == tenant_documento)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if doc_exists:
+            if tenant_tipo_documento == TenantDocumentoTipo.cpf:
+                raise BadRequestError("CPF já cadastrado. Se esse escritório já existiu, procure pelo CPF na plataforma.")
+            raise BadRequestError("CNPJ já cadastrado. Se esse escritório já existiu, procure pelo CNPJ na plataforma.")
+
+        email_exists = (
+            await db.execute(select(User.id).where(User.email == admin_email).limit(1))
+        ).scalar_one_or_none()
+        if email_exists:
+            raise BadRequestError("Email já cadastrado. Use outro email ou faça login.")
+
         plan_stmt = select(Plan).where(Plan.code == PlanCode.FREE)
         free_plan = (await db.execute(plan_stmt)).scalar_one_or_none()
         if not free_plan:
@@ -119,7 +238,13 @@ class AuthService:
             slug=tenant_slug,
         )
         db.add(tenant)
-        await db.flush()  # allocate tenant.id before using it
+        try:
+            await db.flush()  # allocate tenant.id before using it
+        except IntegrityError as exc:
+            await db.rollback()
+            raise BadRequestError(
+                _register_tenant_integrity_message(exc, tenant_tipo_documento=tenant_tipo_documento)
+            ) from exc
 
         admin = User(
             tenant_id=tenant.id,
@@ -147,7 +272,9 @@ class AuthService:
             await db.commit()
         except IntegrityError as exc:
             await db.rollback()
-            raise BadRequestError("Não foi possível registrar: documento, slug ou email já cadastrado.") from exc
+            raise BadRequestError(
+                _register_tenant_integrity_message(exc, tenant_tipo_documento=tenant_tipo_documento)
+            ) from exc
 
         await db.refresh(tenant)
         await db.refresh(admin)
