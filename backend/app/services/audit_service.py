@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import event
@@ -88,6 +88,8 @@ def register_audit_listeners() -> None:
                 record_id=str(record_id) if record_id is not None else None,
                 old_value=old_value,
                 new_value=new_value,
+                # Be explicit to avoid any environment-specific default issues.
+                created_at=datetime.now(timezone.utc),
             )
             session.add(log)
 

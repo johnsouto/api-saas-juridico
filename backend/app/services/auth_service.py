@@ -5,6 +5,7 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Any, Iterator
 
 from fastapi import BackgroundTasks
 from sqlalchemy import select
@@ -40,40 +41,58 @@ def _utcnow() -> datetime:
 logger = logging.getLogger(__name__)
 
 
+def _iter_orig_chain(exc: IntegrityError) -> Iterator[Any]:
+    """
+    Iterate over nested `.orig` exceptions, if any.
+
+    Some SQLAlchemy dialects (notably asyncpg) wrap the real driver exception inside multiple
+    layers that also expose an `.orig` attribute. We follow the chain to improve our ability
+    to extract SQLSTATE / constraint / table / column without logging PII.
+    """
+    orig = getattr(exc, "orig", None)
+    seen: set[int] = set()
+    while orig is not None and id(orig) not in seen:
+        seen.add(id(orig))
+        yield orig
+        orig = getattr(orig, "orig", None)
+
+
 def _extract_integrity_context(exc: IntegrityError) -> tuple[str | None, str | None, str | None, str | None]:
     """
     Best-effort extraction of useful info from an IntegrityError.
 
     We intentionally avoid logging the full exception string because it may contain PII.
     """
-    orig = getattr(exc, "orig", None)
-    diag = getattr(orig, "diag", None) if orig is not None else None
+    sqlstate: str | None = None
+    constraint: str | None = None
+    column: str | None = None
+    table: str | None = None
 
-    # NOTE: avoid `a or b or c if diag else None` because the conditional has lower precedence
-    # and would discard `a`/`b` when `diag` is None.
-    sqlstate = None
-    if orig is not None:
-        sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
-    if not sqlstate and diag is not None:
-        sqlstate = getattr(diag, "sqlstate", None)
+    for err in _iter_orig_chain(exc):
+        diag = getattr(err, "diag", None)
 
-    constraint = None
-    if orig is not None:
-        constraint = getattr(orig, "constraint_name", None)
-    if not constraint and diag is not None:
-        constraint = getattr(diag, "constraint_name", None)
+        if not sqlstate:
+            sqlstate = getattr(err, "sqlstate", None) or getattr(err, "pgcode", None)
+            if not sqlstate and diag is not None:
+                sqlstate = getattr(diag, "sqlstate", None)
 
-    column = None
-    if orig is not None:
-        column = getattr(orig, "column_name", None)
-    if not column and diag is not None:
-        column = getattr(diag, "column_name", None)
+        if not constraint:
+            constraint = getattr(err, "constraint_name", None)
+            if not constraint and diag is not None:
+                constraint = getattr(diag, "constraint_name", None)
 
-    table = None
-    if orig is not None:
-        table = getattr(orig, "table_name", None)
-    if not table and diag is not None:
-        table = getattr(diag, "table_name", None)
+        if not column:
+            column = getattr(err, "column_name", None)
+            if not column and diag is not None:
+                column = getattr(diag, "column_name", None)
+
+        if not table:
+            table = getattr(err, "table_name", None)
+            if not table and diag is not None:
+                table = getattr(diag, "table_name", None)
+
+        if sqlstate and constraint and column and table:
+            break
 
     return sqlstate, constraint, column, table
 
@@ -94,7 +113,12 @@ def _extract_not_null_from_message(message: str) -> tuple[str | None, str | None
     # Intentionally keep the regex strict to avoid accidentally capturing values.
     import re
 
-    m = re.search(r'null value in column "([^"]+)" of relation "([^"]+)" violates not-null constraint', message)
+    first_line = message.splitlines()[0].strip()
+    m = re.search(
+        r"""null value in column ["']([^"']+)["'] of relation ["']([^"']+)["'] violates not-null constraint""",
+        first_line,
+        flags=re.IGNORECASE,
+    )
     if not m:
         return None, None
     col = m.group(1).strip() or None
@@ -109,8 +133,9 @@ def _log_integrity_error(exc: IntegrityError, *, action: str) -> tuple[str | Non
     Returns the extracted context plus the original exception type name (orig_type).
     """
     sqlstate, constraint, column, table = _extract_integrity_context(exc)
-    orig = getattr(exc, "orig", None)
-    orig_type = getattr(orig, "__class__", type("-")).__name__ if orig is not None else "-"
+    orig_type = "-"
+    for err in _iter_orig_chain(exc):
+        orig_type = getattr(err, "__class__", type("-")).__name__
 
     logger.warning(
         "%s IntegrityError sqlstate=%s constraint=%s table=%s column=%s orig=%s",
@@ -128,8 +153,9 @@ def _register_tenant_integrity_message(
     exc: IntegrityError,
     *,
     tenant_tipo_documento: TenantDocumentoTipo,
+    action: str = "register_tenant",
 ) -> str:
-    sqlstate, constraint, column, table, _orig_type = _log_integrity_error(exc, action="register_tenant")
+    sqlstate, constraint, column, table, _orig_type = _log_integrity_error(exc, action=action)
 
     # SQLSTATE reference (PostgreSQL):
     # - 23505: unique_violation
@@ -154,13 +180,24 @@ def _register_tenant_integrity_message(
         col = (column or "").lower()
         if not col:
             # Try to extract from the database message (safe for not-null; contains only identifiers).
-            orig_msg = str(getattr(exc, "orig", "") or "")
-            parsed_col, parsed_tbl = _extract_not_null_from_message(orig_msg)
+            parsed_col = None
+            parsed_tbl = None
+            for err in _iter_orig_chain(exc):
+                msg = str(err or "")
+                first_line = msg.splitlines()[0].strip() if msg else ""
+                pc, pt = _extract_not_null_from_message(first_line)
+                if pc or pt:
+                    parsed_col, parsed_tbl = pc, pt
+                    break
+
             if parsed_col and not column:
                 column = parsed_col
                 col = parsed_col.lower()
             if parsed_tbl and not table:
                 table = parsed_tbl
+
+            if column or table:
+                logger.warning("%s not-null parsed table=%s column=%s", action, table or "-", column or "-")
 
         if col.endswith("cnpj"):
             return "CNPJ é obrigatório para este cadastro (verifique o tipo de documento)."
@@ -301,7 +338,11 @@ class AuthService:
         except IntegrityError as exc:
             await db.rollback()
             raise BadRequestError(
-                _register_tenant_integrity_message(exc, tenant_tipo_documento=tenant_tipo_documento)
+                _register_tenant_integrity_message(
+                    exc,
+                    tenant_tipo_documento=tenant_tipo_documento,
+                    action="register_tenant.flush",
+                )
             ) from exc
 
         admin = User(
@@ -333,7 +374,11 @@ class AuthService:
         except IntegrityError as exc:
             await db.rollback()
             raise BadRequestError(
-                _register_tenant_integrity_message(exc, tenant_tipo_documento=tenant_tipo_documento)
+                _register_tenant_integrity_message(
+                    exc,
+                    tenant_tipo_documento=tenant_tipo_documento,
+                    action="register_tenant.commit",
+                )
             ) from exc
 
         await db.refresh(tenant)
