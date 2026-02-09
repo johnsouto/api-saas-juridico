@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AuthError, NotFoundError
+from app.core.exceptions import AuthError, BadRequestError, NotFoundError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -29,6 +29,7 @@ from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
 from app.utils.crypto import sha256_hex
 from app.utils.slug import normalize_slug
+from app.utils.validators import is_disposable_email, is_valid_cnpj, is_valid_cpf, only_digits
 
 
 def _utcnow() -> datetime:
@@ -89,6 +90,21 @@ class AuthService:
         admin_senha: str,
     ) -> tuple[Tenant, User, str, str]:
         tenant_slug = normalize_slug(tenant_slug)
+        tenant_documento = only_digits(tenant_documento)
+        admin_email = admin_email.strip().lower()
+
+        if not tenant_documento:
+            raise BadRequestError("Documento é obrigatório")
+
+        if tenant_tipo_documento == TenantDocumentoTipo.cpf:
+            if not is_valid_cpf(tenant_documento):
+                raise BadRequestError("CPF inválido")
+        else:
+            if not is_valid_cnpj(tenant_documento):
+                raise BadRequestError("CNPJ inválido")
+
+        if is_disposable_email(admin_email):
+            raise BadRequestError("Email descartável não é permitido. Use um email real (Gmail/corporativo).")
 
         plan_stmt = select(Plan).where(Plan.code == PlanCode.FREE)
         free_plan = (await db.execute(plan_stmt)).scalar_one_or_none()
@@ -131,7 +147,7 @@ class AuthService:
             await db.commit()
         except IntegrityError as exc:
             await db.rollback()
-            raise AuthError("Não foi possível registrar o tenant (documento/slug/email já existe).") from exc
+            raise BadRequestError("Não foi possível registrar: documento, slug ou email já cadastrado.") from exc
 
         await db.refresh(tenant)
         await db.refresh(admin)
