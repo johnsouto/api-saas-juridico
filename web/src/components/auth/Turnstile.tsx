@@ -26,6 +26,17 @@ export function Turnstile({ siteKey, onVerify, onExpire, onError, className }: P
   const widgetIdRef = useRef<string | null>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
 
+  // Keep the latest callbacks without triggering widget re-render on each parent render.
+  const onVerifyRef = useRef(onVerify);
+  const onExpireRef = useRef(onExpire);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onVerifyRef.current = onVerify;
+    onExpireRef.current = onExpire;
+    onErrorRef.current = onError;
+  }, [onError, onExpire, onVerify]);
+
   const containerId = useMemo(() => `turnstile-${Math.random().toString(36).slice(2)}`, []);
 
   useEffect(() => {
@@ -38,13 +49,13 @@ export function Turnstile({ siteKey, onVerify, onExpire, onError, className }: P
       sitekey: siteKey,
       theme: "auto",
       callback: (token: unknown) => {
-        if (typeof token === "string") onVerify(token);
+        if (typeof token === "string") onVerifyRef.current(token);
       },
       "expired-callback": () => {
-        onExpire?.();
+        onExpireRef.current?.();
       },
       "error-callback": () => {
-        onError?.();
+        onErrorRef.current?.();
       }
     });
 
@@ -59,7 +70,7 @@ export function Turnstile({ siteKey, onVerify, onExpire, onError, className }: P
       }
       widgetIdRef.current = null;
     };
-  }, [onError, onExpire, onVerify, scriptLoaded, siteKey]);
+  }, [scriptLoaded, siteKey]);
 
   return (
     <div className={className}>
@@ -72,4 +83,3 @@ export function Turnstile({ siteKey, onVerify, onExpire, onError, className }: P
     </div>
   );
 }
-
