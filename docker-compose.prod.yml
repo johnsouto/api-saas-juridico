@@ -73,6 +73,16 @@ services:
       - traefik.http.routers.api-platform-https.middlewares=api-inflight,api-ratelimit-sensitive
       - traefik.http.routers.api-platform-https.service=api
 
+      # Dedicated health router (used by CI deploy health checks). This is intentionally explicit
+      # so it keeps working even if the generic /api router is misconfigured.
+      - traefik.http.routers.api-health-https.rule=(Host(`elementojuris.cloud`) || Host(`www.elementojuris.cloud`)) && Path(`/api/health`)
+      - traefik.http.routers.api-health-https.entrypoints=websecure
+      - traefik.http.routers.api-health-https.tls=true
+      - traefik.http.routers.api-health-https.tls.certresolver=le
+      - traefik.http.routers.api-health-https.priority=300
+      - traefik.http.routers.api-health-https.middlewares=api-inflight
+      - traefik.http.routers.api-health-https.service=api
+
       - traefik.http.services.api.loadbalancer.server.port=8000
 
   web:

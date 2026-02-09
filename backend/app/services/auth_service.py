@@ -199,6 +199,12 @@ def _register_tenant_integrity_message(
             if column or table:
                 logger.warning("%s not-null parsed table=%s column=%s", action, table or "-", column or "-")
 
+        tbl = (table or "").lower()
+
+        # Common "production drift" case: DB is still on legacy subscriptions schema (plan_id NOT NULL).
+        if tbl == "subscriptions" and col == "plan_id":
+            return "Não foi possível registrar: sistema de planos não configurado. Tente novamente ou contate o suporte."
+
         if col.endswith("cnpj"):
             return "CNPJ é obrigatório para este cadastro (verifique o tipo de documento)."
         if col.endswith("documento"):
