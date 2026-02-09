@@ -49,31 +49,31 @@ def _extract_integrity_context(exc: IntegrityError) -> tuple[str | None, str | N
     orig = getattr(exc, "orig", None)
     diag = getattr(orig, "diag", None) if orig is not None else None
 
-    sqlstate = (
-        getattr(orig, "sqlstate", None)
-        or getattr(orig, "pgcode", None)
-        or getattr(diag, "sqlstate", None)
-        if diag is not None
-        else None
-    )
-    constraint = (
-        getattr(orig, "constraint_name", None)
-        or getattr(diag, "constraint_name", None)
-        if diag is not None
-        else None
-    )
-    column = (
-        getattr(orig, "column_name", None)
-        or getattr(diag, "column_name", None)
-        if diag is not None
-        else None
-    )
-    table = (
-        getattr(orig, "table_name", None)
-        or getattr(diag, "table_name", None)
-        if diag is not None
-        else None
-    )
+    # NOTE: avoid `a or b or c if diag else None` because the conditional has lower precedence
+    # and would discard `a`/`b` when `diag` is None.
+    sqlstate = None
+    if orig is not None:
+        sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    if not sqlstate and diag is not None:
+        sqlstate = getattr(diag, "sqlstate", None)
+
+    constraint = None
+    if orig is not None:
+        constraint = getattr(orig, "constraint_name", None)
+    if not constraint and diag is not None:
+        constraint = getattr(diag, "constraint_name", None)
+
+    column = None
+    if orig is not None:
+        column = getattr(orig, "column_name", None)
+    if not column and diag is not None:
+        column = getattr(diag, "column_name", None)
+
+    table = None
+    if orig is not None:
+        table = getattr(orig, "table_name", None)
+    if not table and diag is not None:
+        table = getattr(diag, "table_name", None)
 
     return sqlstate, constraint, column, table
 
@@ -124,7 +124,16 @@ def _register_tenant_integrity_message(
     _tbl = table or "-"
     _col = column or "-"
     _con = constraint or "-"
-    logger.warning("register_tenant IntegrityError sqlstate=%s constraint=%s table=%s column=%s", sqlstate, _con, _tbl, _col)
+    orig = getattr(exc, "orig", None)
+    orig_type = getattr(orig, "__class__", type("-")).__name__ if orig is not None else "-"
+    logger.warning(
+        "register_tenant IntegrityError sqlstate=%s constraint=%s table=%s column=%s orig=%s",
+        sqlstate,
+        _con,
+        _tbl,
+        _col,
+        orig_type,
+    )
     return "Não foi possível registrar por um erro de integridade. Tente novamente ou contate o suporte."
 
 
