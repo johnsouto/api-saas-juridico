@@ -34,6 +34,7 @@ export async function registerTenant(input: {
   admin_nome: string;
   admin_email: string;
   admin_senha: string;
+  cf_turnstile_response?: string;
 }): Promise<void> {
   await api.post("/v1/auth/register-tenant", input);
 }
@@ -45,4 +46,3 @@ export async function logout(): Promise<void> {
     cleanupLegacySaaSTokens();
   }
 }
-

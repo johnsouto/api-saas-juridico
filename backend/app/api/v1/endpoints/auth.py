@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,7 @@ from app.schemas.user import UserOut
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
+from app.services.turnstile_service import verify_turnstile
 
 
 router = APIRouter()
@@ -42,6 +43,21 @@ def _app_base_url(request: Request) -> str:
     host = request.headers.get("host")
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
     return f"{scheme}://{host}"
+
+
+def _client_ip(request: Request) -> str | None:
+    """
+    Best-effort client IP extraction.
+
+    NOTE: In production we sit behind Traefik, so prefer X-Forwarded-For.
+    """
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        first = xff.split(",")[0].strip()
+        return first or None
+    if request.client:
+        return request.client.host
+    return None
 
 
 def _set_auth_cookies(*, response: JSONResponse, access_token: str, refresh_token: str) -> None:
@@ -104,6 +120,14 @@ async def register_tenant(
     background: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    # Anti-bot protection (optional; enabled when TURNSTILE_SECRET_KEY is set).
+    if settings.TURNSTILE_SECRET_KEY:
+        if not payload.cf_turnstile_response:
+            raise HTTPException(status_code=403, detail="Verificação anti-robô obrigatória")
+        result = await verify_turnstile(payload.cf_turnstile_response, remoteip=_client_ip(request))
+        if not result.success:
+            raise HTTPException(status_code=403, detail="Falha na verificação anti-robô. Tente novamente.")
+
     _, __, access, refresh = await _auth_service.register_tenant(
         db,
         background,

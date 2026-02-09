@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     BILLING_PROVIDER: str = "FAKE"  # FAKE | STRIPE | MERCADOPAGO
     BILLING_WEBHOOK_SECRET: str | None = None
 
+    # Cloudflare Turnstile (anti-bot)
+    # If TURNSTILE_SECRET_KEY is empty/None, verification is disabled.
+    TURNSTILE_SECRET_KEY: str | None = None
+
     def cors_origins_list(self) -> list[str]:
         try:
             data = json.loads(self.CORS_ORIGINS)

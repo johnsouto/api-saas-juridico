@@ -97,6 +97,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@local}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SaaS Juridico}
+      # Cloudflare Turnstile (anti-bot) - optional
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
       PLATFORM_ADMIN_KEY: ${PLATFORM_ADMIN_KEY:-}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}
@@ -125,9 +127,13 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
     depends_on:
       - api
     labels:

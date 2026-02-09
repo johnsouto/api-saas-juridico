@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Turnstile } from "@/components/auth/Turnstile";
 
 const schema = z.object({
   email: z.string().email(),
@@ -64,6 +65,8 @@ const registerSchema = z
   });
 type RegisterValues = z.infer<typeof registerSchema>;
 
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+
 export default function LoginPage() {
   const router = useRouter();
   const initializedFromQuery = useRef(false);
@@ -74,6 +77,9 @@ export default function LoginPage() {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterPasswordConfirm, setShowRegisterPasswordConfirm] = useState(false);
   const [registerSlugEdited, setRegisterSlugEdited] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const turnstileEnabled = Boolean(TURNSTILE_SITE_KEY);
 
   function safeNext(raw: string | null): string {
     if (!raw) return "/dashboard";
@@ -169,7 +175,8 @@ export default function LoginPage() {
         tenant_slug: normalizeSlug(values.tenant_slug),
         admin_nome: values.admin_nome,
         admin_email: values.admin_email,
-        admin_senha: values.admin_senha
+        admin_senha: values.admin_senha,
+        cf_turnstile_response: turnstileToken ?? undefined
       };
 
       await registerTenantApi(payload);
@@ -278,13 +285,24 @@ export default function LoginPage() {
               onClick={() => {
                 setShowRegister((v) => !v);
                 setShowReset(false);
+                setTurnstileToken(null);
+                setTurnstileError(null);
               }}
             >
               {showRegister ? "Fechar cadastro" : "Criar conta grátis"}
             </Button>
 
             {showRegister ? (
-              <form className="mt-3 space-y-2" onSubmit={registerForm.handleSubmit((v) => registerTenant.mutate(v))}>
+              <form
+                className="mt-3 space-y-2"
+                onSubmit={registerForm.handleSubmit((v) => {
+                  if (turnstileEnabled && !turnstileToken) {
+                    setTurnstileError("Confirme que você não é um robô.");
+                    return;
+                  }
+                  registerTenant.mutate(v);
+                })}
+              >
                 <div className="space-y-1">
                   <Label htmlFor="reg_tenant_nome">Nome do escritório</Label>
                   <Input id="reg_tenant_nome" placeholder="Ex: Silva Advocacia" {...registerForm.register("tenant_nome")} />
@@ -412,6 +430,26 @@ export default function LoginPage() {
                     <p className="text-xs text-red-600">{registerForm.formState.errors.admin_senha_confirm.message}</p>
                   ) : null}
                 </div>
+
+                {turnstileEnabled ? (
+                  <div className="pt-2">
+                    <Turnstile
+                      siteKey={TURNSTILE_SITE_KEY}
+                      onVerify={(token) => {
+                        setTurnstileToken(token);
+                        setTurnstileError(null);
+                      }}
+                      onExpire={() => {
+                        setTurnstileToken(null);
+                      }}
+                      onError={() => {
+                        setTurnstileToken(null);
+                        setTurnstileError("Falha na verificação anti-robô. Recarregue a página e tente novamente.");
+                      }}
+                    />
+                    {turnstileError ? <p className="mt-1 text-xs text-red-600">{turnstileError}</p> : null}
+                  </div>
+                ) : null}
 
                 <Button className="w-full" disabled={registerTenant.isPending} type="submit">
                   {registerTenant.isPending ? "Criando..." : "Criar conta"}
