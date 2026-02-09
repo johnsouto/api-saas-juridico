@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # If TURNSTILE_SECRET_KEY is empty/None, verification is disabled.
     TURNSTILE_SECRET_KEY: str | None = None
 
+    # Telegram alerts (optional)
+    TELEGRAM_BOT_TOKEN: str | None = None
+    TELEGRAM_CHAT_ID: str | None = None
+
     def cors_origins_list(self) -> list[str]:
         try:
             data = json.loads(self.CORS_ORIGINS)

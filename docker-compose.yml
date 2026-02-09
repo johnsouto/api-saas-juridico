@@ -99,6 +99,9 @@ services:
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SaaS Juridico}
       # Cloudflare Turnstile (anti-bot) - optional
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      # Telegram alerts (optional)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
       PLATFORM_ADMIN_KEY: ${PLATFORM_ADMIN_KEY:-}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}

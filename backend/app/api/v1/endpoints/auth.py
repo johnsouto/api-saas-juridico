@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_roles
 from app.core.config import settings
-from app.core.exceptions import AuthError
+from app.core.exceptions import AuthError, BadRequestError
 from app.db.session import get_db
 from app.models.enums import UserRole
 from app.models.user import User
@@ -25,7 +26,9 @@ from app.schemas.user import UserOut
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
+from app.services.telegram_service import send_telegram_alert
 from app.services.turnstile_service import verify_turnstile
+from app.utils.validators import only_digits
 
 
 router = APIRouter()
@@ -58,6 +61,27 @@ def _client_ip(request: Request) -> str | None:
     if request.client:
         return request.client.host
     return None
+
+
+def _tg_code(value: str | None) -> str:
+    """
+    Wrap dynamic values as inline code for Telegram Markdown, avoiding formatting breakage.
+    """
+    s = (value or "").strip().replace("`", "'")
+    return f"`{s}`" if s else "`-`"
+
+
+def _notify_telegram_async(message: str) -> None:
+    """
+    Fire-and-forget Telegram alert.
+
+    Must never block or break the request flow.
+    """
+    try:
+        asyncio.create_task(send_telegram_alert(message))
+    except Exception:
+        # Best-effort only.
+        return
 
 
 def _set_auth_cookies(*, response: JSONResponse, access_token: str, refresh_token: str) -> None:
@@ -121,24 +145,75 @@ async def register_tenant(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Anti-bot protection (optional; enabled when TURNSTILE_SECRET_KEY is set).
+    attempted_doc = only_digits(payload.tenant_documento)
+    attempted_email = str(payload.admin_email).strip().lower()
     if settings.TURNSTILE_SECRET_KEY:
         if not payload.cf_turnstile_response:
+            _notify_telegram_async(
+                "\n".join(
+                    [
+                        "⚠️ *Tentativa de Cadastro Barrada*",
+                        f"• *Nome:* {_tg_code(payload.tenant_nome)}",
+                        f"• *Doc Tentado:* {_tg_code(attempted_doc)}",
+                        f"• *Motivo:* {_tg_code('Captcha obrigatório')}",
+                    ]
+                )
+            )
             raise HTTPException(status_code=403, detail="Verificação anti-robô obrigatória")
         result = await verify_turnstile(payload.cf_turnstile_response, remoteip=_client_ip(request))
         if not result.success:
+            _notify_telegram_async(
+                "\n".join(
+                    [
+                        "⚠️ *Tentativa de Cadastro Barrada*",
+                        f"• *Nome:* {_tg_code(payload.tenant_nome)}",
+                        f"• *Doc Tentado:* {_tg_code(attempted_doc)}",
+                        f"• *Motivo:* {_tg_code('Captcha inválido')}",
+                    ]
+                )
+            )
             raise HTTPException(status_code=403, detail="Falha na verificação anti-robô. Tente novamente.")
 
-    _, __, access, refresh = await _auth_service.register_tenant(
-        db,
-        background,
-        tenant_nome=payload.tenant_nome,
-        tenant_tipo_documento=payload.tenant_tipo_documento,
-        tenant_documento=payload.tenant_documento,
-        tenant_slug=payload.tenant_slug,
-        admin_nome=payload.admin_nome,
-        admin_email=str(payload.admin_email),
-        admin_senha=payload.admin_senha,
+    try:
+        tenant, __, access, refresh = await _auth_service.register_tenant(
+            db,
+            background,
+            tenant_nome=payload.tenant_nome,
+            tenant_tipo_documento=payload.tenant_tipo_documento,
+            tenant_documento=payload.tenant_documento,
+            tenant_slug=payload.tenant_slug,
+            admin_nome=payload.admin_nome,
+            admin_email=attempted_email,
+            admin_senha=payload.admin_senha,
+        )
+    except BadRequestError as exc:
+        reason = str(exc)
+        if reason in {"CPF inválido", "CNPJ inválido"}:
+            _notify_telegram_async(
+                "\n".join(
+                    [
+                        "⚠️ *Tentativa de Cadastro Barrada*",
+                        f"• *Nome:* {_tg_code(payload.tenant_nome)}",
+                        f"• *Doc Tentado:* {_tg_code(attempted_doc)}",
+                        f"• *Motivo:* {_tg_code(reason)}",
+                    ]
+                )
+            )
+        raise
+
+    # Success alert (best-effort)
+    _notify_telegram_async(
+        "\n".join(
+            [
+                "✅ *Novo Cadastro no Elemento Juris*",
+                f"• *Nome:* {_tg_code(tenant.nome)}",
+                f"• *Doc:* {_tg_code(tenant.documento)}",
+                f"• *E-mail:* {_tg_code(attempted_email)}",
+                "• *Status:* Turnstile Validado",
+            ]
+        )
     )
+
     response = JSONResponse({"ok": True})
     _set_auth_cookies(response=response, access_token=access, refresh_token=refresh)
     return response
