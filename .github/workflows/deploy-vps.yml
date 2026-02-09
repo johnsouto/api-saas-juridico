@@ -15,9 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Configure SSH
         shell: bash
         env:
@@ -90,10 +87,21 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Note: this deploy job does not need to checkout the repository locally.
+          # We deploy by SSH and pull the repository on the VPS itself.
           ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
             cd '${VPS_PATH}'; \
+            echo '--- git pull (with retries) ---'; \
+            for i in 1 2 3; do \
+              if git pull --ff-only; then break; fi; \
+              echo \"git pull failed (attempt \${i}/3). Retrying in 10s...\"; \
+              sleep 10; \
+            done; \
+            # Final attempt (will fail the deploy if it still can't pull).
             git pull --ff-only; \
+            echo '--- docker compose up ---'; \
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build traefik api web; \
+            echo '--- docker compose ps ---'; \
             docker compose ps"
 
       - name: Health check (API)
