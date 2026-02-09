@@ -109,7 +109,6 @@ services:
         condition: service_completed_successfully
     labels:
       - traefik.enable=true
-      - traefik.docker.network=juridico-saas_saas
       - traefik.http.routers.api-http.rule=(Host(`elementojuris.cloud`) || Host(`www.elementojuris.cloud`)) && PathPrefix(`/api`)
       - traefik.http.routers.api-http.entrypoints=web
       - traefik.http.routers.api-http.priority=100
