@@ -29,15 +29,47 @@ services:
     labels:
       - traefik.enable=true
 
+      # Global protection for the API service
+      # - Concurrency limit (in-flight requests): 30 simultaneous requests
+      - traefik.http.middlewares.api-inflight.inflightreq.amount=30
+
+      # Sensitive endpoints abuse protection (per client IP):
+      # 10 requests per minute + small burst (token bucket)
+      - traefik.http.middlewares.api-ratelimit-sensitive.ratelimit.average=10
+      - traefik.http.middlewares.api-ratelimit-sensitive.ratelimit.period=1m
+      - traefik.http.middlewares.api-ratelimit-sensitive.ratelimit.burst=10
+      - traefik.http.middlewares.api-ratelimit-sensitive.ratelimit.sourcecriterion.ipstrategy.depth=1
+
+      # Apply concurrency limit to all API routes
+      - traefik.http.routers.api-http.middlewares=api-inflight
       - traefik.http.routers.api-http.rule=(Host(`elementojuris.cloud`) || Host(`www.elementojuris.cloud`)) && PathPrefix(`/api`)
       - traefik.http.routers.api-http.entrypoints=web
       - traefik.http.routers.api-http.priority=100
 
+      - traefik.http.routers.api-https.middlewares=api-inflight
       - traefik.http.routers.api-https.rule=(Host(`elementojuris.cloud`) || Host(`www.elementojuris.cloud`)) && PathPrefix(`/api`)
       - traefik.http.routers.api-https.entrypoints=websecure
       - traefik.http.routers.api-https.tls=true
       - traefik.http.routers.api-https.tls.certresolver=le
       - traefik.http.routers.api-https.priority=100
+
+      # Rate limit only the most abused endpoints (/auth/* and /platform/*).
+      # We use dedicated routers with higher priority so they win over the generic /api router.
+      - traefik.http.routers.api-auth-https.rule=(Host(`elementojuris.cloud`) || Host(`www.elementojuris.cloud`)) && PathPrefix(`/api/v1/auth`)
+      - traefik.http.routers.api-auth-https.entrypoints=websecure
+      - traefik.http.routers.api-auth-https.tls=true
+      - traefik.http.routers.api-auth-https.tls.certresolver=le
+      - traefik.http.routers.api-auth-https.priority=200
+      - traefik.http.routers.api-auth-https.middlewares=api-inflight,api-ratelimit-sensitive
+      - traefik.http.routers.api-auth-https.service=api
+
+      - traefik.http.routers.api-platform-https.rule=(Host(`elementojuris.cloud`) || Host(`www.elementojuris.cloud`)) && PathPrefix(`/api/v1/platform`)
+      - traefik.http.routers.api-platform-https.entrypoints=websecure
+      - traefik.http.routers.api-platform-https.tls=true
+      - traefik.http.routers.api-platform-https.tls.certresolver=le
+      - traefik.http.routers.api-platform-https.priority=200
+      - traefik.http.routers.api-platform-https.middlewares=api-inflight,api-ratelimit-sensitive
+      - traefik.http.routers.api-platform-https.service=api
 
       - traefik.http.services.api.loadbalancer.server.port=8000
 
