@@ -32,6 +32,7 @@ def upgrade() -> None:
     # Postgres does not allow ALTER TYPE ... ADD VALUE inside a transaction.
     with op.get_context().autocommit_block():
         op.execute("ALTER TYPE subscription_status ADD VALUE IF NOT EXISTS 'free'")
+        op.execute("ALTER TYPE subscription_status ADD VALUE IF NOT EXISTS 'past_due'")
         op.execute("ALTER TYPE subscription_status ADD VALUE IF NOT EXISTS 'expired'")
 
     # 3) Plans: add required billing fields + backfill
@@ -137,6 +138,44 @@ def upgrade() -> None:
               currency = EXCLUDED.currency,
               billing_period = EXCLUDED.billing_period,
               atualizado_em = NOW()
+        """
+    )
+
+    # Normalize plan codes to the expected values. This is defensive: some older DBs may have created
+    # `plans.code` as TEXT/VARCHAR and stored lower/unknown values.
+    #
+    # We only accept: FREE, PLUS_MONTHLY_CARD, PLUS_ANNUAL_PIX.
+    op.execute("UPDATE plans SET code = 'FREE' WHERE code IS NULL OR btrim(code::text) = ''")
+    op.execute("UPDATE plans SET code = 'FREE' WHERE lower(code::text) = 'free'")
+    op.execute("UPDATE plans SET code = 'PLUS_MONTHLY_CARD' WHERE lower(code::text) = 'plus_monthly_card'")
+    op.execute("UPDATE plans SET code = 'PLUS_ANNUAL_PIX' WHERE lower(code::text) = 'plus_annual_pix'")
+    op.execute(
+        """
+        UPDATE plans
+        SET code = 'FREE'
+        WHERE code::text NOT IN ('FREE', 'PLUS_MONTHLY_CARD', 'PLUS_ANNUAL_PIX')
+        """
+    )
+
+    # Ensure `plans.code` uses the enum type `plan_code`. Some DBs may have created it as TEXT/VARCHAR in older
+    # iterations; that would break the FK from subscriptions.plan_code -> plans.code.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'plans'
+              AND column_name = 'code'
+              AND udt_name <> 'plan_code'
+          ) THEN
+            ALTER TABLE plans
+            ALTER COLUMN code TYPE plan_code
+            USING code::plan_code;
+          END IF;
+        END $$;
         """
     )
 
