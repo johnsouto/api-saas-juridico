@@ -310,6 +310,8 @@ class AuthService:
             email=admin_email,
             senha_hash=hash_password(admin_senha),
             role=UserRole.admin,
+            # Explicit to avoid any DB default mismatch (users.is_active is NOT NULL).
+            is_active=True,
         )
         sub = Subscription(
             tenant_id=tenant.id,
@@ -419,6 +421,7 @@ class AuthService:
                 email=inv.email,
                 senha_hash=hash_password(password),
                 role=inv.role,
+                is_active=True,
             )
 
         inv.accepted_at = _utcnow()
