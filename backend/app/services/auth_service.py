@@ -78,12 +78,58 @@ def _extract_integrity_context(exc: IntegrityError) -> tuple[str | None, str | N
     return sqlstate, constraint, column, table
 
 
+def _extract_not_null_from_message(message: str) -> tuple[str | None, str | None]:
+    """
+    Best-effort extraction of (column, table) from a Postgres not-null violation message.
+
+    Example asyncpg message:
+      null value in column "foo" of relation "bar" violates not-null constraint
+
+    We only extract identifiers (safe); we never log or return the full message because it may include PII
+    for other error types (e.g. unique violations).
+    """
+    if not message:
+        return None, None
+
+    # Intentionally keep the regex strict to avoid accidentally capturing values.
+    import re
+
+    m = re.search(r'null value in column "([^"]+)" of relation "([^"]+)" violates not-null constraint', message)
+    if not m:
+        return None, None
+    col = m.group(1).strip() or None
+    tbl = m.group(2).strip() or None
+    return col, tbl
+
+
+def _log_integrity_error(exc: IntegrityError, *, action: str) -> tuple[str | None, str | None, str | None, str | None, str]:
+    """
+    Log a sanitized summary of an IntegrityError (no PII).
+
+    Returns the extracted context plus the original exception type name (orig_type).
+    """
+    sqlstate, constraint, column, table = _extract_integrity_context(exc)
+    orig = getattr(exc, "orig", None)
+    orig_type = getattr(orig, "__class__", type("-")).__name__ if orig is not None else "-"
+
+    logger.warning(
+        "%s IntegrityError sqlstate=%s constraint=%s table=%s column=%s orig=%s",
+        action,
+        sqlstate or "-",
+        constraint or "-",
+        table or "-",
+        column or "-",
+        orig_type,
+    )
+    return sqlstate, constraint, column, table, orig_type
+
+
 def _register_tenant_integrity_message(
     exc: IntegrityError,
     *,
     tenant_tipo_documento: TenantDocumentoTipo,
 ) -> str:
-    sqlstate, constraint, column, table = _extract_integrity_context(exc)
+    sqlstate, constraint, column, table, _orig_type = _log_integrity_error(exc, action="register_tenant")
 
     # SQLSTATE reference (PostgreSQL):
     # - 23505: unique_violation
@@ -106,6 +152,16 @@ def _register_tenant_integrity_message(
     if sqlstate == "23502":
         # Not-null violations typically indicate schema mismatch or missing required fields.
         col = (column or "").lower()
+        if not col:
+            # Try to extract from the database message (safe for not-null; contains only identifiers).
+            orig_msg = str(getattr(exc, "orig", "") or "")
+            parsed_col, parsed_tbl = _extract_not_null_from_message(orig_msg)
+            if parsed_col and not column:
+                column = parsed_col
+                col = parsed_col.lower()
+            if parsed_tbl and not table:
+                table = parsed_tbl
+
         if col.endswith("cnpj"):
             return "CNPJ é obrigatório para este cadastro (verifique o tipo de documento)."
         if col.endswith("documento"):
@@ -114,6 +170,12 @@ def _register_tenant_integrity_message(
             return "Slug é obrigatório."
         if col.endswith("email"):
             return "Email é obrigatório."
+        if col.endswith("senha_hash") or col.endswith("senha"):
+            return "Senha é obrigatória."
+        if col.endswith("nome"):
+            return "Nome é obrigatório."
+        if col.endswith("tenant_id"):
+            return "Não foi possível registrar por um erro interno (tenant inválido). Tente novamente."
         return "Não foi possível registrar: dados obrigatórios ausentes."
 
     if sqlstate == "23503":
@@ -121,19 +183,6 @@ def _register_tenant_integrity_message(
         return "Não foi possível registrar por configuração incompleta do sistema. Tente novamente em instantes."
 
     # Fallback (do not leak internal DB details).
-    _tbl = table or "-"
-    _col = column or "-"
-    _con = constraint or "-"
-    orig = getattr(exc, "orig", None)
-    orig_type = getattr(orig, "__class__", type("-")).__name__ if orig is not None else "-"
-    logger.warning(
-        "register_tenant IntegrityError sqlstate=%s constraint=%s table=%s column=%s orig=%s",
-        sqlstate,
-        _con,
-        _tbl,
-        _col,
-        orig_type,
-    )
     return "Não foi possível registrar por um erro de integridade. Tente novamente ou contate o suporte."
 
 
