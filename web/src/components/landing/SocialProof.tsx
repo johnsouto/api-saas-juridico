@@ -29,9 +29,9 @@ export function SocialProof() {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-5">
             <p className="text-sm font-semibold text-white/80">Prova social</p>
-            <div className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">+10.000 usuários</div>
+            <div className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">+3.400 usuários</div>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-white/70 sm:text-base">
-              Junte-se a mais de 10.000 profissionais e leve seu escritório para o próximo nível.
+              Junte-se a mais de 3.400 profissionais e leve seu escritório para o próximo nível.
             </p>
 
             <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/75 backdrop-blur">

@@ -29,7 +29,7 @@ export function Pricing() {
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75 backdrop-blur">
-            <Sparkles className="h-4 w-4 text-[#234066]" /> Plus pensado para conversão e crescimento
+            <Sparkles className="h-4 w-4 text-[#234066]" /> Melhore seu escritório com o Plano Plus
           </div>
         </div>
 

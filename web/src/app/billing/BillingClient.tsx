@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Container } from "@/components/landing/Container";
 import { api } from "@/lib/api";
+import { formatDateTimeBR } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,13 +45,6 @@ function planLabel(plan: BillingStatus["plan_code"]): string {
   if (plan === "PLUS_MONTHLY_CARD") return "Plus (Mensal)";
   if (plan === "PLUS_ANNUAL_PIX") return "Plus (Anual Pix)";
   return "Free";
-}
-
-function fmtDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("pt-BR");
 }
 
 export function BillingClient() {
@@ -224,8 +218,8 @@ export function BillingClient() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Período</p>
                   <p className="mt-1 text-sm text-white/80">
                     {status.data?.status === "past_due"
-                      ? `Acesso até: ${fmtDateTime(status.data.grace_period_end)}`
-                      : `Até: ${fmtDateTime(status.data?.current_period_end)}`}
+                      ? `Acesso até: ${formatDateTimeBR(status.data.grace_period_end) || "—"}`
+                      : `Até: ${formatDateTimeBR(status.data?.current_period_end) || "—"}`}
                   </p>
                 </div>
               </div>
@@ -308,7 +302,9 @@ export function BillingClient() {
                   <code className="mt-2 block select-all whitespace-pre-wrap break-words rounded bg-white/5 p-3 text-xs text-white/80">
                     {pixInfo.pix_copy_paste}
                   </code>
-                  <div className="mt-3 text-xs text-white/60">Expira em: {fmtDateTime(pixInfo.expires_at)}</div>
+                  <div className="mt-3 text-xs text-white/60">
+                    Expira em: {formatDateTimeBR(pixInfo.expires_at) || "—"}
+                  </div>
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                     <Button
                       className={cn("w-full sm:w-auto", focusRing)}
@@ -338,4 +334,3 @@ export function BillingClient() {
     </div>
   );
 }
-

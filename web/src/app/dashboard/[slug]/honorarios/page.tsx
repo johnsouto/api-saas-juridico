@@ -7,7 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
-import { centsToDecimalString, maskCurrencyBRL, parseCurrencyToCents } from "@/lib/format";
+import { centsToDecimalString, formatDateBR, maskCurrencyBRL, parseCurrencyToCents } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -408,7 +408,7 @@ export default function HonorariosPage() {
                           : "(sem processo)"}
                       </TableCell>
                       <TableCell>{h.valor}</TableCell>
-                      <TableCell>{h.data_vencimento}</TableCell>
+                      <TableCell>{formatDateBR(h.data_vencimento) || h.data_vencimento}</TableCell>
                       <TableCell>{h.qtd_parcelas ?? 1}</TableCell>
                       <TableCell>{h.percentual_exito != null ? `${h.percentual_exito}%` : "—"}</TableCell>
                       <TableCell>{h.percentual_parceiro != null ? `${h.percentual_parceiro}%` : "—"}</TableCell>

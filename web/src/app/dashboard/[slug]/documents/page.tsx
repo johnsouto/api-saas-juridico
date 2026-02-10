@@ -23,6 +23,10 @@ type Doc = {
 type Proc = { id: string; numero: string };
 type Client = { id: string; nome: string };
 type Honorario = { id: string; client_id: string; process_id?: string | null; status: string };
+type BillingStatus = {
+  plan_code: "FREE" | "PLUS_MONTHLY_CARD" | "PLUS_ANNUAL_PIX";
+  is_plus_effective: boolean;
+};
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
@@ -52,6 +56,14 @@ export default function DocumentsPage() {
   const [filterId, setFilterId] = useState<string>("");
   const [filterCategoria, setFilterCategoria] = useState<string>("");
   const [q, setQ] = useState<string>("");
+
+  const billing = useQuery({
+    queryKey: ["billing-status"],
+    queryFn: async () => (await api.get<BillingStatus>("/v1/billing/status")).data,
+    retry: false
+  });
+
+  const isFreePlan = billing.isSuccess && billing.data.plan_code === "FREE" && !billing.data.is_plus_effective;
 
   const list = useQuery({
     queryKey: ["documents", filterType, filterId, filterCategoria, q],
@@ -142,10 +154,14 @@ export default function DocumentsPage() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Documentos (MinIO/S3)</CardTitle>
+          <CardTitle>Documentos</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Uploads contam para o limite do plano.</p>
+          {isFreePlan ? (
+            <p className="text-sm text-muted-foreground">Armazene e organize seus PDFs. Limite do plano Free: 100 MB.</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Armazene e organize seus PDFs com segurança.</p>
+          )}
         </CardContent>
       </Card>
 

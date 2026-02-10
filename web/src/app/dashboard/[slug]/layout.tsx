@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -29,7 +29,7 @@ function planBadgeLabel(plan: BillingStatus["plan_code"]): string {
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
-  const { tenant, logout } = useAuth();
+  const { tenant, user, logout } = useAuth();
 
   const slug = params.slug;
 
@@ -49,6 +49,10 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const planCode = billing.data?.plan_code ?? "FREE";
   const status = billing.data?.status;
   const message = billing.data?.message;
+
+  const officeName = tenant?.nome?.trim() ? tenant.nome : "Seu escritório";
+  const firstName = (user?.nome ?? "").trim().split(/\s+/).filter(Boolean)[0] ?? "";
+  const welcomeValue = firstName ? `Dr. ${firstName}` : "Bem-vindo";
 
   const cta = (() => {
     if (status === "past_due") {
@@ -74,11 +78,12 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
       <header className="sticky top-0 z-40 border-b border-border/10 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 p-4">
-          <div className="flex items-center gap-3">
-            <Link className="text-sm font-semibold text-foreground" href={`/dashboard/${slug}`}>
-              Elemento Juris
-            </Link>
-            <span className="text-xs text-muted-foreground">Tenant: {slug}</span>
+          <div className="flex flex-col gap-1">
+            <div className="text-sm font-semibold text-foreground">Elemento Juris</div>
+            <div className="text-xs text-muted-foreground">
+              <div>Escritório: {officeName}</div>
+              <div>Bem-vindo: {welcomeValue}</div>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -123,6 +128,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 p-4 md:grid-cols-4">
         <aside className="space-y-2 md:col-span-1">
+          <NavLink href="/dashboard" label="Dashboard" activeOn={["/dashboard", `/dashboard/${slug}`]} />
           <NavLink href={`/dashboard/${slug}/clients`} label="Clientes" />
           <NavLink href={`/dashboard/${slug}/parcerias`} label="Parcerias" />
           <NavLink href={`/dashboard/${slug}/processes`} label="Processos" />
@@ -137,9 +143,25 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   );
 }
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({
+  href,
+  label,
+  activeOn
+}: {
+  href: string;
+  label: string;
+  activeOn?: string[];
+}) {
+  const currentPath = usePathname();
+
+  const isActive = (() => {
+    if (activeOn?.length) return activeOn.includes(currentPath);
+    if (currentPath === href) return true;
+    return currentPath.startsWith(`${href}/`);
+  })();
+
   return (
-    <Button asChild className="w-full justify-start" variant="outline">
+    <Button asChild className="w-full justify-start" variant={isActive ? "secondary" : "outline"}>
       <Link href={href}>{label}</Link>
     </Button>
   );

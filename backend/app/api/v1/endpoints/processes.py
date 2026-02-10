@@ -4,7 +4,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,13 +25,20 @@ router = APIRouter()
 async def list_processes(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
-    q: str | None = Query(default=None, description="Busca por número"),
+    q: str | None = Query(default=None, description="Busca por número/nicho/status"),
     client_id: uuid.UUID | None = Query(default=None, description="Filtrar por cliente"),
     parceria_id: uuid.UUID | None = Query(default=None, description="Filtrar por parceria"),
 ):
     stmt = select(Process).where(Process.tenant_id == user.tenant_id).order_by(Process.criado_em.desc())
     if q:
-        stmt = stmt.where(Process.numero.ilike(f"%{q}%"))
+        like = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                Process.numero.ilike(like),
+                Process.nicho.ilike(like),
+                Process.status.ilike(like),
+            )
+        )
     if client_id:
         stmt = stmt.where(Process.client_id == client_id)
     if parceria_id:

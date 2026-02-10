@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -52,6 +52,7 @@ const NICHOS = [
 export default function ProcessesPage() {
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [q, setQ] = useState<string>("");
   const clients = useQuery({
     queryKey: ["clients"],
     queryFn: async () => (await api.get<Client[]>("/v1/clients")).data
@@ -63,8 +64,8 @@ export default function ProcessesPage() {
   });
 
   const list = useQuery({
-    queryKey: ["processes"],
-    queryFn: async () => (await api.get<Proc[]>("/v1/processes")).data
+    queryKey: ["processes", q],
+    queryFn: async () => (await api.get<Proc[]>("/v1/processes", { params: q ? { q } : {} })).data
   });
 
   const form = useForm<FormValues>({
@@ -107,10 +108,8 @@ export default function ProcessesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Processos</CardTitle>
+          <CardDescription>Busca por Processo / Nicho + Cadastre seu processo</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Número é único por tenant.</p>
-        </CardContent>
       </Card>
 
       <Card>
@@ -196,6 +195,13 @@ export default function ProcessesPage() {
           <CardTitle className="text-sm">Lista</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="flex items-center gap-2">
+            <Input placeholder="Buscar por processo ou nicho…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Button variant="outline" type="button" onClick={() => setQ("")}>
+              Limpar
+            </Button>
+          </div>
+
         {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
         {list.data ? (
           <div className="mt-3 overflow-x-auto">

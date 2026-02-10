@@ -10,6 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Proc = { id: string; status: "ativo" | "inativo" | "outros"; criado_em: string };
+type BillingStatus = {
+  plan_code: "FREE" | "PLUS_MONTHLY_CARD" | "PLUS_ANNUAL_PIX";
+  is_plus_effective: boolean;
+  limits?: { max_users: number; max_storage_mb: number };
+};
+type DocumentsUsage = { used_bytes: number };
 
 export default function DashboardHome() {
   const params = useParams<{ slug: string }>();
@@ -21,6 +27,21 @@ export default function DashboardHome() {
       const r = await api.get("/v1/auth/me");
       return r.data as { nome: string; email: string; role: string };
     }
+  });
+
+  const billing = useQuery({
+    queryKey: ["billing-status"],
+    queryFn: async () => (await api.get<BillingStatus>("/v1/billing/status")).data,
+    retry: false
+  });
+
+  const isFreePlan = billing.isSuccess && billing.data.plan_code === "FREE" && !billing.data.is_plus_effective;
+
+  const storageUsage = useQuery({
+    queryKey: ["documents-usage"],
+    queryFn: async () => (await api.get<DocumentsUsage>("/v1/documents/usage")).data,
+    enabled: isFreePlan,
+    retry: false
   });
 
   const stats = useQuery({
@@ -116,6 +137,55 @@ export default function DashboardHome() {
           ) : null}
         </CardContent>
       </Card>
+
+      {isFreePlan ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Armazenamento</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {storageUsage.isLoading ? <p className="text-sm text-muted-foreground">Carregando uso…</p> : null}
+            {storageUsage.isError ? (
+              <p className="text-sm text-destructive">
+                {(storageUsage.error as any)?.response?.data?.detail ?? "Erro ao carregar uso de armazenamento"}
+              </p>
+            ) : null}
+
+            {storageUsage.data ? (
+              <>
+                {(() => {
+                  const usedBytes = storageUsage.data?.used_bytes ?? 0;
+                  const maxBytes = 100 * 1024 * 1024;
+                  const pct = Math.min(100, Math.max(0, Math.round((usedBytes / maxBytes) * 100)));
+                  const usedMb = usedBytes / 1024 / 1024;
+                  const barClass = pct < 50 ? "bg-emerald-500" : pct < 80 ? "bg-amber-400" : "bg-red-500";
+
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <div className="text-muted-foreground">Armazenamento (Free): {usedMb.toFixed(1)} MB de 100 MB</div>
+                        <div className="tabular-nums text-muted-foreground">{pct}%</div>
+                      </div>
+                      <div className="h-3 w-full overflow-hidden rounded-full bg-card/40">
+                        <div className={`h-full ${barClass}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Faça upgrade para aumentar limites e enviar mais documentos.
+                  </p>
+                  <Button asChild size="sm" className="shadow-glow">
+                    <Link href="/billing?plan=plus&next=/dashboard">Assinar Plus</Link>
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <Card>

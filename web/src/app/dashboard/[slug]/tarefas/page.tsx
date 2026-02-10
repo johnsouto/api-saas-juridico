@@ -28,6 +28,12 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
+const KANBAN_STATUS_LABEL: Record<string, string> = {
+  pendente: "pendente",
+  em_andamento: "em andamento",
+  concluido: "concluído"
+};
+
 export default function TarefasPage() {
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -170,7 +176,9 @@ export default function TarefasPage() {
             {["pendente", "em_andamento", "concluido"].map((col) => (
               <div key={col} className="rounded-lg border border-border/15 bg-card/20 p-3 backdrop-blur">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-semibold text-muted-foreground">{col}</div>
+                  <div className="text-xs font-semibold text-muted-foreground">
+                    {KANBAN_STATUS_LABEL[col] ?? col}
+                  </div>
                   <Badge variant="secondary">{list.data.filter((t) => t.status === col).length}</Badge>
                 </div>
                 <div className="mt-2 space-y-2">

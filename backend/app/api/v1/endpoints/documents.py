@@ -4,7 +4,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import StreamingResponse
@@ -49,6 +49,21 @@ async def list_documents(
     if categoria:
         stmt = stmt.where(Document.categoria == categoria)
     return list((await db.execute(stmt)).scalars().all())
+
+
+@router.get("/usage")
+async def get_documents_usage(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Return the tenant storage usage in bytes (sum of documents.size_bytes).
+
+    This is useful for dashboards/thermometers on the frontend.
+    """
+    stmt = select(func.coalesce(func.sum(Document.size_bytes), 0)).where(Document.tenant_id == user.tenant_id)
+    used_bytes = int((await db.execute(stmt)).scalar_one())
+    return {"used_bytes": used_bytes}
 
 
 @router.post("/upload", response_model=DocumentOut)
