@@ -8,7 +8,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
-import { formatDateTimeBR } from "@/lib/format";
+import { formatDateTimeBR } from "@/lib/datetime";
 import { clearPlatformAdminKey, getPlatformAdminKey, setPlatformAdminKey } from "@/lib/platformAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -435,8 +435,8 @@ export default function PlatformAdminPage() {
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         <div className="flex flex-col">
-                          <span>Vence: {formatDateTimeBR(t.current_period_end) || "—"}</span>
-                          <span className="text-zinc-500">Carência: {formatDateTimeBR(t.grace_period_end) || "—"}</span>
+                          <span>Vence: {formatDateTimeBR(t.current_period_end)}</span>
+                          <span className="text-zinc-500">Carência: {formatDateTimeBR(t.grace_period_end)}</span>
                         </div>
                       </TableCell>
                       <TableCell className={t.is_active ? "text-emerald-700" : "text-red-700"}>{t.is_active ? "ativo" : "inativo"}</TableCell>

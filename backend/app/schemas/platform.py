@@ -4,9 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import EmailStr
-
-from app.schemas.auth import TenantRegisterRequest
+from pydantic import EmailStr, Field
 from app.schemas.common import APIModel
 from app.schemas.tenant import TenantOut
 from app.schemas.token import TokenPair
@@ -15,10 +13,22 @@ from app.schemas.subscription import SubscriptionOut
 from app.models.enums import PlanCode, SubscriptionStatus, TenantDocumentoTipo
 
 
-class PlatformTenantCreate(TenantRegisterRequest):
+class PlatformTenantCreate(APIModel):
     """
-    Same payload as /auth/register-tenant, but intended for the SaaS operator.
+    Payload used by the SaaS operator to provision a tenant with an initial password.
+
+    Note: We keep a single `admin_nome` field here to keep the platform flow simple
+    and backward-compatible with the existing UI.
     """
+
+    tenant_nome: str = Field(min_length=2, max_length=200)
+    tenant_tipo_documento: TenantDocumentoTipo = TenantDocumentoTipo.cnpj
+    tenant_documento: str = Field(min_length=8, max_length=32)
+    tenant_slug: str = Field(min_length=2, max_length=80)
+
+    admin_nome: str = Field(min_length=2, max_length=200)
+    admin_email: EmailStr
+    admin_senha: str = Field(min_length=8, max_length=128)
 
 
 class PlatformTrialTenantCreate(APIModel):

@@ -51,8 +51,11 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const message = billing.data?.message;
 
   const officeName = tenant?.nome?.trim() ? tenant.nome : "Seu escritório";
-  const firstName = (user?.nome ?? "").trim().split(/\s+/).filter(Boolean)[0] ?? "";
-  const welcomeValue = firstName ? `Dr. ${firstName}` : "Bem-vindo";
+  const firstName =
+    (user?.first_name ?? "").trim() ||
+    (user?.nome ?? "").trim().split(/\s+/).filter(Boolean)[0] ||
+    "";
+  const welcomeLine = firstName ? `Bem-vindo: Dr. ${firstName}` : "Bem-vindo";
 
   const cta = (() => {
     if (status === "past_due") {
@@ -82,7 +85,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
             <div className="text-sm font-semibold text-foreground">Elemento Juris</div>
             <div className="text-xs text-muted-foreground">
               <div>Escritório: {officeName}</div>
-              <div>Bem-vindo: {welcomeValue}</div>
+              <div>{welcomeLine}</div>
             </div>
           </div>
 

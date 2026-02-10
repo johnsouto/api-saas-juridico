@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { formatDateTimeBR } from "@/lib/format";
+import { formatDateTimeBR } from "@/lib/datetime";
 
 type Client = { id: string; nome: string };
 type Tarefa = { id: string; titulo: string; descricao?: string | null; status: string; prazo_em?: string | null; client_id?: string | null };

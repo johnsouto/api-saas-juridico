@@ -31,7 +31,8 @@ export async function registerTenant(input: {
   tenant_tipo_documento: "cpf" | "cnpj";
   tenant_documento: string;
   tenant_slug: string;
-  admin_nome: string;
+  first_name: string;
+  last_name: string;
   admin_email: string;
   admin_senha: string;
   cf_turnstile_response?: string;

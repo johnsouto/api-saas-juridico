@@ -54,7 +54,8 @@ const registerSchema = z
       .string()
       .min(2, "Informe um slug (ex: silva-advocacia)")
       .regex(/^[a-z0-9-]+$/, "Use apenas letras minúsculas, números e hífen"),
-    admin_nome: z.string().min(2, "Informe seu nome"),
+    first_name: z.string().min(2, "Informe seu primeiro nome"),
+    last_name: z.string().min(2, "Informe seu sobrenome"),
     admin_email: z.string().email("Email inválido"),
     admin_senha: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
     admin_senha_confirm: z.string().min(8, "Confirme a senha")
@@ -133,7 +134,8 @@ export default function LoginPage() {
       tenant_tipo_documento: "cnpj",
       tenant_documento: "",
       tenant_slug: "",
-      admin_nome: "",
+      first_name: "",
+      last_name: "",
       admin_email: "",
       admin_senha: "",
       admin_senha_confirm: ""
@@ -173,7 +175,8 @@ export default function LoginPage() {
         tenant_tipo_documento: values.tenant_tipo_documento,
         tenant_documento: onlyDigits(values.tenant_documento),
         tenant_slug: normalizeSlug(values.tenant_slug),
-        admin_nome: values.admin_nome,
+        first_name: values.first_name,
+        last_name: values.last_name,
         admin_email: values.admin_email,
         admin_senha: values.admin_senha,
         cf_turnstile_response: turnstileToken ?? undefined
@@ -357,12 +360,22 @@ export default function LoginPage() {
                   ) : null}
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="reg_admin_nome">Seu nome</Label>
-                  <Input id="reg_admin_nome" placeholder="Ex: João Souza" {...registerForm.register("admin_nome")} />
-                  {registerForm.formState.errors.admin_nome?.message ? (
-                    <p className="text-xs text-red-600">{registerForm.formState.errors.admin_nome.message}</p>
-                  ) : null}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="reg_first_name">Primeiro nome</Label>
+                    <Input id="reg_first_name" placeholder="Ex: Marco Aurélio" {...registerForm.register("first_name")} />
+                    {registerForm.formState.errors.first_name?.message ? (
+                      <p className="text-xs text-red-600">{registerForm.formState.errors.first_name.message}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="reg_last_name">Sobrenome</Label>
+                    <Input id="reg_last_name" placeholder="Ex: Silva" {...registerForm.register("last_name")} />
+                    {registerForm.formState.errors.last_name?.message ? (
+                      <p className="text-xs text-red-600">{registerForm.formState.errors.last_name.message}</p>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="space-y-1">

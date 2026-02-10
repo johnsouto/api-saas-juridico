@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateTimeBR } from "@/lib/format";
+import { formatDateTimeBR } from "@/lib/datetime";
 
 type Client = { id: string; nome: string };
 type Evento = {
@@ -219,7 +219,7 @@ export default function AgendaPage() {
                       <TableCell>{e.titulo}</TableCell>
                       <TableCell>{e.tipo}</TableCell>
                       <TableCell>{e.client_id ? clients.data?.find((c) => c.id === e.client_id)?.nome ?? "—" : "—"}</TableCell>
-                      <TableCell>{formatDateTimeBR(e.inicio_em) || e.inicio_em}</TableCell>
+                      <TableCell>{formatDateTimeBR(e.inicio_em)}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="destructive"

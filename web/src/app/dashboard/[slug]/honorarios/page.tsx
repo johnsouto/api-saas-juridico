@@ -408,7 +408,7 @@ export default function HonorariosPage() {
                           : "(sem processo)"}
                       </TableCell>
                       <TableCell>{h.valor}</TableCell>
-                      <TableCell>{formatDateBR(h.data_vencimento) || h.data_vencimento}</TableCell>
+                      <TableCell>{formatDateBR(h.data_vencimento)}</TableCell>
                       <TableCell>{h.qtd_parcelas ?? 1}</TableCell>
                       <TableCell>{h.percentual_exito != null ? `${h.percentual_exito}%` : "—"}</TableCell>
                       <TableCell>{h.percentual_parceiro != null ? `${h.percentual_parceiro}%` : "—"}</TableCell>

@@ -80,6 +80,8 @@ async def seed(db: AsyncSession) -> None:
     admin = User(
         tenant_id=tenant.id,
         nome="Admin Demo",
+        first_name="Admin Demo",
+        last_name=None,
         email="admin@demo.example.com",
         senha_hash=hash_password("admin12345"),
         role=UserRole.admin,

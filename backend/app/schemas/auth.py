@@ -13,7 +13,8 @@ class TenantRegisterRequest(APIModel):
     tenant_documento: str = Field(min_length=8, max_length=32)
     tenant_slug: str = Field(min_length=2, max_length=80)
 
-    admin_nome: str = Field(min_length=2, max_length=200)
+    first_name: str = Field(min_length=2, max_length=200)
+    last_name: str = Field(min_length=2, max_length=200)
     admin_email: EmailStr
     admin_senha: str = Field(min_length=8, max_length=128)
 

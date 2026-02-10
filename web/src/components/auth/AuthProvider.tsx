@@ -10,6 +10,8 @@ export type AuthUser = {
   id: string;
   tenant_id: string;
   nome: string;
+  first_name?: string | null;
+  last_name?: string | null;
   email: string;
   role: "admin" | "advogado" | "financeiro";
   is_active: boolean;
@@ -108,4 +110,3 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth must be used within <AuthProvider />");
   return ctx;
 }
-

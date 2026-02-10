@@ -182,9 +182,10 @@ async def register_tenant(
             tenant_tipo_documento=payload.tenant_tipo_documento,
             tenant_documento=payload.tenant_documento,
             tenant_slug=payload.tenant_slug,
-            admin_nome=payload.admin_nome,
             admin_email=attempted_email,
             admin_senha=payload.admin_senha,
+            admin_first_name=payload.first_name,
+            admin_last_name=payload.last_name,
         )
     except BadRequestError as exc:
         reason = str(exc)

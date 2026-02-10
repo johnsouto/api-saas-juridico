@@ -278,13 +278,38 @@ class AuthService:
         tenant_tipo_documento: TenantDocumentoTipo,
         tenant_documento: str,
         tenant_slug: str,
-        admin_nome: str,
         admin_email: str,
         admin_senha: str,
+        admin_first_name: str | None = None,
+        admin_last_name: str | None = None,
+        admin_nome: str | None = None,
     ) -> tuple[Tenant, User, str, str]:
         tenant_slug = normalize_slug(tenant_slug)
         tenant_documento = only_digits(tenant_documento)
         admin_email = admin_email.strip().lower()
+
+        def _norm_name(value: str | None) -> str | None:
+            if value is None:
+                return None
+            s = " ".join(str(value).strip().split())
+            return s or None
+
+        admin_nome_norm = _norm_name(admin_nome)
+        admin_first_name_norm = _norm_name(admin_first_name)
+        admin_last_name_norm = _norm_name(admin_last_name)
+
+        if admin_nome_norm:
+            full_name = admin_nome_norm
+            first_name_value = admin_first_name_norm or admin_nome_norm
+            last_name_value = admin_last_name_norm
+        else:
+            if not admin_first_name_norm:
+                raise BadRequestError("Primeiro nome é obrigatório")
+            if not admin_last_name_norm:
+                raise BadRequestError("Sobrenome é obrigatório")
+            full_name = f"{admin_first_name_norm} {admin_last_name_norm}".strip()
+            first_name_value = admin_first_name_norm
+            last_name_value = admin_last_name_norm
 
         if not tenant_documento:
             raise BadRequestError("Documento é obrigatório")
@@ -353,7 +378,9 @@ class AuthService:
 
         admin = User(
             tenant_id=tenant.id,
-            nome=admin_nome,
+            nome=full_name,
+            first_name=first_name_value,
+            last_name=last_name_value,
             email=admin_email,
             senha_hash=hash_password(admin_senha),
             role=UserRole.admin,
@@ -461,6 +488,9 @@ class AuthService:
             if user.is_active:
                 raise AuthError("Usuário já está ativo")
             user.nome = inv.nome
+            # Best-effort: keep the full invited name as first_name to preserve composed names.
+            user.first_name = inv.nome
+            user.last_name = None
             user.role = inv.role
             user.senha_hash = hash_password(password)
             user.is_active = True
@@ -469,6 +499,8 @@ class AuthService:
             user = User(
                 tenant_id=inv.tenant_id,
                 nome=inv.nome,
+                first_name=inv.nome,
+                last_name=None,
                 email=inv.email,
                 senha_hash=hash_password(password),
                 role=inv.role,

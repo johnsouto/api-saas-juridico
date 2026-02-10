@@ -88,6 +88,8 @@ class PlatformService:
         admin = User(
             tenant_id=tenant.id,
             nome=admin_nome,
+            first_name=admin_nome,
+            last_name=None,
             email=admin_email,
             senha_hash=hash_password(random_pw),
             role=UserRole.admin,

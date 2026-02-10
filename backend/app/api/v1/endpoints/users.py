@@ -42,6 +42,8 @@ async def create_user(
     new_user = User(
         tenant_id=current.tenant_id,
         nome=payload.nome,
+        first_name=payload.nome,
+        last_name=None,
         email=str(payload.email),
         senha_hash=hash_password(payload.senha),
         role=payload.role,

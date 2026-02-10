@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Container } from "@/components/landing/Container";
 import { api } from "@/lib/api";
-import { formatDateTimeBR } from "@/lib/format";
+import { formatDateTimeBR } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -218,8 +218,8 @@ export function BillingClient() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Período</p>
                   <p className="mt-1 text-sm text-white/80">
                     {status.data?.status === "past_due"
-                      ? `Acesso até: ${formatDateTimeBR(status.data.grace_period_end) || "—"}`
-                      : `Até: ${formatDateTimeBR(status.data?.current_period_end) || "—"}`}
+                      ? `Acesso até: ${formatDateTimeBR(status.data.grace_period_end)}`
+                      : `Até: ${formatDateTimeBR(status.data?.current_period_end)}`}
                   </p>
                 </div>
               </div>
@@ -303,7 +303,7 @@ export function BillingClient() {
                     {pixInfo.pix_copy_paste}
                   </code>
                   <div className="mt-3 text-xs text-white/60">
-                    Expira em: {formatDateTimeBR(pixInfo.expires_at) || "—"}
+                    Expira em: {formatDateTimeBR(pixInfo.expires_at)}
                   </div>
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                     <Button
