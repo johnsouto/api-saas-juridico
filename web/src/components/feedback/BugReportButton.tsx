@@ -21,6 +21,9 @@ export function BugReportButton() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [includeUrl, setIncludeUrl] = useState(true);
   const [includeUA, setIncludeUA] = useState(true);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -28,7 +31,27 @@ export function BugReportButton() {
   const titleId = useId();
   const descId = useId();
   const dialogTitleId = useId();
+  const dialogDescId = useId();
+  const titleErrorId = useId();
+  const descErrorId = useId();
   const titleRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  function validate(): boolean {
+    const t = title.trim();
+    const d = description.trim();
+
+    const nextTitleError = t.length < 3 ? "Informe um título com pelo menos 3 caracteres." : null;
+    const nextDescError = d.length < 10 ? "Informe uma descrição com pelo menos 10 caracteres." : null;
+
+    setTitleError(nextTitleError);
+    setDescriptionError(nextDescError);
+    setFormError(nextTitleError || nextDescError ? "Preencha os campos obrigatórios." : null);
+
+    return !nextTitleError && !nextDescError;
+  }
+
+  const isValid = title.trim().length >= 3 && description.trim().length >= 10;
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -44,6 +67,9 @@ export function BugReportButton() {
       setSuccessMsg("Obrigado! Seu bug report foi enviado.");
       setTitle("");
       setDescription("");
+      setFormError(null);
+      setTitleError(null);
+      setDescriptionError(null);
       setIncludeUrl(true);
       setIncludeUA(true);
     }
@@ -52,6 +78,11 @@ export function BugReportButton() {
   useEffect(() => {
     if (!open) return;
     setSuccessMsg(null);
+    setFormError(null);
+    setTitleError(null);
+    setDescriptionError(null);
+    // Ensure the top (title) is visible even on smaller desktop heights.
+    dialogRef.current?.scrollTo({ top: 0 });
     // Focus first input for better accessibility.
     const t = window.setTimeout(() => titleRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
@@ -79,52 +110,85 @@ export function BugReportButton() {
       </Button>
 
       {open ? (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/50"
-            aria-hidden="true"
-            onClick={() => setOpen(false)}
-          />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/50" aria-hidden="true" onClick={() => setOpen(false)} />
 
-          <div className="absolute inset-0 flex items-start justify-center p-4 sm:items-center">
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={dialogTitleId}
-              className="w-full max-w-lg rounded-2xl border border-border/20 bg-background p-5 shadow-xl"
-            >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
+            aria-describedby={dialogDescId}
+            className={[
+              "relative w-[95vw] max-w-xl",
+              "max-h-[90vh] sm:max-h-[85vh] overflow-y-auto",
+              "rounded-2xl border border-border/20 bg-background/95 shadow-xl backdrop-blur"
+            ].join(" ")}
+          >
+            <div className="sticky top-0 z-10 border-b border-border/10 bg-background/95 p-4 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 id={dialogTitleId} className="text-lg font-semibold">
                     Reportar um bug
                   </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p id={dialogDescId} className="mt-1 text-sm text-muted-foreground">
                     Descreva o problema. Isso nos ajuda a melhorar o Elemento Juris.
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" aria-label="Fechar" onClick={() => setOpen(false)} type="button">
-                  X
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Fechar"
+                  onClick={() => setOpen(false)}
+                  type="button"
+                >
+                  ✕
                 </Button>
               </div>
+            </div>
 
+            <div className="p-4 sm:p-6">
               <form
-                className="mt-4 space-y-3"
+                className="space-y-3"
+                noValidate
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (submit.isPending) return;
+                  if (!validate()) return;
                   submit.mutate();
                 }}
               >
+                {formError ? (
+                  <p className="text-sm text-destructive">{formError}</p>
+                ) : null}
+
                 <div className="space-y-1">
                   <Label htmlFor={titleId}>Título</Label>
                   <Input
                     ref={titleRef}
                     id={titleId}
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      if (titleError) setTitleError(null);
+                    }}
+                    onBlur={() => {
+                      const t = title.trim();
+                      setTitleError(t.length < 3 ? "Informe um título com pelo menos 3 caracteres." : null);
+                    }}
                     placeholder="Ex: Erro ao salvar processo"
-                    required
+                    aria-invalid={!!titleError}
+                    aria-describedby={titleError ? titleErrorId : undefined}
                   />
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Mínimo: 3 caracteres</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">{Math.min(999, title.trim().length)}/3</p>
+                  </div>
+                  {titleError ? (
+                    <p id={titleErrorId} className="text-xs text-destructive">
+                      {titleError}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1">
@@ -132,11 +196,30 @@ export function BugReportButton() {
                   <Textarea
                     id={descId}
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e) => {
+                      setDescription(e.target.value);
+                      if (descriptionError) setDescriptionError(null);
+                    }}
+                    onBlur={() => {
+                      const d = description.trim();
+                      setDescriptionError(d.length < 10 ? "Informe uma descrição com pelo menos 10 caracteres." : null);
+                    }}
                     placeholder="O que você estava fazendo? O que esperava acontecer? O que aconteceu?"
-                    rows={5}
-                    required
+                    className="min-h-[120px] resize-y sm:min-h-[160px]"
+                    aria-invalid={!!descriptionError}
+                    aria-describedby={descriptionError ? descErrorId : undefined}
                   />
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Mínimo: 10 caracteres</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {Math.min(9999, description.trim().length)}/10
+                    </p>
+                  </div>
+                  {descriptionError ? (
+                    <p id={descErrorId} className="text-xs text-destructive">
+                      {descriptionError}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2 text-sm text-muted-foreground">
@@ -166,15 +249,10 @@ export function BugReportButton() {
                 {successMsg ? <p className="text-sm text-emerald-600">{successMsg}</p> : null}
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    disabled={submit.isPending}
-                  >
+                  <Button variant="outline" type="button" onClick={() => setOpen(false)} disabled={submit.isPending}>
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={submit.isPending}>
+                  <Button type="submit" disabled={submit.isPending || !isValid}>
                     {submit.isPending ? "Enviando..." : "Enviar"}
                   </Button>
                 </div>
