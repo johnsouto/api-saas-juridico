@@ -21,7 +21,7 @@ type BillingStatus = {
   grace_period_end: string | null;
   is_plus_effective: boolean;
   message: string | null;
-  limits: { max_users: number; max_storage_mb: number };
+  limits: { max_users: number; max_clients?: number | null; max_storage_mb: number };
 };
 
 type BillingCheckout = {
@@ -205,8 +205,14 @@ export function BillingClient() {
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Limite de usuários</p>
-                  <p className="mt-1 text-sm text-white/80">{status.data ? status.data.limits.max_users : "—"}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Limite de clientes</p>
+                  <p className="mt-1 text-sm text-white/80">
+                    {status.data
+                      ? status.data.limits.max_clients == null
+                        ? "Ilimitado"
+                        : status.data.limits.max_clients
+                      : "—"}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Armazenamento</p>

@@ -43,6 +43,7 @@ async def create_client(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
+    await _limits.enforce_client_limit(db, tenant_id=user.tenant_id)
     client = Client(tenant_id=user.tenant_id, nome=payload.nome, cpf=payload.cpf, dados_contato=payload.dados_contato)
     db.add(client)
     try:

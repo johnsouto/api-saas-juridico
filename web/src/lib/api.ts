@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { getPlatformAdminKey } from "@/lib/platformAuth";
+import { isIdleExpired } from "@/lib/session";
 
 const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
@@ -64,6 +65,17 @@ api.interceptors.response.use(
 
     if (status === 401 && !isAuthEndpoint(url)) {
       try {
+        if (isIdleExpired()) {
+          // Best-effort: clear cookies server-side.
+          try {
+            await authClient.post("/v1/auth/logout");
+          } catch {
+            // ignore
+          }
+          emitAuthFailed();
+          throw error;
+        }
+
         original.__isRetryRequest = true;
         await ensureRefreshed();
         return api.request(original);

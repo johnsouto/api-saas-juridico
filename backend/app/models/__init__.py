@@ -1,6 +1,7 @@
 from app.models.agenda_evento import AgendaEvento
 from app.models.audit_log import AuditLog
 from app.models.billing_event import BillingEvent
+from app.models.bug_report import BugReport
 from app.models.client import Client
 from app.models.document import Document
 from app.models.enums import BillingPeriod, BillingProvider, HonorarioStatus, PlanCode, SubscriptionStatus, TarefaStatus, UserRole
@@ -21,6 +22,7 @@ __all__ = [
     "BillingEvent",
     "BillingPeriod",
     "BillingProvider",
+    "BugReport",
     "Client",
     "Document",
     "Honorario",

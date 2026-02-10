@@ -19,6 +19,16 @@ class BadRequestError(AppError):
 
 
 class PlanLimitExceeded(ForbiddenError):
-    def __init__(self, message: str):
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "PLAN_LIMIT_REACHED",
+        resource: str | None = None,
+        limit: int | None = None,
+    ):
         super().__init__(message)
         self.message = message
+        self.code = code
+        self.resource = resource
+        self.limit = limit

@@ -187,7 +187,7 @@ export default function PlatformAdminPage() {
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
               />
-              <p className="text-xs text-zinc-600">
+              <p className="text-xs text-muted-foreground">
                 Dica: defina `PLATFORM_ADMIN_KEY` no `.env` (raiz) para habilitar os endpoints `/v1/platform/*`.
                 Em dev, se você não definir, a chave padrão é `dev-platform-key`.
               </p>
@@ -217,9 +217,9 @@ export default function PlatformAdminPage() {
           </div>
 
           {storedKey ? (
-            <p className="text-sm text-emerald-700">Chave carregada. Você pode provisionar tenants.</p>
+            <p className="text-sm text-emerald-600">Chave carregada. Você pode provisionar tenants.</p>
           ) : (
-            <p className="text-sm text-amber-700">Informe a chave para habilitar a tela.</p>
+            <p className="text-sm text-amber-500">Informe a chave para habilitar a tela.</p>
           )}
         </CardContent>
       </Card>
@@ -261,7 +261,7 @@ export default function PlatformAdminPage() {
             <div className="space-y-1 md:col-span-3">
               <Label>Admin (senha inicial)</Label>
               <Input type="password" {...form.register("admin_senha")} placeholder="mín. 8 caracteres" />
-              <p className="text-xs text-zinc-600">
+              <p className="text-xs text-muted-foreground">
                 Para teste (Free), você pode criar “sem senha” e enviar link de primeiro acesso por e-mail.
               </p>
             </div>
@@ -297,43 +297,45 @@ export default function PlatformAdminPage() {
           </form>
 
           {createTenant.isError ? (
-            <p className="mt-3 text-sm text-red-600">{(createTenant.error as any)?.response?.data?.detail ?? "Erro ao criar tenant"}</p>
+            <p className="mt-3 text-sm text-destructive">
+              {(createTenant.error as any)?.response?.data?.detail ?? "Erro ao criar tenant"}
+            </p>
           ) : null}
 
           {createTenant.data ? (
-            <div className="mt-4 rounded-md border bg-white p-3 text-sm">
-              <div className="font-medium">Tenant criado</div>
-              <div className="mt-1 text-zinc-700">
+            <div className="mt-4 rounded-md border border-border/20 bg-card/40 p-3 text-sm">
+              <div className="font-medium text-foreground">Tenant criado</div>
+              <div className="mt-1 text-muted-foreground">
                 Slug: <span className="font-mono">{createTenant.data.tenant.slug}</span>
               </div>
-              <div className="text-zinc-700">
+              <div className="text-muted-foreground">
                 Admin: <span className="font-mono">{createTenant.data.admin_user.email}</span>
               </div>
               <div className="mt-2">
                 <Link className="underline" href="/login">
                   Ir para login
                 </Link>
-                <span className="text-xs text-zinc-600"> (use o email e a senha inicial)</span>
+                <span className="text-xs text-muted-foreground"> (use o email e a senha inicial)</span>
               </div>
             </div>
           ) : null}
 
           {createTrialTenant.isError ? (
-            <p className="mt-3 text-sm text-red-600">
+            <p className="mt-3 text-sm text-destructive">
               {(createTrialTenant.error as any)?.response?.data?.detail ?? "Erro ao criar Free e enviar convite"}
             </p>
           ) : null}
 
           {createTrialTenant.data ? (
-            <div className="mt-4 rounded-md border bg-white p-3 text-sm">
-              <div className="font-medium">Tenant Free criado</div>
-              <div className="mt-1 text-zinc-700">
+            <div className="mt-4 rounded-md border border-border/20 bg-card/40 p-3 text-sm">
+              <div className="font-medium text-foreground">Tenant Free criado</div>
+              <div className="mt-1 text-muted-foreground">
                 Slug: <span className="font-mono">{createTrialTenant.data.tenant.slug}</span>
               </div>
-              <div className="text-zinc-700">
+              <div className="text-muted-foreground">
                 Email do admin: <span className="font-mono">{createTrialTenant.data.admin_user.email}</span>
               </div>
-              <div className="mt-2 text-xs text-zinc-600">
+              <div className="mt-2 text-xs text-muted-foreground">
                 Se o SMTP estiver configurado, enviamos um link de primeiro acesso para definir senha em `/accept-invite`.
               </div>
             </div>
@@ -346,21 +348,21 @@ export default function PlatformAdminPage() {
           <CardTitle className="text-sm">Tenants</CardTitle>
         </CardHeader>
         <CardContent>
-          {!storedKey ? <p className="text-sm text-zinc-600">Informe a chave para carregar a lista.</p> : null}
-          {tenants.isLoading ? <p className="text-sm text-zinc-600">Carregando…</p> : null}
-          {actionInfo ? <p className="mt-2 text-sm text-emerald-700">{actionInfo}</p> : null}
+          {!storedKey ? <p className="text-sm text-muted-foreground">Informe a chave para carregar a lista.</p> : null}
+          {tenants.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
+          {actionInfo ? <p className="mt-2 text-sm text-emerald-600">{actionInfo}</p> : null}
           {resendInvite.isError ? (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 text-sm text-destructive">
               {(resendInvite.error as any)?.response?.data?.detail ?? "Erro ao reenviar convite"}
             </p>
           ) : null}
           {setTenantActive.isError ? (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 text-sm text-destructive">
               {(setTenantActive.error as any)?.response?.data?.detail ?? "Erro ao alterar status do tenant"}
             </p>
           ) : null}
           {deleteTenant.isError ? (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 text-sm text-destructive">
               {(deleteTenant.error as any)?.response?.data?.detail ?? "Erro ao excluir tenant"}
             </p>
           ) : null}
@@ -424,22 +426,22 @@ export default function PlatformAdminPage() {
                       <TableCell>
                         <div className="flex flex-col">
                           <span>{t.plan_nome ?? t.plan_code ?? "—"}</span>
-                          {t.plan_code ? <span className="font-mono text-xs text-zinc-500">{t.plan_code}</span> : null}
+                          {t.plan_code ? <span className="font-mono text-xs text-muted-foreground">{t.plan_code}</span> : null}
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         <div className="flex flex-col">
                           <span>{t.subscription_status ?? "—"}</span>
-                          <span className="text-zinc-500">{t.provider ?? "—"}</span>
+                          <span className="text-muted-foreground">{t.provider ?? "—"}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         <div className="flex flex-col">
                           <span>Vence: {formatDateTimeBR(t.current_period_end)}</span>
-                          <span className="text-zinc-500">Carência: {formatDateTimeBR(t.grace_period_end)}</span>
+                          <span className="text-muted-foreground">Carência: {formatDateTimeBR(t.grace_period_end)}</span>
                         </div>
                       </TableCell>
-                      <TableCell className={t.is_active ? "text-emerald-700" : "text-red-700"}>{t.is_active ? "ativo" : "inativo"}</TableCell>
+                      <TableCell className={t.is_active ? "text-emerald-600" : "text-destructive"}>{t.is_active ? "ativo" : "inativo"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -483,7 +485,7 @@ export default function PlatformAdminPage() {
                             <Link href={`/dashboard/${t.slug}`}>Dashboard</Link>
                           </Button>
                         </div>
-                        {t.is_active ? <p className="mt-1 text-xs text-zinc-500">Para excluir, desative primeiro.</p> : null}
+                        {t.is_active ? <p className="mt-1 text-xs text-muted-foreground">Para excluir, desative primeiro.</p> : null}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -492,7 +494,7 @@ export default function PlatformAdminPage() {
             </div>
           ) : null}
           {tenants.isError ? (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 text-sm text-destructive">
               {(tenants.error as any)?.response?.data?.detail ?? "Erro ao carregar tenants (confira a chave e o backend)"}
             </p>
           ) : null}

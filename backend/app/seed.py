@@ -21,6 +21,7 @@ async def seed(db: AsyncSession) -> None:
         PlanCode.FREE: dict(
             nome="Free",
             max_users=3,
+            max_clients=3,
             max_storage_mb=100,
             price=Decimal("0.00"),
             price_cents=0,
@@ -30,6 +31,7 @@ async def seed(db: AsyncSession) -> None:
         PlanCode.PLUS_MONTHLY_CARD: dict(
             nome="Plus Mensal (Cartão)",
             max_users=20,
+            max_clients=None,
             max_storage_mb=5000,
             price=Decimal("47.00"),
             price_cents=4700,
@@ -39,6 +41,7 @@ async def seed(db: AsyncSession) -> None:
         PlanCode.PLUS_ANNUAL_PIX: dict(
             nome="Plus Anual (Pix)",
             max_users=30,
+            max_clients=None,
             max_storage_mb=8000,
             price=Decimal("499.00"),
             price_cents=49900,

@@ -10,6 +10,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { cleanupLegacySaaSTokens, loginWithEmailSenha, registerTenant as registerTenantApi } from "@/lib/auth";
+import { passwordPolicyMessage, validatePassword } from "@/lib/password";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,11 @@ function onlyDigits(input: string): string {
   return input.replace(/\D+/g, "");
 }
 
+const passwordSchema = z
+  .string()
+  .min(8, passwordPolicyMessage)
+  .refine((pwd) => validatePassword(pwd).allOk, passwordPolicyMessage);
+
 const registerSchema = z
   .object({
     tenant_nome: z.string().min(2, "Informe o nome do escritório"),
@@ -57,7 +63,7 @@ const registerSchema = z
     first_name: z.string().min(2, "Informe seu primeiro nome"),
     last_name: z.string().min(2, "Informe seu sobrenome"),
     admin_email: z.string().email("Email inválido"),
-    admin_senha: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
+    admin_senha: passwordSchema,
     admin_senha_confirm: z.string().min(8, "Confirme a senha")
   })
   .refine((d) => d.admin_senha === d.admin_senha_confirm, {
@@ -143,6 +149,8 @@ export default function LoginPage() {
   });
 
   const watchedTenantNome = registerForm.watch("tenant_nome");
+  const watchedRegisterPassword = registerForm.watch("admin_senha");
+  const pwdValidation = validatePassword(watchedRegisterPassword ?? "");
   useEffect(() => {
     if (registerSlugEdited) return;
     if (!watchedTenantNome?.trim()) {
@@ -269,7 +277,7 @@ export default function LoginPage() {
                 </Button>
 
                 {reset.isSuccess ? (
-                  <p className="text-sm text-emerald-700">
+                  <p className="text-sm text-emerald-600">
                     Se o email existir, enviaremos um link de redefinição.
                   </p>
                 ) : null}
@@ -337,7 +345,7 @@ export default function LoginPage() {
                         }
                       })}
                     />
-                    <p className="text-xs text-zinc-600">
+                    <p className="text-xs text-muted-foreground">
                       Se não tiver CNPJ, selecione CPF e use o CPF do responsável.
                     </p>
                     {registerForm.formState.errors.tenant_documento?.message ? (
@@ -416,6 +424,27 @@ export default function LoginPage() {
                   {registerForm.formState.errors.admin_senha?.message ? (
                     <p className="text-xs text-red-600">{registerForm.formState.errors.admin_senha.message}</p>
                   ) : null}
+
+                  <div className="mt-2 rounded-xl border border-border/20 bg-card/40 p-3 text-xs text-muted-foreground">
+                    <p className="font-semibold text-foreground">Requisitos de senha</p>
+                    <ul className="mt-2 space-y-1">
+                      <li className={pwdValidation.lengthOk ? "text-emerald-600" : "text-red-600"}>
+                        • Mínimo 8 caracteres
+                      </li>
+                      <li className={pwdValidation.twoNumbersOk ? "text-emerald-600" : "text-red-600"}>
+                        • Pelo menos 2 números
+                      </li>
+                      <li className={pwdValidation.specialOk ? "text-emerald-600" : "text-red-600"}>
+                        • Pelo menos 1 caractere especial
+                      </li>
+                      <li className={pwdValidation.upperOk ? "text-emerald-600" : "text-red-600"}>
+                        • Pelo menos 1 letra maiúscula
+                      </li>
+                      <li className={pwdValidation.lowerOk ? "text-emerald-600" : "text-red-600"}>
+                        • Pelo menos 1 letra minúscula
+                      </li>
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -464,7 +493,11 @@ export default function LoginPage() {
                   </div>
                 ) : null}
 
-                <Button className="w-full" disabled={registerTenant.isPending} type="submit">
+                <Button
+                  className="w-full"
+                  disabled={registerTenant.isPending || (turnstileEnabled && !turnstileToken) || !pwdValidation.allOk}
+                  type="submit"
+                >
                   {registerTenant.isPending ? "Criando..." : "Criar conta"}
                 </Button>
 

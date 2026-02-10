@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import { cleanupLegacySaaSTokens, logout as apiLogout } from "@/lib/auth";
+import { clearActivity, touchActivity } from "@/lib/session";
 
 export type AuthUser = {
   id: string;
@@ -49,7 +50,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Client-side "idle timeout" support: record last activity timestamp.
+    // Tokens stay HttpOnly (no auth in JS); this is only a timestamp to force re-login after long inactivity.
+    let lastTouch = 0;
+    const touch = () => {
+      const now = Date.now();
+      // Throttle writes to localStorage.
+      if (now - lastTouch < 5000) return;
+      lastTouch = now;
+      touchActivity(now);
+    };
+
+    touch();
+
+    const opts: AddEventListenerOptions = { passive: true };
+    window.addEventListener("mousemove", touch, opts);
+    window.addEventListener("keydown", touch);
+    window.addEventListener("click", touch, opts);
+    window.addEventListener("scroll", touch, opts);
+    document.addEventListener("visibilitychange", touch);
+
+    return () => {
+      window.removeEventListener("mousemove", touch);
+      window.removeEventListener("keydown", touch);
+      window.removeEventListener("click", touch);
+      window.removeEventListener("scroll", touch);
+      document.removeEventListener("visibilitychange", touch);
+    };
+  }, []);
+
+  useEffect(() => {
     function onAuthFailed() {
+      clearActivity();
       setForcedUnauth(true);
       qc.removeQueries({ queryKey: ["auth-me"] });
       qc.removeQueries({ queryKey: ["auth-tenant"] });
@@ -89,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await apiLogout();
+    clearActivity();
     setForcedUnauth(true);
     qc.removeQueries({ queryKey: ["auth-me"] });
     qc.removeQueries({ queryKey: ["auth-tenant"] });

@@ -372,8 +372,14 @@ function AreaChart({
         </defs>
 
         {/* axis */}
-        <line x1={padX} y1={padY + innerH} x2={padX + innerW} y2={padY + innerH} stroke="rgba(255,255,255,0.16)" />
-        <line x1={padX} y1={padY} x2={padX} y2={padY + innerH} stroke="rgba(255,255,255,0.16)" />
+        <line
+          x1={padX}
+          y1={padY + innerH}
+          x2={padX + innerW}
+          y2={padY + innerH}
+          stroke="rgb(var(--border) / 0.16)"
+        />
+        <line x1={padX} y1={padY} x2={padX} y2={padY + innerH} stroke="rgb(var(--border) / 0.16)" />
 
         {/* area + line */}
         <path d={areaD} fill="url(#areaFill)" />
@@ -381,18 +387,33 @@ function AreaChart({
 
         {/* points */}
         {points.map((p) => (
-          <circle key={p.i} cx={p.x} cy={p.y} r="3.5" fill={stroke} stroke="#fff" strokeWidth="1.5" />
+          <circle
+            key={p.i}
+            cx={p.x}
+            cy={p.y}
+            r="3.5"
+            fill={stroke}
+            stroke="rgb(var(--foreground))"
+            strokeWidth="1.5"
+          />
         ))}
 
         {/* x labels */}
         {points.map((p) => (
-          <text key={`l-${p.i}`} x={p.x} y={padY + innerH + 16} textAnchor="middle" fontSize="11" fill="rgba(255,255,255,0.65)">
+          <text
+            key={`l-${p.i}`}
+            x={p.x}
+            y={padY + innerH + 16}
+            textAnchor="middle"
+            fontSize="11"
+            fill="rgb(var(--muted-foreground) / 0.85)"
+          >
             {labels[p.i]}
           </text>
         ))}
 
         {/* y max */}
-        <text x={padX - 6} y={padY + 10} textAnchor="end" fontSize="11" fill="rgba(255,255,255,0.65)">
+        <text x={padX - 6} y={padY + 10} textAnchor="end" fontSize="11" fill="rgb(var(--muted-foreground) / 0.85)">
           {max}
         </text>
       </svg>

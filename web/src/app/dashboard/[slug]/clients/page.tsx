@@ -103,9 +103,19 @@ export default function ClientsPage() {
             </div>
           </form>
           {create.isError ? (
-            <p className="mt-3 text-sm text-destructive">
-              {(create.error as any)?.response?.data?.detail ?? "Erro ao salvar cliente"}
-            </p>
+            <div className="mt-3 rounded-xl border border-border/20 bg-card/40 p-3 text-sm text-destructive">
+              <p>
+                {(create.error as any)?.response?.data?.detail ?? "Erro ao salvar cliente"}
+              </p>
+              {(create.error as any)?.response?.data?.code === "PLAN_LIMIT_REACHED" &&
+              (create.error as any)?.response?.data?.resource === "clients" ? (
+                <div className="mt-2">
+                  <Button asChild size="sm">
+                    <Link href="/billing?plan=plus&next=/dashboard">Assinar Plus</Link>
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </CardContent>
       </Card>

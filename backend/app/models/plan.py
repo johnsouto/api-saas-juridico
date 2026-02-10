@@ -15,6 +15,8 @@ class Plan(UUIDBaseMixin, Base):
     code: Mapped[PlanCode] = mapped_column(Enum(PlanCode, name="plan_code"), nullable=False, unique=True, index=True)
     nome: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
     max_users: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Max number of clients a tenant can register. NULL means unlimited.
+    max_clients: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_storage_mb: Mapped[int] = mapped_column(Integer, nullable=False)
     # Legacy column (kept for backward-compatibility). Prefer `price_cents`.
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("0.00"))

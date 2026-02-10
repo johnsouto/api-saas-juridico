@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,6 +24,8 @@ class User(UUIDBaseMixin, Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False)
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Updated periodically to enforce "idle session" timeouts for refresh tokens.
+    last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     tenant: Mapped["Tenant"] = relationship(back_populates="users")
 

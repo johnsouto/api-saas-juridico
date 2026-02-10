@@ -16,6 +16,7 @@ from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut
 from app.services.plan_limit_service import PlanLimitService
+from app.utils.passwords import validate_password_strength
 
 
 router = APIRouter()
@@ -38,6 +39,7 @@ async def create_user(
     current: Annotated[User, Depends(require_roles(UserRole.admin))],
 ):
     await _limits.enforce_user_limit(db, tenant_id=current.tenant_id)
+    validate_password_strength(payload.senha)
 
     new_user = User(
         tenant_id=current.tenant_id,

@@ -57,7 +57,12 @@ async def forbidden_error_handler(_: Request, exc: ForbiddenError):
 
 @app.exception_handler(PlanLimitExceeded)
 async def plan_limit_error_handler(_: Request, exc: PlanLimitExceeded):
-    return JSONResponse(status_code=403, content={"detail": exc.message})
+    payload: dict[str, object] = {"detail": exc.message, "code": exc.code}
+    if exc.resource:
+        payload["resource"] = exc.resource
+    if exc.limit is not None:
+        payload["limit"] = exc.limit
+    return JSONResponse(status_code=403, content=payload)
 
 
 @app.exception_handler(NotFoundError)

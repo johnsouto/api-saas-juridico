@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import PlanLimitExceeded
+from app.models.client import Client
 from app.models.document import Document
 from app.models.enums import PlanCode, SubscriptionStatus
 from app.models.plan import Plan
@@ -45,7 +46,27 @@ class PlanLimitService:
         stmt = select(func.count(User.id)).where(User.tenant_id == tenant_id).where(User.is_active.is_(True))
         current = int((await db.execute(stmt)).scalar_one())
         if current >= plan.max_users:
-            raise PlanLimitExceeded("Upgrade seu plano para adicionar mais usuários")
+            raise PlanLimitExceeded(
+                "Upgrade seu plano para adicionar mais usuários",
+                code="PLAN_LIMIT_REACHED",
+                resource="users",
+                limit=int(plan.max_users),
+            )
+
+    async def enforce_client_limit(self, db: AsyncSession, *, tenant_id: uuid.UUID) -> None:
+        plan = await self._get_effective_plan(db, tenant_id=tenant_id)
+        if plan.max_clients is None:
+            return
+
+        stmt = select(func.count(Client.id)).where(Client.tenant_id == tenant_id)
+        current = int((await db.execute(stmt)).scalar_one())
+        if current >= int(plan.max_clients):
+            raise PlanLimitExceeded(
+                f"Limite do Plano Free atingido: até {int(plan.max_clients)} clientes. Assine o Plus para cadastrar mais.",
+                code="PLAN_LIMIT_REACHED",
+                resource="clients",
+                limit=int(plan.max_clients),
+            )
 
     async def enforce_storage_limit(self, db: AsyncSession, *, tenant_id: uuid.UUID, new_file_size_bytes: int) -> None:
         plan = await self._get_effective_plan(db, tenant_id=tenant_id)
@@ -54,5 +75,9 @@ class PlanLimitService:
         used_bytes = int((await db.execute(stmt)).scalar_one())
         max_bytes = int(plan.max_storage_mb) * 1024 * 1024
         if used_bytes + int(new_file_size_bytes) > max_bytes:
-            raise PlanLimitExceeded("Upgrade seu plano para enviar mais documentos")
-
+            raise PlanLimitExceeded(
+                "Upgrade seu plano para enviar mais documentos",
+                code="PLAN_LIMIT_REACHED",
+                resource="storage",
+                limit=int(plan.max_storage_mb),
+            )

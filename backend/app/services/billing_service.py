@@ -85,7 +85,7 @@ class BillingService:
             current_period_end=sub.current_period_end,
             grace_period_end=sub.grace_period_end,
             is_plus_effective=_is_plus_effective(sub, now=now),
-            limits=BillingLimits(max_users=plan.max_users, max_storage_mb=plan.max_storage_mb),
+            limits=BillingLimits(max_users=plan.max_users, max_clients=plan.max_clients, max_storage_mb=plan.max_storage_mb),
             message=message,
         )
 

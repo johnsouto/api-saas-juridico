@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import AuthError, BadRequestError, NotFoundError
 from app.core.security import (
     create_access_token,
@@ -30,6 +31,7 @@ from app.models.user_invitation import UserInvitation
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
 from app.utils.crypto import sha256_hex
+from app.utils.passwords import validate_password_strength
 from app.utils.slug import normalize_slug
 from app.utils.validators import is_disposable_email, is_valid_cnpj, is_valid_cpf, only_digits
 
@@ -247,6 +249,11 @@ class AuthService:
         if not tenant_is_active:
             raise AuthError("Escritório desativado")
 
+        # Touch activity to support refresh idle timeouts.
+        user.last_activity_at = _utcnow()
+        db.add(user)
+        await db.commit()
+
         access = create_access_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role.value)
         refresh = create_refresh_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role.value)
         return user, access, refresh
@@ -257,6 +264,7 @@ class AuthService:
             raise AuthError("Refresh token inválido")
 
         user_id = payload.get("sub")
+        tenant_id_from_token = payload.get("tenant_id")
         stmt = select(User, Tenant.is_active).join(Tenant, Tenant.id == User.tenant_id).where(User.id == uuid.UUID(user_id))
         row = (await db.execute(stmt)).first()
         if not row:
@@ -264,6 +272,33 @@ class AuthService:
         user, tenant_is_active = row
         if not user.is_active or not tenant_is_active:
             raise AuthError("Usuário inválido")
+        if tenant_id_from_token and str(user.tenant_id) != str(tenant_id_from_token):
+            raise AuthError("Usuário inválido")
+
+        # Enforce idle timeout for refresh tokens.
+        now = _utcnow()
+        sub = (await db.execute(select(Subscription).where(Subscription.tenant_id == user.tenant_id))).scalar_one_or_none()
+        plus_effective = False
+        if sub:
+            if sub.status == SubscriptionStatus.active and sub.current_period_end and now <= sub.current_period_end:
+                plus_effective = True
+            elif sub.status == SubscriptionStatus.past_due and sub.grace_period_end and now <= sub.grace_period_end:
+                plus_effective = True
+
+        max_idle = (
+            timedelta(days=int(getattr(settings, "PLUS_IDLE_TIMEOUT_DAYS", 30)))
+            if plus_effective
+            else timedelta(hours=int(getattr(settings, "FREE_IDLE_TIMEOUT_HOURS", 12)))
+        )
+
+        last_activity = user.last_activity_at
+        if last_activity and now - last_activity > max_idle:
+            raise AuthError("Sessão expirada por inatividade. Faça login novamente.")
+
+        # Touch activity.
+        user.last_activity_at = now
+        db.add(user)
+        await db.commit()
 
         access = create_access_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role.value)
         refresh = create_refresh_token(subject=str(user.id), tenant_id=str(user.tenant_id), role=user.role.value)
@@ -323,6 +358,9 @@ class AuthService:
 
         if is_disposable_email(admin_email):
             raise BadRequestError("Email descartável não é permitido. Use um email real (Gmail/corporativo).")
+
+        # Server-side password policy (do not rely only on frontend).
+        validate_password_strength(admin_senha)
 
         # Pre-checks to return friendly messages without relying only on DB constraint errors.
         # (We still keep IntegrityError handling for race conditions.)
@@ -386,6 +424,7 @@ class AuthService:
             role=UserRole.admin,
             # Explicit to avoid any DB default mismatch (users.is_active is NOT NULL).
             is_active=True,
+            last_activity_at=_utcnow(),
         )
         sub = Subscription(
             tenant_id=tenant.id,
@@ -478,6 +517,9 @@ class AuthService:
         # Enforce plan limit again at accept time (race-safe).
         await self.plan_limit_service.enforce_user_limit(db, tenant_id=inv.tenant_id)
 
+        # Server-side password policy (do not rely only on frontend).
+        validate_password_strength(password)
+
         # If a platform operator pre-created the user as inactive (first-access flow),
         # we "activate" that user here. Otherwise, we create a new one.
         existing_stmt = select(User).where(User.email == inv.email)
@@ -494,6 +536,7 @@ class AuthService:
             user.role = inv.role
             user.senha_hash = hash_password(password)
             user.is_active = True
+            user.last_activity_at = _utcnow()
             db.add(user)
         else:
             user = User(
@@ -505,6 +548,7 @@ class AuthService:
                 senha_hash=hash_password(password),
                 role=inv.role,
                 is_active=True,
+                last_activity_at=_utcnow(),
             )
 
         inv.accepted_at = _utcnow()
@@ -567,6 +611,9 @@ class AuthService:
         user = (await db.execute(user_stmt)).scalar_one_or_none()
         if not user:
             raise AuthError("Usuário não encontrado")
+
+        # Server-side password policy (do not rely only on frontend).
+        validate_password_strength(new_password)
 
         user.senha_hash = hash_password(new_password)
         pr.used_at = _utcnow()

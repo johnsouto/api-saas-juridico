@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Moon, Sun } from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { BugReportButton } from "@/components/feedback/BugReportButton";
 import { api } from "@/lib/api";
+import { setIdleTimeoutMs } from "@/lib/session";
+import { getEffectiveTheme, setTheme, type AppTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +34,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const params = useParams<{ slug: string }>();
   const router = useRouter();
   const { tenant, user, logout } = useAuth();
+  const [theme, setThemeState] = useState<AppTheme>("dark");
 
   const slug = params.slug;
 
@@ -46,9 +51,20 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     }
   }, [router, slug, tenant?.slug]);
 
+  useEffect(() => {
+    setThemeState(getEffectiveTheme());
+  }, []);
+
   const planCode = billing.data?.plan_code ?? "FREE";
   const status = billing.data?.status;
   const message = billing.data?.message;
+
+  useEffect(() => {
+    // Persist idle timeout policy based on tenant plan.
+    // FREE: 12h | PLUS: 30 days
+    const ms = planCode === "FREE" ? 12 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    setIdleTimeoutMs(ms);
+  }, [planCode]);
 
   const officeName = tenant?.nome?.trim() ? tenant.nome : "Seu escritório";
   const firstName =
@@ -71,7 +87,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   })();
 
   return (
-    <div className="theme-premium min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Decorative background (matches landing) */}
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(35,64,102,0.30),transparent_45%)]" />
@@ -93,6 +109,20 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
             <Badge variant="secondary" className="border border-border/15 bg-card/40">
               {planBadgeLabel(planCode)}
             </Badge>
+            <Button
+              size="icon"
+              variant="outline"
+              aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+              onClick={() => {
+                const next = theme === "dark" ? "light" : "dark";
+                setTheme(next);
+                setThemeState(next);
+              }}
+              type="button"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <BugReportButton />
             <Button asChild size="sm" className="shadow-glow">
               <Link href={cta.href}>{cta.label}</Link>
             </Button>
@@ -115,7 +145,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
         <div className="mx-auto w-full max-w-6xl px-4">
           <div
             className={cn(
-              "mt-4 rounded-xl border border-border/15 bg-card/40 p-4 text-sm text-white/85 backdrop-blur",
+              "mt-4 rounded-xl border border-border/15 bg-card/40 p-4 text-sm text-foreground/85 backdrop-blur",
               status === "past_due" ? "border-amber-400/30 bg-amber-500/10" : null
             )}
           >

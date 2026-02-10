@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     billing_webhooks,
     clients,
     documents,
+    feedback,
     honorarios,
     parcerias,
     platform,
@@ -39,3 +40,4 @@ api_router.include_router(agenda_eventos.router, prefix="/agenda", tags=["agenda
 api_router.include_router(tarefas.router, prefix="/tarefas", tags=["tarefas"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"], dependencies=[Depends(get_tenant_context)])
+api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"], dependencies=[Depends(get_tenant_context)])

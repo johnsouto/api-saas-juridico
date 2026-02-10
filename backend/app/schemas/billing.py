@@ -11,6 +11,7 @@ from app.schemas.common import APIModel
 
 class BillingLimits(APIModel):
     max_users: int
+    max_clients: int | None = None
     max_storage_mb: int
 
 
@@ -38,4 +39,3 @@ class BillingCheckoutOut(APIModel):
 class BillingCancelOut(APIModel):
     ok: bool = True
     message: str = Field(default="Assinatura cancelada (ou marcada para cancelamento)")
-

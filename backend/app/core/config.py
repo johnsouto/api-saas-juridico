@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 20
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Session policy (idle timeout for refresh tokens).
+    # If the user is inactive for longer than this, refresh will be denied and they must login again.
+    FREE_IDLE_TIMEOUT_HOURS: int = 12
+    PLUS_IDLE_TIMEOUT_DAYS: int = 30
+
     # CORS_ORIGINS can be a JSON array string: ["http://localhost","https://localhost"]
     CORS_ORIGINS: str = '["http://localhost","https://localhost"]'
 
