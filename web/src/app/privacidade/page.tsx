@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { Container } from "@/components/landing/Container";
+import { SUPPORT_EMAIL } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -82,10 +83,10 @@ export default function PrivacidadePage() {
             <p className="text-sm leading-relaxed text-white/70">
               Caso você tenha dúvidas ou queira exercer direitos relacionados a dados, entre em contato pelo e-mail{" "}
               <a
-                href="mailto:johnsouto216@gmail.com"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className={cn("underline decoration-white/30 hover:decoration-white/60", focusRing)}
               >
-                johnsouto216@gmail.com
+                {SUPPORT_EMAIL}
               </a>
               .
             </p>
