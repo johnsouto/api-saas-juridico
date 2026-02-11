@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -37,7 +37,7 @@ export function Turnstile({ siteKey, onVerify, onExpire, onError, className }: P
     onErrorRef.current = onError;
   }, [onError, onExpire, onVerify]);
 
-  const containerId = useMemo(() => `turnstile-${Math.random().toString(36).slice(2)}`, []);
+  const containerId = useId();
 
   useEffect(() => {
     if (!scriptLoaded) return;
@@ -79,7 +79,7 @@ export function Turnstile({ siteKey, onVerify, onExpire, onError, className }: P
         strategy="afterInteractive"
         onLoad={() => setScriptLoaded(true)}
       />
-      <div id={containerId} ref={containerRef} />
+      <div id={`turnstile-${containerId}`} ref={containerRef} />
     </div>
   );
 }
