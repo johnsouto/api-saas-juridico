@@ -221,7 +221,7 @@ export default function PerfilPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base text-destructive">Ações</CardTitle>
+          <CardTitle className="text-base text-destructive">Zona de risco!</CardTitle>
           <CardDescription>Essas ações estarão disponíveis em breve.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 sm:flex-row">
