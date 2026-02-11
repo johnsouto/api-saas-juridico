@@ -76,6 +76,24 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str | None = None
     TELEGRAM_CHAT_ID: str | None = None
 
+    # Upload hardening
+    UPLOAD_MAX_FILE_MB: int = 25
+    UPLOAD_ALLOWED_EXTENSIONS: str = "pdf,doc,docx,jpg,jpeg,png,webp,xlsx,xls,txt"
+    UPLOAD_BLOCKED_EXTENSIONS: str = "exe,js,bat,cmd,sh,dll,msi,com,scr,jar,ps1,vbs"
+    UPLOAD_ALLOWED_MIME_TYPES: str = (
+        "application/pdf,"
+        "application/msword,"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document,"
+        "application/vnd.ms-excel,"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+        "image/jpeg,image/png,image/webp,text/plain"
+    )
+    UPLOAD_SCANNER_ENABLED: bool = False
+
+    # Audit logging hardening
+    AUDIT_MINIMAL_MODE: bool = True
+    AUDIT_TRACKED_TABLES: str = "clients,processes,documents,honorarios,agenda_eventos,tarefas"
+
     def cors_origins_list(self) -> list[str]:
         try:
             data = json.loads(self.CORS_ORIGINS)
@@ -84,6 +102,9 @@ class Settings(BaseSettings):
         except Exception:
             pass
         return [self.CORS_ORIGINS]
+
+    def csv_set(self, value: str) -> set[str]:
+        return {part.strip().lower() for part in value.split(",") if part.strip()}
 
 
 settings = Settings()

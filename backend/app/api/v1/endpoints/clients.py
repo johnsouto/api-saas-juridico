@@ -20,12 +20,14 @@ from app.schemas.client import ClientCreate, ClientDetailsOut, ClientOut, Client
 from app.schemas.document import DocumentOut
 from app.services.plan_limit_service import PlanLimitService
 from app.services.s3_service import S3Service
+from app.services.upload_security_service import UploadSecurityService
 from app.utils.validators import only_digits
 
 
 router = APIRouter()
 _s3 = S3Service()
 _limits = PlanLimitService()
+_uploads = UploadSecurityService()
 
 
 @router.get("", response_model=list[ClientOut])
@@ -267,10 +269,16 @@ async def upload_client_document(
     file.file.seek(0, 2)
     size_bytes = int(file.file.tell())
     file.file.seek(0)
+    safe_filename = _uploads.validate_upload(
+        filename=file.filename or "arquivo",
+        content_type=file.content_type,
+        size_bytes=size_bytes,
+    )
+    _uploads.scan_upload(fileobj=file.file, filename=safe_filename, content_type=file.content_type)
 
     await _limits.enforce_storage_limit(db, tenant_id=user.tenant_id, new_file_size_bytes=size_bytes)
 
-    key = _s3.build_tenant_key(tenant_id=str(user.tenant_id), filename=file.filename or "arquivo")
+    key = _s3.build_tenant_key(tenant_id=str(user.tenant_id), filename=safe_filename)
     _s3.upload_fileobj(key=key, fileobj=file.file, content_type=file.content_type)
 
     doc = Document(
@@ -279,7 +287,7 @@ async def upload_client_document(
         categoria=categoria,
         mime_type=file.content_type,
         s3_key=key,
-        filename=file.filename or "arquivo",
+        filename=safe_filename,
         size_bytes=size_bytes,
     )
     db.add(doc)
