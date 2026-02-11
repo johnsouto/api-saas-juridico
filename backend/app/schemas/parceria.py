@@ -13,6 +13,7 @@ class ParceriaCreate(APIModel):
     nome: str = Field(min_length=2, max_length=200)
     email: EmailStr | None = None
     telefone: str | None = Field(default=None, max_length=40)
+    oab_number: str | None = Field(default=None, max_length=40)
     tipo_documento: TenantDocumentoTipo = TenantDocumentoTipo.cpf
     documento: str = Field(min_length=8, max_length=32)
 
@@ -21,6 +22,7 @@ class ParceriaUpdate(APIModel):
     nome: str | None = Field(default=None, min_length=2, max_length=200)
     email: EmailStr | None = None
     telefone: str | None = Field(default=None, max_length=40)
+    oab_number: str | None = Field(default=None, max_length=40)
     tipo_documento: TenantDocumentoTipo | None = None
     documento: str | None = Field(default=None, min_length=8, max_length=32)
 
@@ -31,7 +33,7 @@ class ParceriaOut(APIModel):
     nome: str
     email: str | None
     telefone: str | None
+    oab_number: str | None = None
     tipo_documento: TenantDocumentoTipo
     documento: str
     criado_em: datetime
-

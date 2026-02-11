@@ -15,6 +15,7 @@ class UserOut(APIModel):
     nome: str
     first_name: str | None = None
     last_name: str | None = None
+    oab_number: str | None = None
     # Output should not 500 if legacy/seed data uses a non-deliverable domain (e.g. *.local).
     email: str
     role: UserRole

@@ -4,11 +4,12 @@ import uuid
 from typing import Any
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDBaseMixin
+from app.models.enums import TenantDocumentoTipo
 
 if TYPE_CHECKING:
     from app.models.document import Document
@@ -18,12 +19,30 @@ if TYPE_CHECKING:
 
 class Client(UUIDBaseMixin, Base):
     __tablename__ = "clients"
-    __table_args__ = (UniqueConstraint("tenant_id", "cpf"),)
+    __table_args__ = (UniqueConstraint("tenant_id", "documento"),)
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
 
     nome: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
-    cpf: Mapped[str] = mapped_column(String(14), nullable=False, index=True)
+    tipo_documento: Mapped[TenantDocumentoTipo] = mapped_column(
+        Enum(TenantDocumentoTipo, name="tenant_documento_tipo"),
+        nullable=False,
+        default=TenantDocumentoTipo.cpf,
+    )
+    documento: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+
+    phone_mobile: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True, index=True)
+
+    address_street: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    address_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    address_complement: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    address_neighborhood: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    address_city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    address_state: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    address_zip: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    # Legacy (kept for backward-compatibility). Prefer explicit fields above.
     dados_contato: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     processos: Mapped[list["Process"]] = relationship(back_populates="client")

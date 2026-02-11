@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-type Client = { id: string; nome: string; cpf: string };
+type Client = { id: string; nome: string; tipo_documento: "cpf" | "cnpj"; documento: string };
 type Proc = { id: string; client_id: string; numero: string };
 type Honorario = {
   id: string;
@@ -197,7 +197,7 @@ export default function HonorariosPage() {
                 <option value="">Selecione o cliente</option>
                 {clients.data?.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.nome} ({c.cpf})
+                    {c.nome} ({c.tipo_documento.toUpperCase()}: {c.documento})
                   </option>
                 ))}
               </Select>

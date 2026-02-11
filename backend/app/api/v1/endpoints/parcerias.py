@@ -41,6 +41,7 @@ async def create_parceria(
         nome=payload.nome,
         email=str(payload.email) if payload.email else None,
         telefone=payload.telefone,
+        oab_number=payload.oab_number,
         tipo_documento=payload.tipo_documento,
         documento=payload.documento,
     )

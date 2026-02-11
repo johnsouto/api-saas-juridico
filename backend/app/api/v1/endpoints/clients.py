@@ -13,11 +13,14 @@ from app.core.exceptions import NotFoundError
 from app.db.session import get_db
 from app.models.client import Client
 from app.models.document import Document
+from app.models.parceria import Parceria
+from app.models.process import Process
 from app.models.user import User
-from app.schemas.client import ClientCreate, ClientOut, ClientUpdate
+from app.schemas.client import ClientCreate, ClientDetailsOut, ClientOut, ClientUpdate
 from app.schemas.document import DocumentOut
 from app.services.plan_limit_service import PlanLimitService
 from app.services.s3_service import S3Service
+from app.utils.validators import only_digits
 
 
 router = APIRouter()
@@ -29,11 +32,12 @@ _limits = PlanLimitService()
 async def list_clients(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
-    q: str | None = Query(default=None, description="Busca por nome ou CPF"),
+    q: str | None = Query(default=None, description="Busca por nome ou documento"),
 ):
     stmt = select(Client).where(Client.tenant_id == user.tenant_id).order_by(Client.criado_em.desc())
     if q:
-        stmt = stmt.where(or_(Client.nome.ilike(f"%{q}%"), Client.cpf.ilike(f"%{q}%")))
+        qnorm = q.strip()
+        stmt = stmt.where(or_(Client.nome.ilike(f"%{qnorm}%"), Client.documento.ilike(f"%{qnorm}%")))
     return list((await db.execute(stmt)).scalars().all())
 
 
@@ -44,13 +48,27 @@ async def create_client(
     user: Annotated[User, Depends(get_current_user)],
 ):
     await _limits.enforce_client_limit(db, tenant_id=user.tenant_id)
-    client = Client(tenant_id=user.tenant_id, nome=payload.nome, cpf=payload.cpf, dados_contato=payload.dados_contato)
+    client = Client(
+        tenant_id=user.tenant_id,
+        nome=payload.nome,
+        tipo_documento=payload.tipo_documento,
+        documento=only_digits(payload.documento),
+        phone_mobile=payload.phone_mobile,
+        email=str(payload.email).strip().lower() if payload.email else None,
+        address_street=payload.address_street,
+        address_number=payload.address_number,
+        address_complement=payload.address_complement,
+        address_neighborhood=payload.address_neighborhood,
+        address_city=payload.address_city,
+        address_state=(payload.address_state or None),
+        address_zip=payload.address_zip,
+    )
     db.add(client)
     try:
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CPF já cadastrado") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Documento já cadastrado") from exc
     await db.refresh(client)
     return client
 
@@ -81,14 +99,19 @@ async def update_client(
         raise NotFoundError("Cliente não encontrado")
 
     for key, value in payload.model_dump(exclude_unset=True).items():
-        setattr(client, key, value)
+        if key == "documento":
+            setattr(client, key, only_digits(value) if value else value)
+        elif key == "email":
+            setattr(client, key, str(value).strip().lower() if value else None)
+        else:
+            setattr(client, key, value)
 
     db.add(client)
     try:
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CPF já cadastrado") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Documento já cadastrado") from exc
 
     await db.refresh(client)
     return client
@@ -127,6 +150,39 @@ async def list_client_documents(
         .order_by(Document.criado_em.desc())
     )
     return list((await db.execute(stmt)).scalars().all())
+
+
+@router.get("/{client_id}/details", response_model=ClientDetailsOut)
+async def get_client_details(
+    client_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    stmt = select(Client).where(Client.id == client_id).where(Client.tenant_id == user.tenant_id)
+    client = (await db.execute(stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    docs_stmt = (
+        select(Document)
+        .where(Document.tenant_id == user.tenant_id)
+        .where(Document.client_id == client_id)
+        .order_by(Document.criado_em.desc())
+    )
+    documents = list((await db.execute(docs_stmt)).scalars().all())
+
+    # Parcerias relacionadas ao cliente via processos.
+    partners_stmt = (
+        select(Parceria)
+        .join(Process, Process.parceria_id == Parceria.id)
+        .where(Process.tenant_id == user.tenant_id)
+        .where(Process.client_id == client_id)
+        .distinct()
+        .order_by(Parceria.nome.asc())
+    )
+    parcerias = list((await db.execute(partners_stmt)).scalars().all())
+
+    return ClientDetailsOut(client=client, parcerias=parcerias, documents=documents)
 
 
 @router.post("/{client_id}/documents/upload", response_model=DocumentOut)

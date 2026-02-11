@@ -19,6 +19,7 @@ class User(UUIDBaseMixin, Base):
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
     first_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    oab_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
     senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False)

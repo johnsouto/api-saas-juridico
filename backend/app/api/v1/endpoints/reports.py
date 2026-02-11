@@ -36,17 +36,38 @@ async def export_overview_xlsx(
 
     # Clientes
     ws = wb.create_sheet("Clientes")
-    ws.append(["id", "nome", "cpf", "criado_em"])
+    ws.append(["id", "nome", "tipo_documento", "documento", "email", "celular", "criado_em"])
     clients = list((await db.execute(select(Client).where(Client.tenant_id == user.tenant_id).order_by(Client.criado_em.desc()))).scalars().all())
     for c in clients:
-        ws.append([str(c.id), c.nome, c.cpf, c.criado_em.isoformat()])
+        ws.append(
+            [
+                str(c.id),
+                c.nome,
+                c.tipo_documento.value,
+                c.documento,
+                c.email or "",
+                c.phone_mobile or "",
+                c.criado_em.isoformat(),
+            ]
+        )
 
     # Parcerias
     ws = wb.create_sheet("Parcerias")
-    ws.append(["id", "nome", "email", "telefone", "tipo_documento", "documento", "criado_em"])
+    ws.append(["id", "nome", "email", "telefone", "oab_number", "tipo_documento", "documento", "criado_em"])
     partners = list((await db.execute(select(Parceria).where(Parceria.tenant_id == user.tenant_id).order_by(Parceria.criado_em.desc()))).scalars().all())
     for p in partners:
-        ws.append([str(p.id), p.nome, p.email, p.telefone, p.tipo_documento.value, p.documento, p.criado_em.isoformat()])
+        ws.append(
+            [
+                str(p.id),
+                p.nome,
+                p.email or "",
+                p.telefone or "",
+                p.oab_number or "",
+                p.tipo_documento.value,
+                p.documento,
+                p.criado_em.isoformat(),
+            ]
+        )
 
     # Processos
     ws = wb.create_sheet("Processos")
@@ -137,4 +158,3 @@ async def export_overview_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers,
     )
-

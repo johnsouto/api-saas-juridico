@@ -26,6 +26,15 @@ class Tenant(UUIDBaseMixin, Base):
     documento: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     slug: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
 
+    # Address (optional) - data of the law firm / tenant.
+    address_street: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    address_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    address_complement: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    address_neighborhood: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    address_city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    address_state: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    address_zip: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     users: Mapped[list["User"]] = relationship(back_populates="tenant")
     subscription: Mapped[Optional["Subscription"]] = relationship(
         "Subscription",

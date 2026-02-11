@@ -169,6 +169,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
           <NavLink href={`/dashboard/${slug}/agenda`} label="Agenda" />
           <NavLink href={`/dashboard/${slug}/tarefas`} label="Tarefas" />
           <NavLink href={`/dashboard/${slug}/documents`} label="Documentos" />
+          <NavLink href={`/dashboard/${slug}/perfil`} label="Perfil" />
         </aside>
         <main className="md:col-span-3">{children}</main>
       </div>

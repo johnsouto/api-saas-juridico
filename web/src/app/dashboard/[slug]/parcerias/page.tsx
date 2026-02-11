@@ -19,6 +19,7 @@ type Parceria = {
   nome: string;
   email?: string | null;
   telefone?: string | null;
+  oab_number?: string | null;
   tipo_documento: "cpf" | "cnpj";
   documento: string;
 };
@@ -27,6 +28,7 @@ const schema = z.object({
   nome: z.string().min(2),
   email: z.string().email().optional().or(z.literal("")),
   telefone: z.string().optional(),
+  oab_number: z.string().optional().or(z.literal("")),
   tipo_documento: z.enum(["cpf", "cnpj"]).default("cpf"),
   documento: z.string().min(8)
 });
@@ -43,7 +45,7 @@ export default function ParceriasPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { nome: "", email: "", telefone: "", tipo_documento: "cpf", documento: "" }
+    defaultValues: { nome: "", email: "", telefone: "", oab_number: "", tipo_documento: "cpf", documento: "" }
   });
 
   const save = useMutation({
@@ -51,14 +53,15 @@ export default function ParceriasPage() {
       const payload = {
         ...values,
         email: values.email ? values.email : null,
-        telefone: values.telefone ? values.telefone : null
+        telefone: values.telefone ? values.telefone : null,
+        oab_number: values.oab_number ? values.oab_number : null
       };
       if (editingId) return (await api.put(`/v1/parcerias/${editingId}`, payload)).data;
       return (await api.post("/v1/parcerias", payload)).data;
     },
     onSuccess: async () => {
       setEditingId(null);
-      form.reset({ nome: "", email: "", telefone: "", tipo_documento: "cpf", documento: "" });
+      form.reset({ nome: "", email: "", telefone: "", oab_number: "", tipo_documento: "cpf", documento: "" });
       await qc.invalidateQueries({ queryKey: ["parcerias"] });
     }
   });
@@ -102,13 +105,17 @@ export default function ParceriasPage() {
               <Input {...form.register("telefone")} />
             </div>
             <div className="space-y-1 md:col-span-1">
+              <Label>Número da OAB</Label>
+              <Input placeholder="Ex: SP 123456" {...form.register("oab_number")} />
+            </div>
+            <div className="space-y-1 md:col-span-1">
               <Label>Tipo</Label>
               <Select {...form.register("tipo_documento")}>
                 <option value="cpf">CPF</option>
                 <option value="cnpj">CNPJ</option>
               </Select>
             </div>
-            <div className="space-y-1 md:col-span-3">
+            <div className="space-y-1 md:col-span-2">
               <Label>Documento</Label>
               <Input {...form.register("documento")} />
             </div>
@@ -122,7 +129,7 @@ export default function ParceriasPage() {
                   type="button"
                   onClick={() => {
                     setEditingId(null);
-                    form.reset({ nome: "", email: "", telefone: "", tipo_documento: "cpf", documento: "" });
+                    form.reset({ nome: "", email: "", telefone: "", oab_number: "", tipo_documento: "cpf", documento: "" });
                   }}
                 >
                   Cancelar
@@ -150,6 +157,7 @@ export default function ParceriasPage() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Telefone</TableHead>
+                    <TableHead>OAB</TableHead>
                     <TableHead>Doc</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -160,6 +168,7 @@ export default function ParceriasPage() {
                       <TableCell>{p.nome}</TableCell>
                       <TableCell>{p.email ?? "—"}</TableCell>
                       <TableCell>{p.telefone ?? "—"}</TableCell>
+                      <TableCell>{p.oab_number ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs">
                         {p.tipo_documento}:{p.documento}
                       </TableCell>
@@ -175,6 +184,7 @@ export default function ParceriasPage() {
                                 nome: p.nome,
                                 email: p.email ?? "",
                                 telefone: p.telefone ?? "",
+                                oab_number: p.oab_number ?? "",
                                 tipo_documento: p.tipo_documento,
                                 documento: p.documento
                               });

@@ -13,6 +13,7 @@ export type AuthUser = {
   nome: string;
   first_name?: string | null;
   last_name?: string | null;
+  oab_number?: string | null;
   email: string;
   role: "admin" | "advogado" | "financeiro";
   is_active: boolean;
@@ -26,6 +27,13 @@ export type AuthTenant = {
   tipo_documento: "cpf" | "cnpj";
   documento: string;
   slug: string;
+  address_street?: string | null;
+  address_number?: string | null;
+  address_complement?: string | null;
+  address_neighborhood?: string | null;
+  address_city?: string | null;
+  address_state?: string | null;
+  address_zip?: string | null;
   criado_em: string;
 };
 
