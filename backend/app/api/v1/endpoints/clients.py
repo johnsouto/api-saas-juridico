@@ -34,7 +34,12 @@ async def list_clients(
     user: Annotated[User, Depends(get_current_user)],
     q: str | None = Query(default=None, description="Busca por nome ou documento"),
 ):
-    stmt = select(Client).where(Client.tenant_id == user.tenant_id).order_by(Client.criado_em.desc())
+    stmt = (
+        select(Client)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+        .order_by(Client.criado_em.desc())
+    )
     if q:
         qnorm = q.strip()
         stmt = stmt.where(or_(Client.nome.ilike(f"%{qnorm}%"), Client.documento.ilike(f"%{qnorm}%")))
@@ -48,11 +53,40 @@ async def create_client(
     user: Annotated[User, Depends(get_current_user)],
 ):
     await _limits.enforce_client_limit(db, tenant_id=user.tenant_id)
+    documento = only_digits(payload.documento)
+
+    # If a client with the same document was previously "deleted", reactivate it instead of failing.
+    existing_stmt = (
+        select(Client)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.documento == documento)
+    )
+    existing = (await db.execute(existing_stmt)).scalar_one_or_none()
+    if existing:
+        if not existing.is_active:
+            existing.is_active = True
+            existing.nome = payload.nome
+            existing.tipo_documento = payload.tipo_documento
+            existing.phone_mobile = payload.phone_mobile
+            existing.email = str(payload.email).strip().lower() if payload.email else None
+            existing.address_street = payload.address_street
+            existing.address_number = payload.address_number
+            existing.address_complement = payload.address_complement
+            existing.address_neighborhood = payload.address_neighborhood
+            existing.address_city = payload.address_city
+            existing.address_state = (payload.address_state or None)
+            existing.address_zip = payload.address_zip
+            db.add(existing)
+            await db.commit()
+            await db.refresh(existing)
+            return existing
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Documento já cadastrado")
+
     client = Client(
         tenant_id=user.tenant_id,
         nome=payload.nome,
         tipo_documento=payload.tipo_documento,
-        documento=only_digits(payload.documento),
+        documento=documento,
         phone_mobile=payload.phone_mobile,
         email=str(payload.email).strip().lower() if payload.email else None,
         address_street=payload.address_street,
@@ -79,7 +113,12 @@ async def get_client(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    stmt = select(Client).where(Client.id == client_id).where(Client.tenant_id == user.tenant_id)
+    stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
     client = (await db.execute(stmt)).scalar_one_or_none()
     if not client:
         raise NotFoundError("Cliente não encontrado")
@@ -93,7 +132,12 @@ async def update_client(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    stmt = select(Client).where(Client.id == client_id).where(Client.tenant_id == user.tenant_id)
+    stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
     client = (await db.execute(stmt)).scalar_one_or_none()
     if not client:
         raise NotFoundError("Cliente não encontrado")
@@ -123,11 +167,18 @@ async def delete_client(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    stmt = select(Client).where(Client.id == client_id).where(Client.tenant_id == user.tenant_id)
+    stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
     client = (await db.execute(stmt)).scalar_one_or_none()
     if not client:
         raise NotFoundError("Cliente não encontrado")
-    await db.delete(client)
+    # Soft delete: keeps historical relations (processes, honorarios, docs, etc) intact.
+    client.is_active = False
+    db.add(client)
     await db.commit()
     return {"message": "Cliente removido"}
 
@@ -138,7 +189,12 @@ async def list_client_documents(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    client_stmt = select(Client).where(Client.id == client_id).where(Client.tenant_id == user.tenant_id)
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
     client = (await db.execute(client_stmt)).scalar_one_or_none()
     if not client:
         raise NotFoundError("Cliente não encontrado")
@@ -158,7 +214,12 @@ async def get_client_details(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    stmt = select(Client).where(Client.id == client_id).where(Client.tenant_id == user.tenant_id)
+    stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
     client = (await db.execute(stmt)).scalar_one_or_none()
     if not client:
         raise NotFoundError("Cliente não encontrado")
@@ -193,7 +254,12 @@ async def upload_client_document(
     file: UploadFile = File(...),
     categoria: str | None = Form(default=None),
 ):
-    client_stmt = select(Client).where(Client.id == client_id).where(Client.tenant_id == user.tenant_id)
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
     client = (await db.execute(client_stmt)).scalar_one_or_none()
     if not client:
         raise NotFoundError("Cliente não encontrado")

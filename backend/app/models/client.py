@@ -4,7 +4,7 @@ import uuid
 from typing import Any
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ class Client(UUIDBaseMixin, Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
 
     nome: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     tipo_documento: Mapped[TenantDocumentoTipo] = mapped_column(
         Enum(TenantDocumentoTipo, name="tenant_documento_tipo"),
         nullable=False,

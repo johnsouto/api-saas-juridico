@@ -58,7 +58,11 @@ class PlanLimitService:
         if plan.max_clients is None:
             return
 
-        stmt = select(func.count(Client.id)).where(Client.tenant_id == tenant_id)
+        stmt = (
+            select(func.count(Client.id))
+            .where(Client.tenant_id == tenant_id)
+            .where(Client.is_active.is_(True))
+        )
         current = int((await db.execute(stmt)).scalar_one())
         if current >= int(plan.max_clients):
             raise PlanLimitExceeded(
