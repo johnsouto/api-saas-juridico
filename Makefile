@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down ps logs api-logs web-logs restart build migrate rev seed api-shell web-shell
+.PHONY: up down ps logs api-logs web-logs restart build migrate rev seed api-shell web-shell test-api
 
 up:
 	$(COMPOSE) up -d --build
@@ -40,3 +40,6 @@ api-shell:
 
 web-shell:
 	$(COMPOSE) exec web sh
+
+test-api:
+	pytest -q backend/tests_api
