@@ -4,7 +4,20 @@ import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Moon, Sun, User } from "lucide-react";
+import {
+  Calendar,
+  ChevronsLeft,
+  ChevronsRight,
+  FileText,
+  Gavel,
+  Handshake,
+  LayoutDashboard,
+  Moon,
+  Sun,
+  User,
+  Users,
+  Wallet
+} from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { BugReportButton } from "@/components/feedback/BugReportButton";
@@ -35,6 +48,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const router = useRouter();
   const { tenant, user, logout } = useAuth();
   const [theme, setThemeState] = useState<AppTheme>("dark");
+  const [collapsed, setCollapsed] = useState<boolean>(false);
 
   const slug = params.slug;
 
@@ -53,6 +67,13 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
   useEffect(() => {
     setThemeState(getEffectiveTheme());
+  }, []);
+
+  useEffect(() => {
+    // Sidebar collapse preference (desktop only).
+    try {
+      setCollapsed(window.localStorage.getItem("ej_sidebar_collapsed") === "true");
+    } catch {}
   }, []);
 
   const planCode = billing.data?.plan_code ?? "FREE";
@@ -165,19 +186,56 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
         </div>
       ) : null}
 
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 p-4 md:grid-cols-4">
-        <aside className="space-y-2 md:col-span-1">
-          <NavLink theme={theme} href="/dashboard" label="Dashboard" activeOn={["/dashboard", `/dashboard/${slug}`]} />
-          <NavLink theme={theme} href={`/dashboard/${slug}/clients`} label="Clientes" />
-          <NavLink theme={theme} href={`/dashboard/${slug}/parcerias`} label="Parcerias" />
-          <NavLink theme={theme} href={`/dashboard/${slug}/processes`} label="Processos" />
-          <NavLink theme={theme} href={`/dashboard/${slug}/honorarios`} label="Honorários" />
-          <NavLink theme={theme} href={`/dashboard/${slug}/agenda`} label="Agenda" />
-          <NavLink theme={theme} href={`/dashboard/${slug}/tarefas`} label="Tarefas" />
-          <NavLink theme={theme} href={`/dashboard/${slug}/documents`} label="Documentos" />
-          <NavLink theme={theme} href={`/dashboard/${slug}/perfil`} label="Perfil" />
-        </aside>
-        <main className="md:col-span-3">{children}</main>
+      <div className="mx-auto max-w-6xl p-4">
+        <div className="flex flex-col gap-6 md:flex-row">
+          <aside
+            className={cn(
+              "space-y-2 md:shrink-0",
+              // Mobile: full width (no collapse). Desktop: collapsible widths.
+              collapsed ? "md:w-20" : "md:w-64",
+              "w-full transition-[width] duration-200 ease-out"
+            )}
+          >
+            <div className={cn("hidden md:flex items-center", collapsed ? "justify-center" : "justify-between")}>
+              {!collapsed ? (
+                <span className="px-2 text-xs font-medium text-muted-foreground">Menu</span>
+              ) : null}
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-9 w-9"
+                type="button"
+                aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+                onClick={() => {
+                  const next = !collapsed;
+                  setCollapsed(next);
+                  try {
+                    window.localStorage.setItem("ej_sidebar_collapsed", String(next));
+                  } catch {}
+                }}
+              >
+                {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            <NavLink
+              theme={theme}
+              collapsed={collapsed}
+              icon={LayoutDashboard}
+              href="/dashboard"
+              label="Dashboard"
+              activeOn={["/dashboard", `/dashboard/${slug}`]}
+            />
+            <NavLink theme={theme} collapsed={collapsed} icon={Users} href={`/dashboard/${slug}/clients`} label="Clientes" />
+            <NavLink theme={theme} collapsed={collapsed} icon={Handshake} href={`/dashboard/${slug}/parcerias`} label="Parcerias" />
+            <NavLink theme={theme} collapsed={collapsed} icon={Gavel} href={`/dashboard/${slug}/processes`} label="Processos" />
+            <NavLink theme={theme} collapsed={collapsed} icon={Wallet} href={`/dashboard/${slug}/honorarios`} label="Honorários" />
+            <NavLink theme={theme} collapsed={collapsed} icon={Calendar} href={`/dashboard/${slug}/agenda`} label="Agenda" />
+            <NavLink theme={theme} collapsed={collapsed} icon={LayoutDashboard} href={`/dashboard/${slug}/tarefas`} label="Tarefas" />
+            <NavLink theme={theme} collapsed={collapsed} icon={FileText} href={`/dashboard/${slug}/documents`} label="Documentos" />
+          </aside>
+          <main className="flex-1">{children}</main>
+        </div>
       </div>
     </div>
   );
@@ -187,12 +245,16 @@ function NavLink({
   href,
   label,
   activeOn,
-  theme
+  theme,
+  collapsed,
+  icon: Icon
 }: {
   href: string;
   label: string;
   activeOn?: string[];
   theme: AppTheme;
+  collapsed: boolean;
+  icon: React.ComponentType<{ className?: string }>;
 }) {
   const currentPath = usePathname();
 
@@ -206,15 +268,39 @@ function NavLink({
   const className =
     theme === "dark"
       ? cn(
-          "w-full justify-start border border-white/10 bg-transparent text-white/90",
+          "w-full border border-white/10 bg-transparent text-white/90",
           "hover:bg-white/5",
+          "justify-start",
+          collapsed ? "md:justify-center md:px-2" : null,
           isActive ? "bg-white/10 border-white/15 backdrop-blur-md shadow-sm text-white hover:bg-white/12" : null
         )
       : "w-full justify-start";
 
+  const showTooltip = collapsed;
+
   return (
-    <Button asChild className={className} variant={variant}>
-      <Link href={href}>{label}</Link>
-    </Button>
+    <div className={cn("relative", showTooltip ? "md:group" : null)}>
+      <Button
+        asChild
+        className={className}
+        variant={variant}
+        title={showTooltip ? label : undefined}
+      >
+        <Link href={href} aria-label={label} className={cn("flex items-center gap-2", collapsed ? "md:justify-center" : null)}>
+          <Icon className="h-4 w-4 shrink-0" />
+          <span className={cn("truncate", collapsed ? "md:hidden" : null)}>{label}</span>
+          {showTooltip ? <span className="sr-only">{label}</span> : null}
+        </Link>
+      </Button>
+
+      {/* Tooltip (desktop + collapsed) */}
+      {showTooltip ? (
+        <div className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 hidden -translate-y-1/2 md:block md:opacity-0 md:group-hover:opacity-100 md:transition md:duration-200">
+          <div className="rounded-lg border border-border/20 bg-card/80 px-3 py-2 text-xs text-foreground shadow-sm backdrop-blur">
+            {label}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

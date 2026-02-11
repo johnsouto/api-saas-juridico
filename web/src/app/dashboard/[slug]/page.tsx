@@ -8,7 +8,7 @@ import { Download } from "lucide-react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Proc = { id: string; status: "ativo" | "inativo" | "outros"; criado_em: string };
 type BillingStatus = {
@@ -235,28 +235,29 @@ export default function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle className="text-sm">Relatório</CardTitle>
+            <CardDescription className="text-xs">Exporte seus dados em Excel.</CardDescription>
           </CardHeader>
-          <CardContent className="flex h-full flex-col gap-3">
-            <p className="text-xs text-muted-foreground">Exporte seus dados em Excel.</p>
-
-            <div className="flex w-full flex-1 items-center justify-center">
+          <CardContent className="flex flex-1 flex-col">
+            <div className="flex flex-1 items-center justify-center">
               <PieChart />
             </div>
 
-            <Button
-              className="w-fit"
-              size="sm"
-              variant="outline"
-              type="button"
-              disabled={exportXlsx.isPending}
-              onClick={() => exportXlsx.mutate()}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {exportXlsx.isPending ? "Gerando..." : "Baixar relatório"}
-            </Button>
+            <div className="mt-4">
+              <Button
+                className="w-full"
+                size="sm"
+                variant="outline"
+                type="button"
+                disabled={exportXlsx.isPending}
+                onClick={() => exportXlsx.mutate()}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {exportXlsx.isPending ? "Gerando..." : "Baixar relatório"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
