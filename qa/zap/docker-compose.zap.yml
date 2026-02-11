@@ -1,0 +1,16 @@
+services:
+  zap-baseline:
+    image: owasp/zap2docker-stable
+    working_dir: /zap/wrk
+    volumes:
+      - ../../artifacts:/zap/wrk
+    command:
+      # Baseline = passive scan only (no active attack).
+      # -I: do not fail the container on WARNINGS (still produces report).
+      - zap-baseline.py
+      - -t
+      - ${QA_TARGET_BASE_URL}
+      - -r
+      - zap-report.html
+      - -I
+

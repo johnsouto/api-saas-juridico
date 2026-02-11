@@ -4,7 +4,9 @@ COMPOSE ?= docker compose
 	test-api test-backend \
 	lint-web lint-backend format-backend typecheck-backend \
 	semgrep semgrep-strict \
-	check check-api
+	check check-api \
+	zap-baseline \
+	load-smoke load-load load-stress load-upload-smoke
 
 up:
 	$(COMPOSE) up -d --build
@@ -79,3 +81,31 @@ check:
 check-api:
 	$(MAKE) check
 	$(MAKE) test-api
+
+zap-baseline:
+	python qa/scripts/guard_target.py --require-allow-dangerous
+	$(COMPOSE) -f qa/zap/docker-compose.zap.yml run --rm zap-baseline
+
+load-smoke:
+	python qa/scripts/guard_target.py
+	$(COMPOSE) -f qa/load/docker-compose.k6.yml run --rm \
+		-e QA_TARGET_BASE_URL -e QA_ALLOW_DANGEROUS -e K6_EMAIL -e K6_PASSWORD \
+		k6 run -e K6_PROFILE=smoke qa/load/suite.js
+
+load-load:
+	python qa/scripts/guard_target.py
+	$(COMPOSE) -f qa/load/docker-compose.k6.yml run --rm \
+		-e QA_TARGET_BASE_URL -e QA_ALLOW_DANGEROUS -e K6_EMAIL -e K6_PASSWORD \
+		k6 run -e K6_PROFILE=load qa/load/suite.js
+
+load-stress:
+	python qa/scripts/guard_target.py --require-allow-dangerous
+	$(COMPOSE) -f qa/load/docker-compose.k6.yml run --rm \
+		-e QA_TARGET_BASE_URL -e QA_ALLOW_DANGEROUS -e K6_EMAIL -e K6_PASSWORD \
+		k6 run -e K6_PROFILE=stress qa/load/suite.js
+
+load-upload-smoke:
+	python qa/scripts/guard_target.py --require-allow-dangerous
+	$(COMPOSE) -f qa/load/docker-compose.k6.yml run --rm \
+		-e QA_TARGET_BASE_URL -e QA_ALLOW_DANGEROUS -e K6_EMAIL -e K6_PASSWORD -e K6_ALLOW_WRITE \
+		k6 run -e K6_PROFILE=smoke qa/load/upload-small.js

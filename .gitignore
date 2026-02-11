@@ -35,6 +35,9 @@ Desktop.ini
 uploads/
 app/uploads/
 
+## QA artifacts
+artifacts/
+
 ## Legacy (not used in monorepo)
 /app/
 /Dockerfile
