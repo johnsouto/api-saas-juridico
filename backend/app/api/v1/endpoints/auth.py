@@ -24,6 +24,7 @@ from app.schemas.auth import (
 from app.schemas.token import RefreshRequest
 from app.schemas.user import UserOut
 from app.services.auth_service import AuthService
+from app.services.auth_security_service import AuthSecurityService
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
 from app.services.telegram_service import send_telegram_alert
@@ -34,6 +35,7 @@ from app.utils.validators import only_digits
 router = APIRouter()
 
 _auth_service = AuthService(email_service=EmailService(), plan_limit_service=PlanLimitService())
+_auth_security = AuthSecurityService()
 
 ACCESS_COOKIE_NAME = "saas_access"
 REFRESH_COOKIE_NAME = "saas_refresh"
@@ -144,6 +146,12 @@ async def register_tenant(
     background: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    _auth_security.enforce_rate_limit(
+        request=request,
+        action="register-tenant",
+        principal=str(payload.admin_email),
+    )
+
     # Anti-bot protection (optional; enabled when TURNSTILE_SECRET_KEY is set).
     attempted_doc = only_digits(payload.tenant_documento)
     attempted_email = str(payload.admin_email).strip().lower()
@@ -222,11 +230,23 @@ async def register_tenant(
 
 @router.post("/login")
 async def login(
+    request: Request,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     # OAuth2PasswordRequestForm uses "username" - we treat it as email.
-    _, access, refresh = await _auth_service.authenticate(db, email=form.username, password=form.password)
+    principal = form.username.strip().lower()
+    _auth_security.enforce_rate_limit(request=request, action="login", principal=principal)
+    _auth_security.enforce_login_lockout(request=request, email=principal)
+
+    try:
+        _, access, refresh = await _auth_service.authenticate(db, email=principal, password=form.password)
+    except AuthError as exc:
+        _auth_security.record_login_failure(request=request, email=principal)
+        # Generic external message to avoid account enumeration.
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.") from exc
+
+    _auth_security.record_login_success(request=request, email=principal)
     response = JSONResponse({"ok": True})
     _set_auth_cookies(response=response, access_token=access, refresh_token=refresh)
     return response

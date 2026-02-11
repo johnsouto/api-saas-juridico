@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     FREE_IDLE_TIMEOUT_HOURS: int = 12
     PLUS_IDLE_TIMEOUT_DAYS: int = 30
 
+    # Auth abuse protection (login/register).
+    AUTH_RL_ENABLED: bool = True
+    AUTH_RL_WINDOW_SEC: int = 60
+    AUTH_RL_MAX: int = 10
+
+    AUTH_LOCKOUT_ENABLED: bool = True
+    AUTH_LOCKOUT_MAX_ATTEMPTS: int = 5
+    AUTH_LOCKOUT_MINUTES: int = 10
+
     # CORS_ORIGINS can be a JSON array string: ["http://localhost","https://localhost"]
     CORS_ORIGINS: str = '["http://localhost","https://localhost"]'
 
