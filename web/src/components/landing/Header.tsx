@@ -27,14 +27,25 @@ export function LandingHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/10 bg-background/80 backdrop-blur">
       <Container className="flex items-center justify-between py-3">
-        <Link href="/" className={cn("flex items-center gap-2 text-foreground", focusRing)}>
-          <div className="relative h-9 w-9 overflow-hidden rounded-lg bg-white/5 ring-1 ring-white/10">
-            <Image src="/images/Logotipo.jpeg" alt="Elemento Juris" fill className="object-cover" sizes="36px" />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-wide">Elemento Juris</div>
-            <div className="text-xs text-white/70">SaaS Jurídico</div>
-          </div>
+        <Link href="/" className={cn("flex items-center gap-3 text-foreground", focusRing)} aria-label="Elemento Juris">
+          <span className="relative h-[40px] w-[180px] sm:h-[44px] sm:w-[220px]">
+            <Image
+              src="/images/logotipo_header_light.png"
+              alt="Elemento Juris"
+              fill
+              priority
+              sizes="220px"
+              className="object-contain dark:hidden"
+            />
+            <Image
+              src="/images/logotipo_header_dark.png"
+              alt="Elemento Juris"
+              fill
+              priority
+              sizes="220px"
+              className="hidden object-contain dark:block"
+            />
+          </span>
         </Link>
 
         <nav className="hidden items-center gap-3 md:flex">

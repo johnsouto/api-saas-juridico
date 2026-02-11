@@ -1,6 +1,9 @@
 import type { Config } from "tailwindcss";
 
 export default {
+  // We use a custom class (`theme-premium`) on <html> to represent the premium dark theme.
+  // This enables Tailwind's `dark:` variant without relying on prefers-color-scheme media queries.
+  darkMode: ["class", ".theme-premium"],
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {

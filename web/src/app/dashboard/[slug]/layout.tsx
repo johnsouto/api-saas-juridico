@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -137,7 +138,26 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
       <header className="sticky top-0 z-40 border-b border-border/10 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 p-4">
-          <div className="text-sm font-semibold text-foreground">Elemento Juris</div>
+          <Link href="/dashboard" className="flex items-center gap-3" aria-label="Ir para o dashboard">
+            <span className="relative h-[40px] w-[180px] sm:h-[44px] sm:w-[220px]">
+              <Image
+                src="/images/logotipo_header_light.png"
+                alt="Elemento Juris"
+                fill
+                priority
+                sizes="220px"
+                className="object-contain dark:hidden"
+              />
+              <Image
+                src="/images/logotipo_header_dark.png"
+                alt="Elemento Juris"
+                fill
+                priority
+                sizes="220px"
+                className="hidden object-contain dark:block"
+              />
+            </span>
+          </Link>
 
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="border border-border/15 bg-card/40">
