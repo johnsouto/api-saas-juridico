@@ -81,7 +81,6 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   useEffect(() => {
     // Show the productivity cockpit once per session (tab) after a successful login.
     if (authStatus !== "authenticated") return;
-    if (cockpitOpen) return;
 
     let alreadyShown = false;
     try {
@@ -89,11 +88,16 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     } catch {}
     if (alreadyShown) return;
 
-    try {
-      window.sessionStorage.setItem("ej_cockpit_shown", "1");
-    } catch {}
-    setCockpitOpen(true);
-  }, [authStatus, cockpitOpen]);
+    // Delay opening slightly to avoid "click-through" from the login button / route transitions.
+    const t = window.setTimeout(() => {
+      try {
+        window.sessionStorage.setItem("ej_cockpit_shown", "1");
+      } catch {}
+      setCockpitOpen(true);
+    }, 450);
+
+    return () => window.clearTimeout(t);
+  }, [authStatus]);
 
   const planCode = billing.data?.plan_code ?? "FREE";
   const status = billing.data?.status;

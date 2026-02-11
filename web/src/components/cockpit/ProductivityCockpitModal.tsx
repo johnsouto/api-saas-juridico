@@ -51,6 +51,7 @@ export function ProductivityCockpitModal({
   const { toast } = useToast();
   const [animateIn, setAnimateIn] = useState(false);
   const ctaRef = useRef<HTMLButtonElement>(null);
+  const closeGuardRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!open) return;
@@ -58,18 +59,29 @@ export function ProductivityCockpitModal({
     setAnimateIn(false);
     const raf = window.requestAnimationFrame(() => setAnimateIn(true));
 
+    // Prevent "ghost clicks" (e.g., click-through from the login button / route transition)
+    // from instantly closing the modal right after it opens.
+    closeGuardRef.current = true;
+    const guardTimer = window.setTimeout(() => {
+      closeGuardRef.current = false;
+    }, 650);
+
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const focusTimer = window.setTimeout(() => ctaRef.current?.focus(), 0);
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onOpenChange(false);
+      if (e.key === "Escape") {
+        if (closeGuardRef.current) return;
+        onOpenChange(false);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
       window.cancelAnimationFrame(raf);
+      window.clearTimeout(guardTimer);
       window.clearTimeout(focusTimer);
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKeyDown);
@@ -118,7 +130,10 @@ export function ProductivityCockpitModal({
             "border border-border/15 bg-background/20 text-foreground/80 backdrop-blur",
             "transition-colors hover:bg-background/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           )}
-          onClick={() => onOpenChange(false)}
+          onClick={() => {
+            if (closeGuardRef.current) return;
+            onOpenChange(false);
+          }}
         >
           <X className="h-4 w-4" />
         </button>
@@ -172,6 +187,7 @@ export function ProductivityCockpitModal({
                 "ej-cta-pulse"
               )}
               onClick={() => {
+                if (closeGuardRef.current) return;
                 onOpenChange(false);
                 toast("Bom trabalho, Doutor(a)!", { variant: "success" });
               }}
@@ -200,7 +216,10 @@ export function ProductivityCockpitModal({
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={() => {
+                  if (closeGuardRef.current) return;
+                  onOpenChange(false);
+                }}
                 className="bg-background/10"
               >
                 Continuar sem iniciar
