@@ -19,6 +19,9 @@ web/.env
 node_modules/
 .next/
 out/
+web/artifacts/
+web/test-results/
+web/playwright-report/
 
 ## IDE
 .vscode/
