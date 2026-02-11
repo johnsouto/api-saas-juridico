@@ -31,6 +31,8 @@ from app.schemas.platform import (
     PlatformTenantCreatedOut,
     PlatformTenantDeletedOut,
     PlatformTenantDetailOut,
+    PlatformTenantLimitsOut,
+    PlatformTenantLimitsUpdate,
     PlatformTenantListItem,
     PlatformTenantStatusOut,
     PlatformTrialTenantCreate,
@@ -182,9 +184,52 @@ async def list_tenants(
                 current_period_end=sub.current_period_end if sub else None,
                 grace_period_end=sub.grace_period_end if sub else None,
                 provider=sub.provider.value if sub else None,
+                max_clients_override=sub.max_clients_override if sub else None,
+                max_storage_mb_override=sub.max_storage_mb_override if sub else None,
             )
         )
     return items
+
+
+@router.patch("/tenants/{tenant_id}/limits", response_model=PlatformTenantLimitsOut)
+async def update_tenant_limits(
+    tenant_id: uuid.UUID,
+    payload: PlatformTenantLimitsUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Set per-tenant overrides for product limits.
+
+    Protected by PLATFORM_ADMIN_KEY (router-level dependency).
+    """
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise NotFoundError("Tenant não encontrado")
+
+    sub = (await db.execute(select(Subscription).where(Subscription.tenant_id == tenant_id))).scalar_one_or_none()
+    if not sub:
+        # Keep defaults consistent with BillingService.
+        sub = Subscription(tenant_id=tenant_id)
+        db.add(sub)
+        await db.commit()
+        await db.refresh(sub)
+
+    data = payload.model_dump(exclude_unset=True)
+    if "max_clients_override" in data:
+        sub.max_clients_override = data["max_clients_override"]
+    if "max_storage_mb_override" in data:
+        sub.max_storage_mb_override = data["max_storage_mb_override"]
+
+    db.add(sub)
+    await db.commit()
+    await db.refresh(sub)
+
+    return PlatformTenantLimitsOut(
+        message="Limites atualizados",
+        tenant_id=tenant_id,
+        max_clients_override=sub.max_clients_override,
+        max_storage_mb_override=sub.max_storage_mb_override,
+    )
 
 
 @router.get("/tenants/{tenant_id}", response_model=PlatformTenantDetailOut)

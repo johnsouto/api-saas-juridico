@@ -78,6 +78,10 @@ class BillingService:
 
         message = self._build_status_message(sub, effective_plan_code=effective_code, now=now)
 
+        # Apply per-tenant overrides (set by platform admin) so the UI and enforcement stay consistent.
+        max_clients = sub.max_clients_override if sub.max_clients_override is not None else plan.max_clients
+        max_storage_mb = sub.max_storage_mb_override if sub.max_storage_mb_override is not None else plan.max_storage_mb
+
         return BillingStatusOut(
             tenant_id=tenant_id,
             plan_code=effective_code,
@@ -85,7 +89,7 @@ class BillingService:
             current_period_end=sub.current_period_end,
             grace_period_end=sub.grace_period_end,
             is_plus_effective=_is_plus_effective(sub, now=now),
-            limits=BillingLimits(max_users=plan.max_users, max_clients=plan.max_clients, max_storage_mb=plan.max_storage_mb),
+            limits=BillingLimits(max_users=plan.max_users, max_clients=max_clients, max_storage_mb=max_storage_mb),
             message=message,
         )
 

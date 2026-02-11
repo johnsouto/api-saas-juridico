@@ -253,7 +253,7 @@ export default function LoginPage() {
             <Button
               className="w-full"
               type="button"
-              variant="secondary"
+              variant="outline"
               onClick={() => {
                 setShowReset((v) => !v);
                 setShowRegister(false);

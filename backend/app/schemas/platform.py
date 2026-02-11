@@ -78,6 +78,28 @@ class PlatformTenantListItem(APIModel):
     grace_period_end: datetime | None = None
     provider: str | None = None
 
+    # Per-tenant overrides (set by platform admin). When NULL, defaults from the plan apply.
+    max_clients_override: int | None = None
+    max_storage_mb_override: int | None = None
+
+
+class PlatformTenantLimitsUpdate(APIModel):
+    """
+    Optional per-tenant overrides for product limits.
+
+    Note: sending `null` clears the override and falls back to the plan default.
+    """
+
+    max_clients_override: int | None = Field(default=None, ge=1, le=100000)
+    max_storage_mb_override: int | None = Field(default=None, ge=10, le=1000000)
+
+
+class PlatformTenantLimitsOut(APIModel):
+    message: str
+    tenant_id: uuid.UUID
+    max_clients_override: int | None = None
+    max_storage_mb_override: int | None = None
+
 
 class PlatformResendInviteOut(APIModel):
     message: str

@@ -40,6 +40,10 @@ class Subscription(UUIDBaseMixin, Base):
         default=PlanCode.FREE,
     )
 
+    # Optional per-tenant overrides (set by platform admin). When NULL, defaults from the plan apply.
+    max_clients_override: Mapped[int | None] = mapped_column(nullable=True)
+    max_storage_mb_override: Mapped[int | None] = mapped_column(nullable=True)
+
     status: Mapped[SubscriptionStatus] = mapped_column(
         Enum(SubscriptionStatus, name="subscription_status"),
         nullable=False,
@@ -74,4 +78,3 @@ class Subscription(UUIDBaseMixin, Base):
 
 from app.models.plan import Plan  # noqa: E402
 from app.models.tenant import Tenant  # noqa: E402
-

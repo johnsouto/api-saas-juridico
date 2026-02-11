@@ -41,6 +41,9 @@ type PlatformTenantListItem = {
   current_period_end?: string | null;
   grace_period_end?: string | null;
   provider?: string | null;
+
+  max_clients_override?: number | null;
+  max_storage_mb_override?: number | null;
 };
 
 type PlatformTenantCreatedOut = {
@@ -63,6 +66,13 @@ type PlatformTenantStatusOut = {
 type PlatformTenantDeletedOut = {
   message: string;
   tenant_id: string;
+};
+
+type PlatformTenantLimitsOut = {
+  message: string;
+  tenant_id: string;
+  max_clients_override: number | null;
+  max_storage_mb_override: number | null;
 };
 
 const createSchema = z.object({
@@ -91,6 +101,12 @@ export default function PlatformAdminPage() {
   const [keyInput, setKeyInput] = useState("");
   const [actionInfo, setActionInfo] = useState<string | null>(null);
   const storedKey = useMemo(() => getPlatformAdminKey(), []);
+
+  const [limitsOpen, setLimitsOpen] = useState(false);
+  const [limitsTenant, setLimitsTenant] = useState<PlatformTenantListItem | null>(null);
+  const [limitsClients, setLimitsClients] = useState<string>("");
+  const [limitsStorage, setLimitsStorage] = useState<string>("");
+  const [limitsError, setLimitsError] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
   const [documento, setDocumento] = useState("");
@@ -171,6 +187,57 @@ export default function PlatformAdminPage() {
     }
   });
 
+  const updateLimits = useMutation({
+    mutationFn: async (vars: { tenantId: string; maxClients: number | null; maxStorageMb: number | null }) =>
+      (
+        await api.patch<PlatformTenantLimitsOut>(`/v1/platform/tenants/${vars.tenantId}/limits`, {
+          max_clients_override: vars.maxClients,
+          max_storage_mb_override: vars.maxStorageMb
+        })
+      ).data,
+    onSuccess: async (data) => {
+      setActionInfo(
+        `Limites atualizados: clientes=${data.max_clients_override ?? "padrão"}; armazenamento=${data.max_storage_mb_override ?? "padrão"} MB`
+      );
+      setLimitsOpen(false);
+      setLimitsTenant(null);
+      await qc.invalidateQueries({ queryKey: ["platform-tenants"] });
+    }
+  });
+
+  function openLimitsModal(t: PlatformTenantListItem) {
+    setLimitsError(null);
+    setLimitsTenant(t);
+    setLimitsClients(t.max_clients_override == null ? "" : String(t.max_clients_override));
+    setLimitsStorage(t.max_storage_mb_override == null ? "" : String(t.max_storage_mb_override));
+    setLimitsOpen(true);
+  }
+
+  function parseNullableInt(raw: string): number | null {
+    const v = raw.trim();
+    if (!v) return null;
+    const n = Number.parseInt(v, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function saveLimits() {
+    if (!limitsTenant) return;
+
+    const maxClients = parseNullableInt(limitsClients);
+    const maxStorageMb = parseNullableInt(limitsStorage);
+
+    if (maxClients !== null && maxClients < 1) {
+      setLimitsError("Informe um limite de clientes >= 1 (ou deixe vazio para usar o padrão do plano).");
+      return;
+    }
+    if (maxStorageMb !== null && maxStorageMb < 10) {
+      setLimitsError("Informe um limite de armazenamento >= 10 MB (ou deixe vazio para usar o padrão do plano).");
+      return;
+    }
+
+    updateLimits.mutate({ tenantId: limitsTenant.id, maxClients, maxStorageMb });
+  }
+
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-6">
       <Card>
@@ -223,6 +290,105 @@ export default function PlatformAdminPage() {
           )}
         </CardContent>
       </Card>
+
+      {limitsOpen && limitsTenant ? (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="fixed inset-0 bg-black/50"
+            aria-hidden="true"
+            onClick={() => {
+              if (updateLimits.isPending) return;
+              setLimitsOpen(false);
+              setLimitsTenant(null);
+            }}
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            className={[
+              "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+              "w-[95vw] max-w-xl",
+              "max-h-[85vh] overflow-hidden",
+              "rounded-2xl border border-border/20 bg-background/95 shadow-xl backdrop-blur"
+            ].join(" ")}
+          >
+            <div className="flex max-h-[85vh] flex-col">
+              <header className="border-b border-border/10 bg-background/95 p-4 sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">Limites do tenant</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Ajuste limites personalizados (somente via chave de admin). Deixe vazio para usar o padrão do plano.
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-mono">{limitsTenant.slug}</span> • {limitsTenant.nome}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      if (updateLimits.isPending) return;
+                      setLimitsOpen(false);
+                      setLimitsTenant(null);
+                    }}
+                  >
+                    Fechar
+                  </Button>
+                </div>
+              </header>
+
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                {limitsError ? <p className="mb-3 text-sm text-destructive">{limitsError}</p> : null}
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Limite de clientes (override)</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="Ex: 3"
+                      value={limitsClients}
+                      onChange={(e) => setLimitsClients(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Ex.: 3 no Free. Vazio = padrão do plano.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Armazenamento (MB override)</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="Ex: 100"
+                      value={limitsStorage}
+                      onChange={(e) => setLimitsStorage(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Vazio = padrão do plano.</p>
+                  </div>
+                </div>
+              </div>
+
+              <footer className="border-t border-border/10 bg-background/95 p-4 sm:p-6">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={updateLimits.isPending}
+                    onClick={() => {
+                      setLimitsOpen(false);
+                      setLimitsTenant(null);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="button" disabled={updateLimits.isPending} onClick={saveLimits}>
+                    {updateLimits.isPending ? "Salvando..." : "Salvar limites"}
+                  </Button>
+                </div>
+              </footer>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -452,6 +618,15 @@ export default function PlatformAdminPage() {
                             onClick={() => resendInvite.mutate(t.id)}
                           >
                             {resendInvite.isPending ? "Enviando..." : "Reenviar convite"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!storedKey || updateLimits.isPending}
+                            type="button"
+                            onClick={() => openLimitsModal(t)}
+                          >
+                            Limites
                           </Button>
                           <Button
                             size="sm"

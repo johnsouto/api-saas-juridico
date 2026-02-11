@@ -54,7 +54,13 @@
     --input: 255 255 255;
 
     --secondary: 255 255 255;
-    --secondary-foreground: 255 255 255;
+    /*
+      IMPORTANT:
+      `secondary` is used for surfaces/buttons. In the premium dark theme we often render it with opacity
+      (e.g. `bg-secondary/10`). If for any reason a component falls back to `bg-secondary` (solid),
+      `secondary-foreground` must remain readable (avoid white-on-white).
+    */
+    --secondary-foreground: 14 30 43; /* #0e1e2b */
   }
 
   html,
