@@ -12,9 +12,26 @@ import { FAQ } from "@/components/landing/FAQ";
 import { Footer } from "@/components/landing/Footer";
 
 export const metadata: Metadata = {
-  title: "Elemento Juris — Gestão Jurídica Premium",
+  title: "Elemento Juris — Plataforma Jurídica para advogados e escritórios",
   description:
-    "Gestão jurídica simples, segura e moderna para o seu escritório. Comece no Free e evolua para o Plus (R$47/mês) quando quiser."
+    "Organize clientes, parcerias, processos, documentos e tarefas em um painel moderno e seguro. Plano Free e Plus por R$47/mês.",
+  openGraph: {
+    title: "Elemento Juris — Plataforma Jurídica para advogados e escritórios",
+    description:
+      "Organize clientes, parcerias, processos, documentos e tarefas em um painel moderno e seguro. Plano Free e Plus por R$47/mês.",
+    url: "https://elementojuris.cloud/",
+    siteName: "Elemento Juris",
+    locale: "pt_BR",
+    type: "website",
+    images: [
+      {
+        url: "/images/opengraph-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Elemento Juris — SaaS Jurídico"
+      }
+    ]
+  }
 };
 
 export default function HomePage() {
