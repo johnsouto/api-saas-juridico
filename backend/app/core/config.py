@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     AUTH_LOCKOUT_MAX_ATTEMPTS: int = 5
     AUTH_LOCKOUT_MINUTES: int = 10
 
+    # Salt used to hash PII in logs (email/ip). Use a strong value in production.
+    LOG_PII_HASH_SALT: str = "dev-log-salt-change-me"
+
     # CORS_ORIGINS can be a JSON array string: ["http://localhost","https://localhost"]
     CORS_ORIGINS: str = '["http://localhost","https://localhost"]'
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from collections import defaultdict, deque
@@ -9,6 +10,7 @@ from typing import Deque
 from fastapi import HTTPException, Request, status
 
 from app.core.config import settings
+from app.utils.log_safe import safe_identifier
 
 
 def _now_ts() -> float:
@@ -49,6 +51,7 @@ class AuthSecurityService:
         self._lock = threading.Lock()
         self._rate_buckets: dict[str, Deque[float]] = defaultdict(deque)
         self._login_lockouts: dict[str, _LockState] = defaultdict(_LockState)
+        self._logger = logging.getLogger(__name__)
 
     def _raise_throttled(self) -> None:
         raise HTTPException(
@@ -81,6 +84,12 @@ class AuthSecurityService:
                 while bucket and bucket[0] < cutoff:
                     bucket.popleft()
                 if len(bucket) >= max_hits:
+                    self._logger.warning(
+                        "auth_rate_limited action=%s ip=%s principal=%s",
+                        action,
+                        safe_identifier(ip),
+                        safe_identifier(principal),
+                    )
                     self._raise_throttled()
             for key in keys:
                 self._rate_buckets[key].append(now)
@@ -89,10 +98,16 @@ class AuthSecurityService:
         if not settings.AUTH_LOCKOUT_ENABLED:
             return
         now = _now_ts()
-        key = self._bucket_key(action="login-lockout", ip=_extract_ip(request), principal=email)
+        ip = _extract_ip(request)
+        key = self._bucket_key(action="login-lockout", ip=ip, principal=email)
         with self._lock:
             st = self._login_lockouts[key]
             if st.locked_until_ts > now:
+                self._logger.warning(
+                    "auth_lockout_blocked ip=%s principal=%s",
+                    safe_identifier(ip),
+                    safe_identifier(email),
+                )
                 self._raise_throttled()
             if st.locked_until_ts and st.locked_until_ts <= now:
                 st.failures = 0
@@ -104,7 +119,8 @@ class AuthSecurityService:
         max_attempts = max(int(settings.AUTH_LOCKOUT_MAX_ATTEMPTS), 1)
         lockout_minutes = max(int(settings.AUTH_LOCKOUT_MINUTES), 1)
         now = _now_ts()
-        key = self._bucket_key(action="login-lockout", ip=_extract_ip(request), principal=email)
+        ip = _extract_ip(request)
+        key = self._bucket_key(action="login-lockout", ip=ip, principal=email)
 
         with self._lock:
             st = self._login_lockouts[key]
@@ -114,9 +130,14 @@ class AuthSecurityService:
             st.failures += 1
             if st.failures >= max_attempts:
                 st.locked_until_ts = now + (lockout_minutes * 60)
+                self._logger.warning(
+                    "auth_lockout_started ip=%s principal=%s duration_min=%s",
+                    safe_identifier(ip),
+                    safe_identifier(email),
+                    lockout_minutes,
+                )
 
     def record_login_success(self, *, request: Request, email: str) -> None:
         key = self._bucket_key(action="login-lockout", ip=_extract_ip(request), principal=email)
         with self._lock:
             self._login_lockouts.pop(key, None)
-
