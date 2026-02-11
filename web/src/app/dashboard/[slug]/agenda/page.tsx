@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,10 @@ type Evento = {
   inicio_em: string;
   fim_em?: string | null;
   client_id?: string | null;
+};
+type AgendaCreateResponse = {
+  event: Evento;
+  email_sent: boolean;
 };
 
 const schema = z.object({
@@ -43,6 +48,7 @@ function toIsoOrThrow(value: string, label: string): string {
 
 export default function AgendaPage() {
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const clients = useQuery({
     queryKey: ["clients"],
@@ -70,11 +76,22 @@ export default function AgendaPage() {
           inicio_em: inicioIso,
           fim_em: fimIso
         })
-      ).data;
+      ).data as AgendaCreateResponse;
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       form.reset({ titulo: "", tipo: "reuniao", client_id: "", inicio_em: "", fim_em: "" });
       await qc.invalidateQueries({ queryKey: ["agenda"] });
+      if (result.email_sent) {
+        toast("Evento cadastrado. Enviamos um e-mail com anexo .ics para você salvar na agenda.", {
+          variant: "success",
+          durationMs: 4200
+        });
+      } else {
+        toast("Evento cadastrado, mas não foi possível enviar o e-mail agora.", {
+          variant: "default",
+          durationMs: 4200
+        });
+      }
     }
   });
 
@@ -92,7 +109,7 @@ export default function AgendaPage() {
       <Card>
         <CardHeader>
           <CardTitle>Agenda</CardTitle>
-          <CardDescription>Eventos (audiências/reuniões) com data/hora sem digitar ISO.</CardDescription>
+          <CardDescription>Cadastre seus eventos e receba notificações por E-mail</CardDescription>
         </CardHeader>
       </Card>
 

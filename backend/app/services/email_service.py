@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import logging
+import smtplib
 from dataclasses import dataclass
+from email.message import EmailMessage
+from email.utils import formataddr
 
 from fastapi import BackgroundTasks
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _is_smtp_configured() -> bool:
@@ -14,6 +20,15 @@ def _is_smtp_configured() -> bool:
 
 @dataclass(frozen=True)
 class EmailService:
+    def _smtp_send(self, message: EmailMessage) -> None:
+        if not _is_smtp_configured():
+            raise RuntimeError("SMTP não configurado")
+
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as client:
+            client.starttls()
+            client.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            client.send_message(message)
+
     def _client(self) -> FastMail:
         conf = ConnectionConfig(
             MAIL_USERNAME=settings.SMTP_USERNAME or "",
@@ -77,3 +92,40 @@ class EmailService:
         if not recipients:
             return
         self._enqueue_or_log(background, subject, recipients, body)
+
+    def send_agenda_event_created_email(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        body: str,
+        ics_bytes: bytes,
+    ) -> bool:
+        """
+        Sends a transactional agenda email with .ics attachment.
+        Returns True on success and False on failure.
+        """
+        if not _is_smtp_configured():
+            logger.warning("SMTP não configurado para enviar e-mail de agenda")
+            return False
+
+        try:
+            message = EmailMessage()
+            message["Subject"] = subject
+            message["From"] = formataddr((settings.EMAIL_FROM_NAME, settings.EMAIL_FROM))
+            message["To"] = to_email
+            # Explicit no-reply direction for recipients.
+            message["Reply-To"] = "no-reply@elementojuris.cloud"
+            message.set_content(body)
+            message.add_attachment(
+                ics_bytes,
+                maintype="text",
+                subtype="calendar",
+                filename="evento-elemento-juris.ics",
+                params={"charset": "utf-8", "method": "REQUEST"},
+            )
+            self._smtp_send(message)
+            return True
+        except Exception:
+            logger.exception("Falha ao enviar e-mail de confirmação de agenda")
+            return False

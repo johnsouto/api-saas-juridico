@@ -125,9 +125,9 @@ export default function DashboardHome() {
             <div className="text-sm text-muted-foreground">
               <div className="flex flex-wrap items-center gap-2">
                 <div>
-                  Logado como: <span className="font-medium">{me.data.nome}</span> ({me.data.email})
+                  Login: <span className="font-medium">{me.data.email}</span>
                 </div>
-                <Badge variant="secondary">{me.data.role}</Badge>
+                <Badge variant="secondary">Usuário</Badge>
               </div>
             </div>
           ) : null}

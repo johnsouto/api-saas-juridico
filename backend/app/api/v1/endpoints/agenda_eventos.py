@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,11 +15,52 @@ from app.db.session import get_db
 from app.models.agenda_evento import AgendaEvento
 from app.models.client import Client
 from app.models.process import Process
+from app.models.tenant import Tenant
 from app.models.user import User
-from app.schemas.agenda_evento import AgendaEventoCreate, AgendaEventoOut, AgendaEventoUpdate
+from app.schemas.agenda_evento import AgendaEventoCreate, AgendaEventoCreateOut, AgendaEventoOut, AgendaEventoUpdate
+from app.services.calendar_service import format_brasilia_date, format_brasilia_time, generate_ics
+from app.services.email_service import EmailService
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+_email = EmailService()
+
+
+def _first_name(user: User) -> str:
+    if user.first_name and user.first_name.strip():
+        return user.first_name.strip()
+    nome = (user.nome or "").strip()
+    return nome.split(" ")[0] if nome else "Doutor(a)"
+
+
+def _build_agenda_email_body(*, user: User, event: AgendaEvento, location: str | None) -> str:
+    lines = [
+        f"Olá, Dr(a). {_first_name(user)}!",
+        "",
+        "Seu evento foi cadastrado na Agenda do Elemento Juris.",
+        f"📅 Data: {format_brasilia_date(event.inicio_em)}",
+        f"⏰ Horário: {format_brasilia_time(event.inicio_em)} (Brasília)",
+    ]
+
+    if location:
+        lines.append(f"📍 Local: {location}")
+    if event.descricao:
+        lines.append(f"📝 Detalhes: {event.descricao}")
+
+    lines.extend(
+        [
+            "",
+            "📅 Salvar na agenda: Abra o anexo .ics deste e-mail para adicionar o evento ao seu calendário.",
+            "",
+            "Este é um e-mail automático (no-reply). Não é necessário responder.",
+            "",
+            "Obrigado por usar o Elemento Juris.",
+            "Atenciosamente,",
+            "Equipe Elemento Juris",
+        ]
+    )
+    return "\n".join(lines)
 
 
 @router.get("", response_model=list[AgendaEventoOut])
@@ -29,7 +72,7 @@ async def list_eventos(
     return list((await db.execute(stmt)).scalars().all())
 
 
-@router.post("", response_model=AgendaEventoOut)
+@router.post("", response_model=AgendaEventoCreateOut)
 async def create_evento(
     payload: AgendaEventoCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -60,7 +103,30 @@ async def create_evento(
     db.add(ev)
     await db.commit()
     await db.refresh(ev)
-    return ev
+
+    tenant_stmt = select(Tenant).where(Tenant.id == user.tenant_id)
+    tenant = (await db.execute(tenant_stmt)).scalar_one_or_none()
+    if tenant is None:
+        raise NotFoundError("Escritório não encontrado")
+
+    location = getattr(ev, "location", None) or getattr(ev, "local", None)
+    body = _build_agenda_email_body(user=user, event=ev, location=location)
+    subject = f"📅 Evento cadastrado — {ev.titulo}"
+    email_sent = False
+    try:
+        ics_bytes = generate_ics(ev, user, tenant)
+        email_sent = await run_in_threadpool(
+            _email.send_agenda_event_created_email,
+            to_email=user.email,
+            subject=subject,
+            body=body,
+            ics_bytes=ics_bytes,
+        )
+    except Exception:
+        logger.exception("Erro ao processar envio de e-mail da agenda")
+        email_sent = False
+
+    return {"event": ev, "email_sent": email_sent}
 
 
 @router.put("/{evento_id}", response_model=AgendaEventoOut)

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   // Needed so Next resolves Open Graph/Twitter image URLs correctly in production.
   // Without this, Next may fall back to http://localhost:3000 and previews break on WhatsApp/Telegram.
   metadataBase: new URL("https://elementojuris.cloud"),
-  title: "SaaS Jurídico",
+  title: "Elemento Juris",
   description: "SaaS Jurídico multi-tenant para escritórios de advocacia",
   icons: {
     icon: [{ url: "/images/favicon.png" }]

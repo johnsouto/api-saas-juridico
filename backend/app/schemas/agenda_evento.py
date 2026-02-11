@@ -39,3 +39,8 @@ class AgendaEventoOut(APIModel):
     fim_em: datetime | None
     descricao: str | None
     criado_em: datetime
+
+
+class AgendaEventoCreateOut(APIModel):
+    event: AgendaEventoOut
+    email_sent: bool
