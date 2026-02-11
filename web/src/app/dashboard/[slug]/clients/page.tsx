@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import { z } from "zod";
@@ -57,6 +58,9 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function ClientsPage() {
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug;
+
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [q, setQ] = useState<string>("");
@@ -275,7 +279,7 @@ export default function ClientsPage() {
                       <TableCell>
                         <Link
                           className="underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
-                          href={`./${c.id}`}
+                          href={`/dashboard/${slug}/clients/${c.id}`}
                         >
                           {c.nome}
                         </Link>
@@ -286,7 +290,7 @@ export default function ClientsPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button asChild variant="outline" size="sm">
-                            <Link href={`./${c.id}`}>Abrir</Link>
+                            <Link href={`/dashboard/${slug}/clients/${c.id}`}>Abrir</Link>
                           </Button>
                           <Button
                             variant="outline"
