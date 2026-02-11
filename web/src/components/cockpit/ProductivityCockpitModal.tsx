@@ -94,10 +94,6 @@ export function ProductivityCockpitModal({
       {/* Overlay */}
       <div
         className={cn("absolute inset-0 backdrop-blur-xl", overlayBg)}
-        onMouseDown={(e) => {
-          // Optional: close on outside click (overlay only).
-          if (e.target === e.currentTarget) onOpenChange(false);
-        }}
       />
 
       {/* Modal */}
@@ -325,4 +321,3 @@ const FlipDigit = (() => {
 
   return Component;
 })();
-
