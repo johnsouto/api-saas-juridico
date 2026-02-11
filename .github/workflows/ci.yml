@@ -101,6 +101,5 @@ jobs:
         with:
           name: playwright-artifacts
           path: |
-            web/test-results
-            web/playwright-report
-
+            web/artifacts/e2e/test-results
+            web/artifacts/e2e/playwright-report
