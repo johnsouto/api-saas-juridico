@@ -1,8 +1,9 @@
-import { test, expect } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { getE2EEnv } from "./env";
+import { test, expect } from "./fixtures";
 
-async function preemptCockpitModal(page: import("@playwright/test").Page) {
+async function preemptCockpitModal(page: Page) {
   await page.addInitScript(() => {
     try {
       window.sessionStorage.setItem("ej_cockpit_shown", "1");
@@ -12,7 +13,7 @@ async function preemptCockpitModal(page: import("@playwright/test").Page) {
   });
 }
 
-async function uiLogin(page: import("@playwright/test").Page) {
+async function uiLogin(page: Page) {
   const env = getE2EEnv();
 
   await preemptCockpitModal(page);
@@ -37,10 +38,10 @@ async function assertPageLoadedOrEmpty({
   emptyText,
   nonEmptyIndicator,
 }: {
-  page: import("@playwright/test").Page;
+  page: Page;
   title: string;
   emptyText: string;
-  nonEmptyIndicator: import("@playwright/test").Locator;
+  nonEmptyIndicator: Locator;
 }) {
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
   await expect(page.getByText(emptyText, { exact: true }).or(nonEmptyIndicator)).toBeVisible();
@@ -112,4 +113,3 @@ test.describe("E2E smoke (read-only)", () => {
     });
   });
 });
-

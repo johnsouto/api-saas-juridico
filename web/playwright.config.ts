@@ -1,22 +1,29 @@
 import { defineConfig, devices } from "@playwright/test";
 
-function failIfProductionTarget(baseUrl: string) {
-  // Golden rule: never run E2E against production domains.
-  // Keep this check intentionally simple and strict.
-  if (baseUrl.includes("elementojuris.cloud")) {
+function normalizeBaseUrl(input: string): string {
+  return (input || "").trim().replace(/\/+$/, "");
+}
+
+function assertSafeBaseUrl(baseUrl: string): void {
+  const value = baseUrl.toLowerCase();
+  if (!value) throw new Error("E2E_BASE_URL is empty. Refusing to run E2E tests.");
+
+  // Golden rule: never run E2E against production.
+  // IMPORTANT: keep this check simple and explicit. Do not add an override.
+  if (value.includes("elementojuris.cloud")) {
     throw new Error(
       [
         "Refusing to run Playwright E2E against a production domain.",
         `E2E_BASE_URL=${baseUrl}`,
         "",
-        "Set E2E_BASE_URL to localhost/staging (e.g. http://localhost:3000).",
-      ].join("\n")
+        "Set E2E_BASE_URL to localhost or a dedicated staging environment.",
+      ].join("\n"),
     );
   }
 }
 
-const baseURL = process.env.E2E_BASE_URL?.trim() || "http://localhost:3000";
-failIfProductionTarget(baseURL);
+const baseURL = normalizeBaseUrl(process.env.E2E_BASE_URL ?? "http://localhost:3000");
+assertSafeBaseUrl(baseURL);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -24,24 +31,19 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
-  reporter: process.env.CI
-    ? [
-        ["list"],
-        ["html", { outputFolder: "playwright-report", open: "never" }],
-      ]
-    : [["list"], ["html", { open: "never" }]],
+  outputDir: "artifacts/e2e/test-results",
+  reporter: [
+    ["list"],
+    ["html", { outputFolder: "artifacts/e2e/playwright-report", open: "never" }],
+  ],
   use: {
     baseURL,
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    // We manage trace/screenshot in ./e2e/fixtures.ts to keep artifacts in:
+    // - artifacts/e2e/screenshots
+    // - artifacts/e2e/traces
+    trace: "off",
+    screenshot: "off",
+    video: "off",
   },
-  outputDir: "test-results",
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });
-
