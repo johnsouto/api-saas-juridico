@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request: {}
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint + Tests + E2E (safe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Always local in CI (never production).
+      E2E_BASE_URL: http://localhost
+      API_BASE_URL: http://localhost
+      # Keep dangerous tools off by default.
+      QA_ALLOW_DANGEROUS: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web deps
+        working-directory: web
+        run: npm ci
+
+      - name: Web lint (eslint)
+        run: npm --prefix web run lint
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install Python deps (runtime + QA tools)
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+
+      - name: Backend lint (ruff)
+        run: cd backend && ruff check app tests tests_api
+
+      - name: Backend unit tests (pytest)
+        run: pytest -q backend/tests
+
+      - name: Semgrep (warn-only)
+        run: semgrep --config p/owasp-top-ten --metrics=off || true
+
+      - name: Start stack (Docker Compose)
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml -f docker-compose.qa.yml up -d --build
+
+      - name: Wait for API health
+        run: |
+          set -euo pipefail
+          url="http://localhost/api/health"
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 5 "$url" >/dev/null; then
+              echo "API is healthy."
+              exit 0
+            fi
+            echo "Waiting for API... ($i/60)"
+            sleep 2
+          done
+          echo "API did not become healthy in time."
+          docker compose ps || true
+          docker compose logs --tail=200 api || true
+          exit 1
+
+      - name: API integration tests (safe)
+        run: pytest -q backend/tests_api
+
+      - name: Install Playwright (Chromium)
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+
+      - name: Playwright E2E (headless, safe)
+        run: npm --prefix web run test:e2e
+
+      - name: Upload Playwright artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            web/test-results
+            web/playwright-report
+

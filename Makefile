@@ -1,7 +1,7 @@
 COMPOSE ?= docker compose
 
 .PHONY: up down ps logs api-logs web-logs restart build migrate rev seed api-shell web-shell \
-	test-api test-backend \
+	test-api test-backend test-e2e test-e2e-ui \
 	lint-web lint-backend format-backend typecheck-backend \
 	semgrep semgrep-strict \
 	check check-api \
@@ -52,6 +52,12 @@ test-api:
 
 test-backend:
 	pytest -q backend/tests
+
+test-e2e:
+	npm --prefix web run test:e2e
+
+test-e2e-ui:
+	npm --prefix web run test:e2e:ui
 
 lint-web:
 	npm --prefix web run lint

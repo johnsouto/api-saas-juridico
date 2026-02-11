@@ -1,0 +1,11 @@
+services:
+  # QA/CI override:
+  # Make `/api/*` route to the API on localhost without requiring production Host() rules.
+  # This keeps auth cookie flows same-origin (web + api behind Traefik).
+  api:
+    labels:
+      - traefik.http.routers.api-local-http.rule=PathPrefix(`/api`)
+      - traefik.http.routers.api-local-http.entrypoints=web
+      - traefik.http.routers.api-local-http.priority=200
+      - traefik.http.routers.api-local-http.service=api
+

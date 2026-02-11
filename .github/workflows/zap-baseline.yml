@@ -1,0 +1,42 @@
+name: ZAP Baseline (Manual, Guarded)
+
+on:
+  workflow_dispatch:
+    inputs:
+      qa_target_base_url:
+        description: "Target base URL (localhost/staging only; production domains are blocked)"
+        required: true
+        default: "http://localhost"
+      qa_allow_dangerous:
+        description: "Must be exactly true to run (safety opt-in)"
+        required: true
+        default: "false"
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    name: ZAP baseline (passive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      QA_TARGET_BASE_URL: ${{ inputs.qa_target_base_url }}
+      QA_ALLOW_DANGEROUS: ${{ inputs.qa_allow_dangerous }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guard target (blocks production)
+        run: python qa/scripts/guard_target.py --require-allow-dangerous
+
+      - name: Run ZAP baseline (passive)
+        run: docker compose -f qa/zap/docker-compose.zap.yml run --rm zap-baseline
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: artifacts/zap-report.html
+
