@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, User } from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { BugReportButton } from "@/components/feedback/BugReportButton";
@@ -109,6 +109,12 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
             <Badge variant="secondary" className="border border-border/15 bg-card/40">
               {planBadgeLabel(planCode)}
             </Badge>
+            <Button asChild size="sm" variant="outline" className="gap-2">
+              <Link href="/dashboard/perfil" aria-label="Perfil">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">Perfil</span>
+              </Link>
+            </Button>
             <Button
               size="icon"
               variant="outline"
@@ -161,15 +167,15 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 p-4 md:grid-cols-4">
         <aside className="space-y-2 md:col-span-1">
-          <NavLink href="/dashboard" label="Dashboard" activeOn={["/dashboard", `/dashboard/${slug}`]} />
-          <NavLink href={`/dashboard/${slug}/clients`} label="Clientes" />
-          <NavLink href={`/dashboard/${slug}/parcerias`} label="Parcerias" />
-          <NavLink href={`/dashboard/${slug}/processes`} label="Processos" />
-          <NavLink href={`/dashboard/${slug}/honorarios`} label="Honorários" />
-          <NavLink href={`/dashboard/${slug}/agenda`} label="Agenda" />
-          <NavLink href={`/dashboard/${slug}/tarefas`} label="Tarefas" />
-          <NavLink href={`/dashboard/${slug}/documents`} label="Documentos" />
-          <NavLink href={`/dashboard/${slug}/perfil`} label="Perfil" />
+          <NavLink theme={theme} href="/dashboard" label="Dashboard" activeOn={["/dashboard", `/dashboard/${slug}`]} />
+          <NavLink theme={theme} href={`/dashboard/${slug}/clients`} label="Clientes" />
+          <NavLink theme={theme} href={`/dashboard/${slug}/parcerias`} label="Parcerias" />
+          <NavLink theme={theme} href={`/dashboard/${slug}/processes`} label="Processos" />
+          <NavLink theme={theme} href={`/dashboard/${slug}/honorarios`} label="Honorários" />
+          <NavLink theme={theme} href={`/dashboard/${slug}/agenda`} label="Agenda" />
+          <NavLink theme={theme} href={`/dashboard/${slug}/tarefas`} label="Tarefas" />
+          <NavLink theme={theme} href={`/dashboard/${slug}/documents`} label="Documentos" />
+          <NavLink theme={theme} href={`/dashboard/${slug}/perfil`} label="Perfil" />
         </aside>
         <main className="md:col-span-3">{children}</main>
       </div>
@@ -180,11 +186,13 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 function NavLink({
   href,
   label,
-  activeOn
+  activeOn,
+  theme
 }: {
   href: string;
   label: string;
   activeOn?: string[];
+  theme: AppTheme;
 }) {
   const currentPath = usePathname();
 
@@ -194,8 +202,18 @@ function NavLink({
     return currentPath.startsWith(`${href}/`);
   })();
 
+  const variant: "secondary" | "outline" = theme === "light" && isActive ? "secondary" : "outline";
+  const className =
+    theme === "dark"
+      ? cn(
+          "w-full justify-start border border-white/10 bg-transparent text-white/90",
+          "hover:bg-white/5",
+          isActive ? "bg-white/10 border-white/15 backdrop-blur-md shadow-sm text-white hover:bg-white/12" : null
+        )
+      : "w-full justify-start";
+
   return (
-    <Button asChild className="w-full justify-start" variant={isActive ? "secondary" : "outline"}>
+    <Button asChild className={className} variant={variant}>
       <Link href={href}>{label}</Link>
     </Button>
   );

@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { Download } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -236,27 +237,25 @@ export default function DashboardHome() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Atalhos</CardTitle>
+            <CardTitle className="text-sm">Relatório</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-1 text-sm">
-            <Link className="text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40" href={`/dashboard/${slug}/agenda`}>
-              Agenda
-            </Link>
-            <Link className="text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40" href={`/dashboard/${slug}/tarefas`}>
-              Tarefas
-            </Link>
-            <Link className="text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40" href={`/dashboard/${slug}/documents`}>
-              Documentos
-            </Link>
+          <CardContent className="flex h-full flex-col gap-3">
+            <p className="text-xs text-muted-foreground">Exporte seus dados em Excel.</p>
+
+            <div className="flex w-full flex-1 items-center justify-center">
+              <PieChart />
+            </div>
+
             <Button
-              className="mt-2 w-fit"
+              className="w-fit"
               size="sm"
               variant="outline"
               type="button"
               disabled={exportXlsx.isPending}
               onClick={() => exportXlsx.mutate()}
             >
-              {exportXlsx.isPending ? "Exportando..." : "Exportar .xlsx"}
+              <Download className="mr-2 h-4 w-4" />
+              {exportXlsx.isPending ? "Gerando..." : "Baixar relatório"}
             </Button>
           </CardContent>
         </Card>
@@ -419,5 +418,75 @@ function AreaChart({
       </svg>
       <p className="mt-2 text-xs text-muted-foreground">Eixo X: meses do ano corrente. Eixo Y: quantidade de processos.</p>
     </div>
+  );
+}
+
+function PieChart() {
+  // Decorative pie chart (donut) – purely visual.
+  // Values are illustrative; they don't represent real analytics yet.
+  const r = 40;
+  const c = 2 * Math.PI * r;
+  const segA = c * 0.55;
+  const segB = c * 0.25;
+  const segC = c - segA - segB;
+
+  return (
+    <svg
+      viewBox="0 0 120 120"
+      className="h-28 w-28 drop-shadow-sm"
+      role="img"
+      aria-label="Gráfico de pizza"
+    >
+      <defs>
+        <radialGradient id="ejDonutGlow" cx="50%" cy="35%" r="70%">
+          <stop offset="0%" stopColor="rgba(35, 64, 102, 0.35)" />
+          <stop offset="100%" stopColor="rgba(35, 64, 102, 0)" />
+        </radialGradient>
+      </defs>
+
+      {/* soft glow */}
+      <circle cx="60" cy="60" r="52" fill="url(#ejDonutGlow)" />
+
+      {/* base ring */}
+      <circle cx="60" cy="60" r={r} fill="none" stroke="rgb(var(--border) / 0.10)" strokeWidth="18" />
+
+      {/* segments */}
+      <g transform="rotate(-90 60 60)">
+        <circle
+          cx="60"
+          cy="60"
+          r={r}
+          fill="none"
+          stroke="#234066"
+          strokeWidth="18"
+          strokeDasharray={`${segA} ${c}`}
+          strokeDashoffset={0}
+        />
+        <circle
+          cx="60"
+          cy="60"
+          r={r}
+          fill="none"
+          stroke="#22C55E"
+          strokeWidth="18"
+          strokeDasharray={`${segB} ${c}`}
+          strokeDashoffset={-segA}
+        />
+        <circle
+          cx="60"
+          cy="60"
+          r={r}
+          fill="none"
+          stroke="#FACC15"
+          strokeWidth="18"
+          strokeDasharray={`${segC} ${c}`}
+          strokeDashoffset={-(segA + segB)}
+        />
+      </g>
+
+      {/* inner hole */}
+      <circle cx="60" cy="60" r="24" fill="rgb(var(--background) / 0.25)" />
+      <circle cx="60" cy="60" r="23" fill="rgb(var(--card) / 0.55)" />
+    </svg>
   );
 }
