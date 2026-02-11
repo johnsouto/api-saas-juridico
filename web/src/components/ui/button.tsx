@@ -16,7 +16,8 @@ const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground shadow-glow hover:bg-primary/90",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          // In premium dark theme we want a subtle translucent surface (not solid white).
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 dark:border dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15",
         outline:
           "border border-border/15 bg-transparent hover:bg-muted/10",
         destructive:
