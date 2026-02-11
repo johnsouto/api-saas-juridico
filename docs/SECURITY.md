@@ -39,6 +39,16 @@ Variaveis de ambiente:
 Mensagem publica quando excede:
 - `Muitas tentativas. Tente novamente em instantes.`
 
+### Logging sem PII (rate limit/lockout)
+
+- Fluxos de rate limit/lockout nao registram email/IP em claro.
+- Identificadores sao hashados para correlacao operacional.
+- Helper: `backend/app/utils/log_safe.py`.
+
+Variavel de ambiente:
+
+- `LOG_PII_HASH_SALT` (obrigatorio ajustar em producao)
+
 ## Login Error Exposure
 
 - O endpoint `POST /api/v1/auth/login` responde externamente com mensagem generica:
@@ -62,6 +72,13 @@ Variaveis de ambiente:
 - `UPLOAD_BLOCKED_EXTENSIONS=exe,js,bat,cmd,sh,dll,msi,com,scr,jar,ps1,vbs`
 - `UPLOAD_ALLOWED_MIME_TYPES=...` (lista CSV)
 - `UPLOAD_SCANNER_ENABLED=false`
+- `ERROR_SCHEMA_ENFORCE_429_413=false`
+
+Quando `ERROR_SCHEMA_ENFORCE_429_413=true`:
+- `429` usa mensagem amigavel padrao:
+  - `Muitas tentativas. Tente novamente em instantes.`
+- `413` usa mensagem amigavel padrao:
+  - `Arquivo acima do limite permitido.`
 
 ## Audit Logging
 
