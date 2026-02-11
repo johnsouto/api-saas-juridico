@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { ProductivityCockpitModal } from "@/components/cockpit/ProductivityCockpitModal";
 import { BugReportButton } from "@/components/feedback/BugReportButton";
 import { api } from "@/lib/api";
 import { setIdleTimeoutMs } from "@/lib/session";
@@ -46,9 +47,10 @@ function planBadgeLabel(plan: BillingStatus["plan_code"]): string {
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
-  const { tenant, user, logout } = useAuth();
+  const { tenant, user, logout, status: authStatus } = useAuth();
   const [theme, setThemeState] = useState<AppTheme>("dark");
   const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [cockpitOpen, setCockpitOpen] = useState<boolean>(false);
 
   const slug = params.slug;
 
@@ -76,6 +78,23 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     } catch {}
   }, []);
 
+  useEffect(() => {
+    // Show the productivity cockpit once per session (tab) after a successful login.
+    if (authStatus !== "authenticated") return;
+    if (cockpitOpen) return;
+
+    let alreadyShown = false;
+    try {
+      alreadyShown = window.sessionStorage.getItem("ej_cockpit_shown") === "1";
+    } catch {}
+    if (alreadyShown) return;
+
+    try {
+      window.sessionStorage.setItem("ej_cockpit_shown", "1");
+    } catch {}
+    setCockpitOpen(true);
+  }, [authStatus, cockpitOpen]);
+
   const planCode = billing.data?.plan_code ?? "FREE";
   const status = billing.data?.status;
   const message = billing.data?.message;
@@ -88,11 +107,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   }, [planCode]);
 
   const officeName = tenant?.nome?.trim() ? tenant.nome : "Seu escritório";
-  const firstName =
-    (user?.first_name ?? "").trim() ||
-    (user?.nome ?? "").trim().split(/\s+/).filter(Boolean)[0] ||
-    "";
-  const welcomeLine = firstName ? `Bem-vindo: Dr. ${firstName}` : "Bem-vindo";
+  const firstName = (user?.first_name ?? "").trim() || (user?.nome ?? "").trim() || "";
 
   const cta = (() => {
     if (status === "past_due") {
@@ -118,13 +133,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
       <header className="sticky top-0 z-40 border-b border-border/10 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 p-4">
-          <div className="flex flex-col gap-1">
-            <div className="text-sm font-semibold text-foreground">Elemento Juris</div>
-            <div className="text-xs text-muted-foreground">
-              <div>Escritório: {officeName}</div>
-              <div>{welcomeLine}</div>
-            </div>
-          </div>
+          <div className="text-sm font-semibold text-foreground">Elemento Juris</div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="border border-border/15 bg-card/40">
@@ -157,6 +166,9 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
               size="sm"
               variant="outline"
               onClick={async () => {
+                try {
+                  window.sessionStorage.removeItem("ej_cockpit_shown");
+                } catch {}
                 await logout();
                 router.replace("/login?next=/dashboard");
               }}
@@ -237,6 +249,14 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
           <main className="flex-1">{children}</main>
         </div>
       </div>
+
+      <ProductivityCockpitModal
+        open={cockpitOpen}
+        onOpenChange={setCockpitOpen}
+        theme={theme}
+        officeName={officeName}
+        firstName={firstName}
+      />
     </div>
   );
 }
