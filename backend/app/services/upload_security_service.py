@@ -55,9 +55,14 @@ class UploadSecurityService:
         max_mb = max(int(settings.UPLOAD_MAX_FILE_MB), 1)
         max_bytes = max_mb * 1024 * 1024
         if int(size_bytes) > max_bytes:
+            detail = (
+                "Arquivo acima do limite permitido."
+                if settings.ERROR_SCHEMA_ENFORCE_429_413
+                else f"Arquivo excede o limite permitido de {max_mb} MB."
+            )
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"Arquivo excede o limite permitido de {max_mb} MB.",
+                detail=detail,
             )
 
         return safe_name
@@ -70,4 +75,3 @@ class UploadSecurityService:
             self._scanner.scan_file(fileobj=fileobj, filename=filename, content_type=content_type)
         finally:
             fileobj.seek(pos)
-

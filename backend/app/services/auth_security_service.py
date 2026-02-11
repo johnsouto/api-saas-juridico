@@ -54,9 +54,14 @@ class AuthSecurityService:
         self._logger = logging.getLogger(__name__)
 
     def _raise_throttled(self) -> None:
+        detail = (
+            "Muitas tentativas. Tente novamente em instantes."
+            if settings.ERROR_SCHEMA_ENFORCE_429_413
+            else "Muitas tentativas. Tente novamente em instantes."
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Muitas tentativas. Tente novamente em instantes.",
+            detail=detail,
         )
 
     def _bucket_key(self, action: str, ip: str, principal: str | None = None) -> str:

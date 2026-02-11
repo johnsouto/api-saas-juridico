@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Salt used to hash PII in logs (email/ip). Use a strong value in production.
     LOG_PII_HASH_SALT: str = "dev-log-salt-change-me"
 
+    # Optional response-message normalization for specific status codes.
+    # Keep OFF by default to avoid contract surprises for existing clients.
+    ERROR_SCHEMA_ENFORCE_429_413: bool = False
+
     # CORS_ORIGINS can be a JSON array string: ["http://localhost","https://localhost"]
     CORS_ORIGINS: str = '["http://localhost","https://localhost"]'
 
