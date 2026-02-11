@@ -19,14 +19,14 @@ import { Select } from "@/components/ui/select";
 import { Turnstile } from "@/components/auth/Turnstile";
 
 const schema = z.object({
-  email: z.string().email(),
+  email: z.string().email("E-mail inválido."),
   senha: z.string().min(1)
 });
 
 type FormValues = z.infer<typeof schema>;
 
 const resetSchema = z.object({
-  email: z.string().email()
+  email: z.string().email("E-mail inválido.")
 });
 type ResetValues = z.infer<typeof resetSchema>;
 
@@ -62,7 +62,7 @@ const registerSchema = z
       .regex(/^[a-z0-9-]+$/, "Use apenas letras minúsculas, números e hífen"),
     first_name: z.string().min(2, "Informe seu primeiro nome"),
     last_name: z.string().min(2, "Informe seu sobrenome"),
-    admin_email: z.string().email("Email inválido"),
+    admin_email: z.string().email("E-mail inválido."),
     admin_senha: passwordSchema,
     admin_senha_confirm: z.string().min(8, "Confirme a senha")
   })
@@ -205,7 +205,7 @@ export default function LoginPage() {
         <CardContent>
           <form className="space-y-3" onSubmit={form.handleSubmit((v) => login.mutate(v))}>
             <div className="space-y-1">
-              <Label htmlFor="login_email">Email</Label>
+              <Label htmlFor="login_email">E-mail</Label>
               <Input id="login_email" autoComplete="email" type="email" {...form.register("email")} />
               {form.formState.errors.email?.message ? (
                 <p className="text-xs text-red-600">{form.formState.errors.email.message}</p>
@@ -265,7 +265,7 @@ export default function LoginPage() {
             {showReset ? (
               <form className="mt-3 space-y-2" onSubmit={resetForm.handleSubmit((v) => reset.mutate(v))}>
                 <div className="space-y-1">
-                  <Label>Email para redefinição</Label>
+                  <Label>E-mail para redefinição</Label>
                   <Input type="email" placeholder="seuemail@dominio.com" {...resetForm.register("email")} />
                   {resetForm.formState.errors.email?.message ? (
                     <p className="text-xs text-red-600">{resetForm.formState.errors.email.message}</p>
@@ -387,7 +387,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="reg_admin_email">Seu email</Label>
+                  <Label htmlFor="reg_admin_email">Seu e-mail</Label>
                   <Input
                     id="reg_admin_email"
                     autoComplete="email"

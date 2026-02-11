@@ -206,7 +206,7 @@ export default function PerfilPage() {
 
             {save.isError ? (
               <div className="rounded-xl border border-border/20 bg-card/40 p-3 text-sm text-destructive">
-                {(save.error as any)?.response?.data?.detail ?? "Erro ao salvar perfil"}
+                Não foi possível salvar o perfil.
               </div>
             ) : null}
 

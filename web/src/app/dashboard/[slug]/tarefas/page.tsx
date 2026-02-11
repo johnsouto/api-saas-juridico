@@ -15,14 +15,18 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeBR } from "@/lib/datetime";
+import { useToast } from "@/components/ui/toast";
 
 type Client = { id: string; nome: string };
 type Tarefa = { id: string; titulo: string; descricao?: string | null; status: string; prazo_em?: string | null; client_id?: string | null };
 
 const schema = z.object({
-  titulo: z.string().min(2),
+  titulo: z.string().min(2, "Informe o título da tarefa."),
   descricao: z.string().optional(),
-  prazo_em: z.string().optional(),
+  prazo_em: z
+    .string()
+    .optional()
+    .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), { message: "Prazo inválido." }),
   client_id: z.string().uuid().optional().or(z.literal("")),
   status: z.enum(["pendente", "em_andamento", "concluido"]).default("pendente")
 });
@@ -36,6 +40,7 @@ const KANBAN_STATUS_LABEL: Record<string, string> = {
 
 export default function TarefasPage() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const clients = useQuery({
     queryKey: ["clients"],
@@ -66,9 +71,14 @@ export default function TarefasPage() {
       return (await api.post("/v1/tarefas", payload)).data;
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       setEditingId(null);
       form.reset({ titulo: "", descricao: "", prazo_em: "", client_id: "", status: "pendente" });
       await qc.invalidateQueries({ queryKey: ["tarefas"] });
+      toast(wasEditing ? "Tarefa atualizada com sucesso." : "Tarefa criada com sucesso.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível salvar a tarefa. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -78,6 +88,10 @@ export default function TarefasPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["tarefas"] });
+      toast("Status atualizado.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível atualizar a tarefa. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -87,6 +101,10 @@ export default function TarefasPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["tarefas"] });
+      toast("Tarefa excluída.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível excluir a tarefa. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -105,13 +123,16 @@ export default function TarefasPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-4" onSubmit={form.handleSubmit((v) => create.mutate(v))}>
             <div className="space-y-1 md:col-span-2">
-              <Label>Título</Label>
-              <Input placeholder="Título" {...form.register("titulo")} />
+              <Label htmlFor="tarefa_titulo">Título *</Label>
+              <Input id="tarefa_titulo" placeholder="Ex: Revisar contrato" {...form.register("titulo")} />
+              {form.formState.errors.titulo ? (
+                <p className="text-xs text-destructive">{form.formState.errors.titulo.message}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1">
-              <Label>Cliente (opcional)</Label>
-              <Select {...form.register("client_id")}>
+              <Label htmlFor="tarefa_cliente">Cliente (opcional)</Label>
+              <Select id="tarefa_cliente" {...form.register("client_id")}>
                 <option value="">(sem cliente)</option>
                 {clients.data?.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -122,8 +143,8 @@ export default function TarefasPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Status</Label>
-              <Select {...form.register("status")}>
+              <Label htmlFor="tarefa_status">Status *</Label>
+              <Select id="tarefa_status" {...form.register("status")}>
                 <option value="pendente">pendente</option>
                 <option value="em_andamento">em andamento</option>
                 <option value="concluido">concluído</option>
@@ -131,13 +152,16 @@ export default function TarefasPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Prazo</Label>
-              <Input className="min-w-[260px]" type="datetime-local" {...form.register("prazo_em")} />
+              <Label htmlFor="tarefa_prazo">Prazo (opcional)</Label>
+              <Input id="tarefa_prazo" className="min-w-[260px]" type="datetime-local" {...form.register("prazo_em")} />
+              {form.formState.errors.prazo_em ? (
+                <p className="text-xs text-destructive">{form.formState.errors.prazo_em.message}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1 md:col-span-4">
-              <Label>Descrição</Label>
-              <Textarea placeholder="(opcional)" {...form.register("descricao")} />
+              <Label htmlFor="tarefa_descricao">Descrição (opcional)</Label>
+              <Textarea id="tarefa_descricao" placeholder="Detalhes da tarefa" {...form.register("descricao")} />
             </div>
 
             <div className="flex flex-wrap gap-2 md:col-span-4">
@@ -158,9 +182,7 @@ export default function TarefasPage() {
               ) : null}
             </div>
 
-            {create.isError ? (
-              <p className="text-sm text-destructive">{(create.error as any)?.response?.data?.detail ?? "Erro ao salvar tarefa"}</p>
-            ) : null}
+            {create.isError ? <p className="text-sm text-destructive">Não foi possível salvar a tarefa.</p> : null}
           </form>
         </CardContent>
       </Card>
@@ -171,7 +193,19 @@ export default function TarefasPage() {
         </CardHeader>
         <CardContent>
         {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
-        {list.data ? (
+        {list.data && list.data.length === 0 ? (
+          <div className="mt-3 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
+            <p>Nenhuma tarefa cadastrada ainda.</p>
+            <Button
+              className="mt-3"
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            >
+              Criar primeira tarefa
+            </Button>
+          </div>
+        ) : null}
+        {list.data && list.data.length > 0 ? (
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
             {["pendente", "em_andamento", "concluido"].map((col) => (
               <div key={col} className="rounded-lg border border-border/15 bg-card/20 p-3 backdrop-blur">
@@ -245,15 +279,9 @@ export default function TarefasPage() {
             ))}
           </div>
         ) : null}
-        {list.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar tarefas"}</p>
-        ) : null}
-        {update.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(update.error as any)?.response?.data?.detail ?? "Erro ao atualizar tarefa"}</p>
-        ) : null}
-        {remove.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir tarefa"}</p>
-        ) : null}
+        {list.isError ? <p className="mt-2 text-sm text-destructive">Erro ao listar tarefas.</p> : null}
+        {update.isError ? <p className="mt-2 text-sm text-destructive">Erro ao atualizar tarefa.</p> : null}
+        {remove.isError ? <p className="mt-2 text-sm text-destructive">Erro ao excluir tarefa.</p> : null}
         </CardContent>
       </Card>
     </div>

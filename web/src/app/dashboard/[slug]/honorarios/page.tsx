@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
 
 type Client = { id: string; nome: string; tipo_documento: "cpf" | "cnpj"; documento: string };
 type Proc = { id: string; client_id: string; numero: string };
@@ -47,6 +48,7 @@ type FormValues = z.infer<typeof schema>;
 
 export default function HonorariosPage() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [comprovante, setComprovante] = useState<File | null>(null);
@@ -97,6 +99,7 @@ export default function HonorariosPage() {
       return (await api.post("/v1/honorarios", payload)).data;
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       setEditingId(null);
       form.reset({
         client_id: "",
@@ -109,6 +112,12 @@ export default function HonorariosPage() {
         status: "aberto"
       });
       await qc.invalidateQueries({ queryKey: ["honorarios"] });
+      toast(wasEditing ? "Honorário atualizado com sucesso." : "Honorário cadastrado com sucesso.", {
+        variant: "success"
+      });
+    },
+    onError: () => {
+      toast("Não foi possível salvar o honorário. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -118,6 +127,10 @@ export default function HonorariosPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["honorarios"] });
+      toast("Honorário excluído.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível excluir o honorário. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -143,6 +156,10 @@ export default function HonorariosPage() {
       setValorPago("");
       setPagoEm("");
       await qc.invalidateQueries({ queryKey: ["honorarios"] });
+      toast("Pagamento confirmado.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível confirmar o pagamento. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -163,6 +180,10 @@ export default function HonorariosPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast("Comprovante baixado.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível baixar o comprovante.", { variant: "error" });
     }
   });
 
@@ -185,8 +206,9 @@ export default function HonorariosPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-6" onSubmit={form.handleSubmit((v) => create.mutate(v))}>
             <div className="space-y-1 md:col-span-2">
-              <Label>Cliente</Label>
+              <Label htmlFor="honorario_cliente">Cliente *</Label>
               <Select
+                id="honorario_cliente"
                 {...form.register("client_id")}
                 onChange={(e) => {
                   form.setValue("client_id", e.target.value);
@@ -204,9 +226,9 @@ export default function HonorariosPage() {
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <Label>Processo (opcional)</Label>
-              <Select {...form.register("process_id")} disabled={!selectedClientId}>
-                <option value="">(sem processo)</option>
+              <Label htmlFor="honorario_processo">Processo (opcional)</Label>
+              <Select id="honorario_processo" {...form.register("process_id")} disabled={!selectedClientId}>
+                <option value="">Sem processo</option>
                 {processesForClient.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.numero}
@@ -217,8 +239,9 @@ export default function HonorariosPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Valor Inicial</Label>
+              <Label htmlFor="honorario_valor">Valor Inicial *</Label>
               <Input
+                id="honorario_valor"
                 inputMode="numeric"
                 placeholder="R$ 0,00"
                 value={form.watch("valor")}
@@ -227,18 +250,18 @@ export default function HonorariosPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Data de Início do Pagamento</Label>
-              <Input type="date" {...form.register("data_vencimento")} />
+              <Label htmlFor="honorario_inicio">Data de Início do Pagamento *</Label>
+              <Input id="honorario_inicio" type="date" {...form.register("data_vencimento")} />
             </div>
 
             <div className="space-y-1">
-              <Label>Parcelas</Label>
-              <Input type="number" min={1} max={120} {...form.register("qtd_parcelas")} />
+              <Label htmlFor="honorario_parcelas">Parcelas *</Label>
+              <Input id="honorario_parcelas" type="number" min={1} max={120} {...form.register("qtd_parcelas")} />
             </div>
 
             <div className="space-y-1">
-              <Label>Percentual no êxito</Label>
-              <Select {...form.register("percentual_exito")}>
+              <Label htmlFor="honorario_exito">Percentual no êxito *</Label>
+              <Select id="honorario_exito" {...form.register("percentual_exito")}>
                 <option value="10">10%</option>
                 <option value="15">15%</option>
                 <option value="20">20%</option>
@@ -248,8 +271,8 @@ export default function HonorariosPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>% do parceiro</Label>
-              <Select {...form.register("percentual_parceiro")}>
+              <Label htmlFor="honorario_parceiro">% do parceiro</Label>
+              <Select id="honorario_parceiro" {...form.register("percentual_parceiro")}>
                 <option value="0">0%</option>
                 <option value="10">10%</option>
                 <option value="20">20%</option>
@@ -262,8 +285,8 @@ export default function HonorariosPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Status</Label>
-              <Select {...form.register("status")}>
+              <Label htmlFor="honorario_status">Status *</Label>
+              <Select id="honorario_status" {...form.register("status")}>
                 <option value="aberto">aberto</option>
                 <option value="pago">pago</option>
               </Select>
@@ -297,11 +320,7 @@ export default function HonorariosPage() {
             </div>
           </form>
 
-          {create.isError ? (
-            <p className="mt-3 text-sm text-destructive">
-              {(create.error as any)?.response?.data?.detail ?? "Erro ao salvar honorário"}
-            </p>
-          ) : null}
+          {create.isError ? <p className="mt-3 text-sm text-destructive">Não foi possível salvar o honorário.</p> : null}
         </CardContent>
       </Card>
 
@@ -313,8 +332,8 @@ export default function HonorariosPage() {
           <CardContent>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
               <div className="space-y-1 md:col-span-2">
-                <Label>Meio</Label>
-                <Select value={meioPagamento} onChange={(e) => setMeioPagamento(e.target.value)}>
+                <Label htmlFor="honorario_meio">Meio de pagamento</Label>
+                <Select id="honorario_meio" value={meioPagamento} onChange={(e) => setMeioPagamento(e.target.value)}>
                   <option value="pix">PIX</option>
                   <option value="dinheiro">Dinheiro</option>
                   <option value="cartao">Cartão</option>
@@ -323,8 +342,9 @@ export default function HonorariosPage() {
               </div>
 
               <div className="space-y-1">
-                <Label>Valor pago</Label>
+                <Label htmlFor="honorario_valor_pago">Valor pago</Label>
                 <Input
+                  id="honorario_valor_pago"
                   inputMode="numeric"
                   placeholder="R$ 0,00"
                   value={valorPago}
@@ -333,8 +353,9 @@ export default function HonorariosPage() {
               </div>
 
               <div className="space-y-1 md:col-span-2">
-                <Label>Pago em</Label>
+                <Label htmlFor="honorario_pago_em">Pago em</Label>
                 <Input
+                  id="honorario_pago_em"
                   className="min-w-[260px]"
                   type="datetime-local"
                   value={pagoEm}
@@ -343,8 +364,8 @@ export default function HonorariosPage() {
               </div>
 
               <div className="space-y-1">
-                <Label>Comprovante</Label>
-                <Input type="file" onChange={(e) => setComprovante(e.target.files?.[0] ?? null)} />
+                <Label htmlFor="honorario_comprovante">Comprovante</Label>
+                <Input id="honorario_comprovante" type="file" onChange={(e) => setComprovante(e.target.files?.[0] ?? null)} />
               </div>
             </div>
 
@@ -369,7 +390,7 @@ export default function HonorariosPage() {
 
             {confirmPayment.isError ? (
               <p className="mt-3 text-sm text-destructive">
-                {(confirmPayment.error as any)?.response?.data?.detail ?? (confirmPayment.error as Error).message}
+                Não foi possível confirmar o pagamento.
               </p>
             ) : null}
           </CardContent>
@@ -382,7 +403,19 @@ export default function HonorariosPage() {
         </CardHeader>
         <CardContent>
           {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
-          {list.data ? (
+          {list.data && list.data.length === 0 ? (
+            <div className="mt-3 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
+              <p>Nenhum honorário cadastrado ainda.</p>
+              <Button
+                className="mt-3"
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              >
+                Cadastrar primeiro honorário
+              </Button>
+            </div>
+          ) : null}
+          {list.data && list.data.length > 0 ? (
             <div className="mt-3 overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -468,9 +501,7 @@ export default function HonorariosPage() {
               </Table>
             </div>
           ) : null}
-          {list.isError ? (
-            <p className="mt-3 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar honorários"}</p>
-          ) : null}
+          {list.isError ? <p className="mt-3 text-sm text-destructive">Erro ao listar honorários.</p> : null}
         </CardContent>
       </Card>
     </div>

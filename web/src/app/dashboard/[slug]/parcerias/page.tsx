@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
 
 type Parceria = {
   id: string;
@@ -24,18 +25,31 @@ type Parceria = {
   documento: string;
 };
 
+function onlyDigits(input: string): string {
+  return input.replace(/\D/g, "");
+}
+
 const schema = z.object({
-  nome: z.string().min(2),
-  email: z.string().email().optional().or(z.literal("")),
-  telefone: z.string().optional(),
+  nome: z.string().min(2, "Informe o nome do parceiro."),
+  email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
+  telefone: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || onlyDigits(v).length >= 10, { message: "Informe um telefone válido." }),
   oab_number: z.string().optional().or(z.literal("")),
   tipo_documento: z.enum(["cpf", "cnpj"]).default("cpf"),
-  documento: z.string().min(8)
+  documento: z
+    .string()
+    .min(8, "Informe o documento.")
+    .refine((v) => onlyDigits(v).length >= 8, { message: "Informe um documento válido." })
+    .refine((v) => onlyDigits(v) === v, { message: "Use somente números." })
 });
 type FormValues = z.infer<typeof schema>;
 
 export default function ParceriasPage() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const list = useQuery({
@@ -53,16 +67,23 @@ export default function ParceriasPage() {
       const payload = {
         ...values,
         email: values.email ? values.email : null,
-        telefone: values.telefone ? values.telefone : null,
+        telefone: values.telefone ? onlyDigits(values.telefone) : null,
         oab_number: values.oab_number ? values.oab_number : null
       };
       if (editingId) return (await api.put(`/v1/parcerias/${editingId}`, payload)).data;
       return (await api.post("/v1/parcerias", payload)).data;
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       setEditingId(null);
       form.reset({ nome: "", email: "", telefone: "", oab_number: "", tipo_documento: "cpf", documento: "" });
       await qc.invalidateQueries({ queryKey: ["parcerias"] });
+      toast(wasEditing ? "Parceria atualizada com sucesso." : "Parceria cadastrada com sucesso.", {
+        variant: "success"
+      });
+    },
+    onError: () => {
+      toast("Não foi possível salvar a parceria. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -72,6 +93,10 @@ export default function ParceriasPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["parcerias"] });
+      toast("Parceria excluída.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível excluir a parceria. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -93,31 +118,49 @@ export default function ParceriasPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-6" onSubmit={form.handleSubmit((v) => save.mutate(v))}>
             <div className="space-y-1 md:col-span-3">
-              <Label>Nome</Label>
-              <Input {...form.register("nome")} />
+              <Label htmlFor="parceria_nome">Nome *</Label>
+              <Input id="parceria_nome" placeholder="Nome do parceiro" {...form.register("nome")} />
+              {form.formState.errors.nome ? <p className="text-xs text-destructive">{form.formState.errors.nome.message}</p> : null}
             </div>
             <div className="space-y-1 md:col-span-3">
-              <Label>Email</Label>
-              <Input type="email" {...form.register("email")} />
+              <Label htmlFor="parceria_email">E-mail (opcional)</Label>
+              <Input id="parceria_email" type="email" placeholder="email@exemplo.com" {...form.register("email")} />
+              {form.formState.errors.email ? <p className="text-xs text-destructive">{form.formState.errors.email.message}</p> : null}
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label>Telefone</Label>
-              <Input {...form.register("telefone")} />
+              <Label htmlFor="parceria_telefone">Telefone (opcional)</Label>
+              <Input id="parceria_telefone" inputMode="tel" placeholder="(11) 99999-9999" {...form.register("telefone")} />
+              {form.formState.errors.telefone ? (
+                <p className="text-xs text-destructive">{form.formState.errors.telefone.message}</p>
+              ) : null}
             </div>
             <div className="space-y-1 md:col-span-1">
-              <Label>Número da OAB</Label>
-              <Input placeholder="Ex: SP 123456" {...form.register("oab_number")} />
+              <Label htmlFor="parceria_oab">Número da OAB (opcional)</Label>
+              <Input id="parceria_oab" placeholder="Ex: SP 123456" {...form.register("oab_number")} />
             </div>
             <div className="space-y-1 md:col-span-1">
-              <Label>Tipo</Label>
-              <Select {...form.register("tipo_documento")}>
+              <Label htmlFor="parceria_tipo">Tipo *</Label>
+              <Select id="parceria_tipo" {...form.register("tipo_documento")}>
                 <option value="cpf">CPF</option>
                 <option value="cnpj">CNPJ</option>
               </Select>
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label>Documento</Label>
-              <Input {...form.register("documento")} />
+              <Label htmlFor="parceria_documento">Documento *</Label>
+              <Input
+                id="parceria_documento"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Somente números"
+                {...form.register("documento", {
+                  onChange: (e) => {
+                    form.setValue("documento", onlyDigits(e.target.value), { shouldValidate: true });
+                  }
+                })}
+              />
+              {form.formState.errors.documento ? (
+                <p className="text-xs text-destructive">{form.formState.errors.documento.message}</p>
+              ) : null}
             </div>
             <div className="flex items-end gap-2 md:col-span-6">
               <Button disabled={save.isPending} type="submit">
@@ -137,9 +180,7 @@ export default function ParceriasPage() {
               ) : null}
             </div>
           </form>
-          {save.isError ? (
-            <p className="mt-2 text-sm text-destructive">{(save.error as any)?.response?.data?.detail ?? "Erro ao salvar parceria"}</p>
-          ) : null}
+          {save.isError ? <p className="mt-2 text-sm text-destructive">Não foi possível salvar a parceria.</p> : null}
         </CardContent>
       </Card>
 
@@ -149,16 +190,28 @@ export default function ParceriasPage() {
         </CardHeader>
         <CardContent>
           {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
-          {list.data ? (
+          {list.data && list.data.length === 0 ? (
+            <div className="mt-3 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
+              <p>Nenhuma parceria cadastrada ainda.</p>
+              <Button
+                className="mt-3"
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              >
+                Cadastrar primeira parceria
+              </Button>
+            </div>
+          ) : null}
+          {list.data && list.data.length > 0 ? (
             <div className="mt-3 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead>E-mail</TableHead>
                     <TableHead>Telefone</TableHead>
                     <TableHead>OAB</TableHead>
-                    <TableHead>Doc</TableHead>
+                    <TableHead>Documento</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -209,12 +262,8 @@ export default function ParceriasPage() {
               </Table>
             </div>
           ) : null}
-          {list.isError ? (
-            <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar parcerias"}</p>
-          ) : null}
-          {remove.isError ? (
-            <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir parceria"}</p>
-          ) : null}
+          {list.isError ? <p className="mt-2 text-sm text-destructive">Erro ao listar parcerias.</p> : null}
+          {remove.isError ? <p className="mt-2 text-sm text-destructive">Erro ao excluir parceria.</p> : null}
         </CardContent>
       </Card>
     </div>

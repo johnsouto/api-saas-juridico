@@ -132,9 +132,7 @@ export default function DashboardHome() {
             </div>
           ) : null}
           {me.isError ? (
-            <p className="mt-2 text-sm text-destructive">
-              {(me.error as any)?.response?.data?.detail ?? "Erro ao carregar usuário"}
-            </p>
+            <p className="mt-2 text-sm text-destructive">Erro ao carregar usuário.</p>
           ) : null}
         </CardContent>
       </Card>
@@ -147,9 +145,7 @@ export default function DashboardHome() {
           <CardContent className="space-y-3">
             {storageUsage.isLoading ? <p className="text-sm text-muted-foreground">Carregando uso…</p> : null}
             {storageUsage.isError ? (
-              <p className="text-sm text-destructive">
-                {(storageUsage.error as any)?.response?.data?.detail ?? "Erro ao carregar uso de armazenamento"}
-              </p>
+              <p className="text-sm text-destructive">Erro ao carregar uso de armazenamento.</p>
             ) : null}
 
             {storageUsage.data ? (
@@ -294,10 +290,10 @@ export default function DashboardHome() {
       </div>
 
       {stats.isError ? (
-        <p className="text-sm text-destructive">{(stats.error as any)?.response?.data?.detail ?? "Erro ao carregar indicadores"}</p>
+        <p className="text-sm text-destructive">Erro ao carregar indicadores.</p>
       ) : null}
       {exportXlsx.isError ? (
-        <p className="text-sm text-destructive">{(exportXlsx.error as any)?.response?.data?.detail ?? "Erro ao exportar .xlsx"}</p>
+        <p className="text-sm text-destructive">Erro ao exportar .xlsx.</p>
       ) : null}
     </div>
   );

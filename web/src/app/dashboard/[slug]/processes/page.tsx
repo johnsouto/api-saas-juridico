@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
 
 type Client = { id: string; nome: string };
 type Parceria = { id: string; nome: string };
@@ -26,9 +27,9 @@ type Proc = {
 };
 
 const schema = z.object({
-  client_id: z.string().uuid(),
+  client_id: z.string().uuid("Selecione um cliente."),
   parceria_id: z.string().uuid().optional().or(z.literal("")),
-  numero: z.string().min(3),
+  numero: z.string().min(3, "Informe o número do processo."),
   status: z.enum(["ativo", "inativo", "outros"]).default("ativo"),
   nicho: z.string().optional().or(z.literal(""))
 });
@@ -51,6 +52,7 @@ const NICHOS = [
 
 export default function ProcessesPage() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [q, setQ] = useState<string>("");
   const clients = useQuery({
@@ -88,9 +90,16 @@ export default function ProcessesPage() {
       return (await api.post<Proc>("/v1/processes", payload)).data;
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       setEditingId(null);
       form.reset({ client_id: "", parceria_id: "", numero: "", status: "ativo", nicho: "" });
       await qc.invalidateQueries({ queryKey: ["processes"] });
+      toast(wasEditing ? "Processo atualizado com sucesso." : "Processo cadastrado com sucesso.", {
+        variant: "success"
+      });
+    },
+    onError: () => {
+      toast("Não foi possível salvar o processo. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -100,6 +109,10 @@ export default function ProcessesPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["processes"] });
+      toast("Processo excluído.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível excluir o processo. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -119,8 +132,8 @@ export default function ProcessesPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-6" onSubmit={form.handleSubmit((v) => create.mutate(v))}>
             <div className="space-y-1">
-              <Label>Cliente</Label>
-              <Select {...form.register("client_id")}>
+              <Label htmlFor="processo_cliente">Cliente *</Label>
+              <Select id="processo_cliente" {...form.register("client_id")}>
                 <option value="">Selecione o cliente</option>
                 {clients.data?.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -128,11 +141,14 @@ export default function ProcessesPage() {
                   </option>
                 ))}
               </Select>
+              {form.formState.errors.client_id ? (
+                <p className="text-xs text-destructive">{form.formState.errors.client_id.message}</p>
+              ) : null}
             </div>
             <div className="space-y-1">
-              <Label>Parceria (opcional)</Label>
-              <Select {...form.register("parceria_id")}>
-                <option value="">(sem parceria)</option>
+              <Label htmlFor="processo_parceria">Parceria (opcional)</Label>
+              <Select id="processo_parceria" {...form.register("parceria_id")}>
+                <option value="">Sem parceria</option>
                 {parcerias.data?.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nome}
@@ -141,21 +157,24 @@ export default function ProcessesPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Número</Label>
-              <Input placeholder="Número" {...form.register("numero")} />
+              <Label htmlFor="processo_numero">Número *</Label>
+              <Input id="processo_numero" placeholder="Ex: 0001234-56.2025.8.26.0000" {...form.register("numero")} />
+              {form.formState.errors.numero ? (
+                <p className="text-xs text-destructive">{form.formState.errors.numero.message}</p>
+              ) : null}
             </div>
             <div className="space-y-1">
-              <Label>Status</Label>
-              <Select {...form.register("status")}>
-                <option value="ativo">ativo</option>
-                <option value="inativo">inativo</option>
-                <option value="outros">outros</option>
+              <Label htmlFor="processo_status">Status *</Label>
+              <Select id="processo_status" {...form.register("status")}>
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Inativo</option>
+                <option value="outros">Outros</option>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Nicho</Label>
-              <Select {...form.register("nicho")}>
-                <option value="">(opcional) Selecione</option>
+              <Label htmlFor="processo_nicho">Nicho (opcional)</Label>
+              <Select id="processo_nicho" {...form.register("nicho")}>
+                <option value="">Selecione um nicho</option>
                 {NICHOS.map((n) => (
                   <option key={n.value} value={n.value}>
                     {n.label}
@@ -184,9 +203,7 @@ export default function ProcessesPage() {
             </Button>
           ) : null}
 
-          {create.isError ? (
-            <p className="mt-2 text-sm text-destructive">{(create.error as any)?.response?.data?.detail ?? "Erro ao salvar processo"}</p>
-          ) : null}
+          {create.isError ? <p className="mt-2 text-sm text-destructive">Não foi possível salvar o processo.</p> : null}
         </CardContent>
       </Card>
 
@@ -203,7 +220,19 @@ export default function ProcessesPage() {
           </div>
 
         {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
-        {list.data ? (
+        {list.data && list.data.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
+            <p>Nenhum processo cadastrado ainda.</p>
+            <Button
+              className="mt-3"
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            >
+              Cadastrar primeiro processo
+            </Button>
+          </div>
+        ) : null}
+        {list.data && list.data.length > 0 ? (
           <div className="mt-3 overflow-x-auto">
             <Table>
               <TableHeader>
@@ -260,12 +289,8 @@ export default function ProcessesPage() {
             </Table>
           </div>
         ) : null}
-        {list.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar processos"}</p>
-        ) : null}
-        {remove.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir processo"}</p>
-        ) : null}
+        {list.isError ? <p className="mt-2 text-sm text-destructive">Erro ao listar processos.</p> : null}
+        {remove.isError ? <p className="mt-2 text-sm text-destructive">Erro ao excluir processo.</p> : null}
         </CardContent>
       </Card>
     </div>

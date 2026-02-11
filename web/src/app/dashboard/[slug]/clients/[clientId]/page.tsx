@@ -175,9 +175,7 @@ export default function ClientDetailPage() {
             </Button>
           </div>
           {details.isError ? (
-            <p className="text-sm text-destructive">
-              {(details.error as any)?.response?.data?.detail ?? "Erro ao carregar cliente"}
-            </p>
+            <p className="text-sm text-destructive">Erro ao carregar cliente.</p>
           ) : null}
         </CardHeader>
       </Card>
@@ -312,19 +310,13 @@ export default function ClientDetailPage() {
           </div>
 
           {upload.isError ? (
-            <p className="mt-3 text-sm text-destructive">
-              {(upload.error as any)?.response?.data?.detail ?? (upload.error as Error).message}
-            </p>
+            <p className="mt-3 text-sm text-destructive">Não foi possível enviar o documento.</p>
           ) : null}
           {view.isError ? (
-            <p className="mt-3 text-sm text-destructive">
-              {(view.error as any)?.response?.data?.detail ?? "Erro ao visualizar documento"}
-            </p>
+            <p className="mt-3 text-sm text-destructive">Erro ao visualizar documento.</p>
           ) : null}
           {download.isError ? (
-            <p className="mt-3 text-sm text-destructive">
-              {(download.error as any)?.response?.data?.detail ?? "Erro ao baixar documento"}
-            </p>
+            <p className="mt-3 text-sm text-destructive">Erro ao baixar documento.</p>
           ) : null}
 
           <div className="mt-4 space-y-3">
@@ -425,9 +417,7 @@ export default function ClientDetailPage() {
             <p className="text-sm text-muted-foreground">Nenhum processo cadastrado para este cliente.</p>
           ) : null}
           {processes.isError ? (
-            <p className="mt-2 text-sm text-destructive">
-              {(processes.error as any)?.response?.data?.detail ?? "Erro ao carregar processos"}
-            </p>
+            <p className="mt-2 text-sm text-destructive">Erro ao carregar processos.</p>
           ) : null}
         </CardContent>
       </Card>
@@ -446,4 +436,3 @@ function InfoItem({ label, value }: { label: string; value: string | null }) {
     </div>
   );
 }
-

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
 
 type Client = {
   id: string;
@@ -32,11 +33,23 @@ type Client = {
   address_zip?: string | null;
 };
 
+function onlyDigits(input: string): string {
+  return input.replace(/\D/g, "");
+}
+
 const schema = z.object({
   nome: z.string().min(2, "Informe o nome do cliente."),
   tipo_documento: z.enum(["cpf", "cnpj"]).default("cpf"),
-  documento: z.string().min(8, "Informe o documento (CPF/CNPJ)."),
-  phone_mobile: z.string().optional().or(z.literal("")),
+  documento: z
+    .string()
+    .min(8, "Informe o documento (CPF/CNPJ).")
+    .refine((v) => onlyDigits(v).length >= 8, { message: "Informe um documento válido." })
+    .refine((v) => onlyDigits(v) === v, { message: "Use somente números." }),
+  phone_mobile: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || onlyDigits(v).length >= 10, { message: "Informe um celular válido." }),
   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
 
   address_street: z.string().optional().or(z.literal("")),
@@ -62,6 +75,7 @@ export default function ClientsPage() {
   const slug = params.slug;
 
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [q, setQ] = useState<string>("");
   const form = useForm<FormValues>({
@@ -94,7 +108,8 @@ export default function ClientsPage() {
     mutationFn: async (values: FormValues) => {
       const payload = {
         ...values,
-        phone_mobile: values.phone_mobile ? values.phone_mobile : null,
+        documento: onlyDigits(values.documento),
+        phone_mobile: values.phone_mobile ? onlyDigits(values.phone_mobile) : null,
         email: values.email ? values.email : null,
         address_street: values.address_street ? values.address_street : null,
         address_number: values.address_number ? values.address_number : null,
@@ -112,9 +127,24 @@ export default function ClientsPage() {
       return r.data;
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       setEditingId(null);
       form.reset();
       await qc.invalidateQueries({ queryKey: ["clients"] });
+      toast(wasEditing ? "Cliente atualizado com sucesso." : "Cliente cadastrado com sucesso.", {
+        variant: "success"
+      });
+    },
+    onError: (error: any) => {
+      const code = error?.response?.data?.code;
+      if (code === "PLAN_LIMIT_REACHED") {
+        toast("Limite do Plano Free atingido: até 3 clientes. Assine o Plus para cadastrar mais.", {
+          variant: "error",
+          durationMs: 4800
+        });
+        return;
+      }
+      toast("Não foi possível salvar o cliente. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -124,6 +154,13 @@ export default function ClientsPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["clients"] });
+      toast("Cliente excluído.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível excluir. Verifique vínculos com processos, documentos ou honorários.", {
+        variant: "error",
+        durationMs: 4800
+      });
     }
   });
 
@@ -132,7 +169,7 @@ export default function ClientsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Clientes</CardTitle>
-          <CardDescription>Busca por Documento/Nome + documentos por cliente.</CardDescription>
+          <CardDescription>Busque por documento ou nome. Cadastre e organize seus clientes.</CardDescription>
         </CardHeader>
       </Card>
 
@@ -143,66 +180,84 @@ export default function ClientsPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-6" onSubmit={form.handleSubmit((v) => create.mutate(v))}>
             <div className="space-y-1 md:col-span-3">
-              <Label>Nome</Label>
-              <Input placeholder="Nome do cliente" {...form.register("nome")} />
+              <Label htmlFor="cliente_nome">Nome *</Label>
+              <Input id="cliente_nome" placeholder="Nome do cliente" {...form.register("nome")} />
               {form.formState.errors.nome ? <p className="text-xs text-destructive">{form.formState.errors.nome.message}</p> : null}
             </div>
             <div className="space-y-1 md:col-span-1">
-              <Label>Tipo</Label>
-              <Select {...form.register("tipo_documento")}>
+              <Label htmlFor="cliente_tipo">Tipo *</Label>
+              <Select id="cliente_tipo" {...form.register("tipo_documento")}>
                 <option value="cpf">CPF</option>
                 <option value="cnpj">CNPJ</option>
               </Select>
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label>Documento</Label>
-              <Input placeholder="Somente números" {...form.register("documento")} />
+              <Label htmlFor="cliente_documento">Documento *</Label>
+              <Input
+                id="cliente_documento"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Somente números"
+                {...form.register("documento", {
+                  onChange: (e) => {
+                    form.setValue("documento", onlyDigits(e.target.value), { shouldValidate: true });
+                  }
+                })}
+              />
               {form.formState.errors.documento ? <p className="text-xs text-destructive">{form.formState.errors.documento.message}</p> : null}
             </div>
 
             <div className="space-y-1 md:col-span-3">
-              <Label>E-mail</Label>
-              <Input type="email" placeholder="email@exemplo.com" {...form.register("email")} />
+              <Label htmlFor="cliente_email">E-mail (opcional)</Label>
+              <Input id="cliente_email" type="email" placeholder="email@exemplo.com" {...form.register("email")} />
               {form.formState.errors.email ? <p className="text-xs text-destructive">{form.formState.errors.email.message}</p> : null}
             </div>
             <div className="space-y-1 md:col-span-3">
-              <Label>Celular</Label>
-              <Input placeholder="(11) 99999-9999" {...form.register("phone_mobile")} />
+              <Label htmlFor="cliente_celular">Celular (opcional)</Label>
+              <Input
+                id="cliente_celular"
+                inputMode="tel"
+                placeholder="(11) 99999-9999"
+                {...form.register("phone_mobile")}
+              />
+              {form.formState.errors.phone_mobile ? (
+                <p className="text-xs text-destructive">{form.formState.errors.phone_mobile.message}</p>
+              ) : null}
             </div>
 
             <div className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur md:col-span-6">
               <div className="text-sm font-semibold">Endereço (opcional)</div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-6">
                 <div className="space-y-1 md:col-span-4">
-                  <Label>Rua</Label>
-                  <Input {...form.register("address_street")} />
+                  <Label htmlFor="cliente_rua">Rua</Label>
+                  <Input id="cliente_rua" {...form.register("address_street")} />
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <Label>Número</Label>
-                  <Input {...form.register("address_number")} />
+                  <Label htmlFor="cliente_numero">Número</Label>
+                  <Input id="cliente_numero" {...form.register("address_number")} />
                 </div>
                 <div className="space-y-1 md:col-span-3">
-                  <Label>Complemento</Label>
-                  <Input {...form.register("address_complement")} />
+                  <Label htmlFor="cliente_complemento">Complemento</Label>
+                  <Input id="cliente_complemento" {...form.register("address_complement")} />
                 </div>
                 <div className="space-y-1 md:col-span-3">
-                  <Label>Bairro</Label>
-                  <Input {...form.register("address_neighborhood")} />
+                  <Label htmlFor="cliente_bairro">Bairro</Label>
+                  <Input id="cliente_bairro" {...form.register("address_neighborhood")} />
                 </div>
                 <div className="space-y-1 md:col-span-3">
-                  <Label>Cidade</Label>
-                  <Input {...form.register("address_city")} />
+                  <Label htmlFor="cliente_cidade">Cidade</Label>
+                  <Input id="cliente_cidade" {...form.register("address_city")} />
                 </div>
                 <div className="space-y-1 md:col-span-1">
-                  <Label>UF</Label>
-                  <Input placeholder="SP" {...form.register("address_state")} />
+                  <Label htmlFor="cliente_uf">UF</Label>
+                  <Input id="cliente_uf" placeholder="SP" {...form.register("address_state")} />
                   {form.formState.errors.address_state ? (
                     <p className="text-xs text-destructive">{form.formState.errors.address_state.message}</p>
                   ) : null}
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <Label>CEP</Label>
-                  <Input placeholder="01001000" {...form.register("address_zip")} />
+                  <Label htmlFor="cliente_cep">CEP</Label>
+                  <Input id="cliente_cep" placeholder="01001000" {...form.register("address_zip")} />
                   {form.formState.errors.address_zip ? (
                     <p className="text-xs text-destructive">{form.formState.errors.address_zip.message}</p>
                   ) : null}
@@ -231,7 +286,9 @@ export default function ClientsPage() {
           {create.isError ? (
             <div className="mt-3 rounded-xl border border-border/20 bg-card/40 p-3 text-sm text-destructive">
               <p>
-                {(create.error as any)?.response?.data?.detail ?? "Erro ao salvar cliente"}
+                {(create.error as any)?.response?.data?.code === "PLAN_LIMIT_REACHED"
+                  ? "Limite do Plano Free atingido: até 3 clientes. Assine o Plus para cadastrar mais."
+                  : "Não foi possível salvar o cliente. Tente novamente."}
               </p>
               {(create.error as any)?.response?.data?.code === "PLAN_LIMIT_REACHED" &&
               (create.error as any)?.response?.data?.resource === "clients" ? (
@@ -263,7 +320,19 @@ export default function ClientsPage() {
           </div>
 
           {list.isLoading ? <p className="mt-3 text-sm text-muted-foreground">Carregando…</p> : null}
-          {list.data ? (
+          {list.data && list.data.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
+              <p>Nenhum cliente cadastrado ainda.</p>
+              <Button
+                className="mt-3"
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              >
+                Cadastrar primeiro cliente
+              </Button>
+            </div>
+          ) : null}
+          {list.data && list.data.length > 0 ? (
             <div className="mt-3 overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -334,14 +403,10 @@ export default function ClientsPage() {
             </div>
           ) : null}
 
-          {list.isError ? (
-            <p className="mt-3 text-sm text-destructive">
-              {(list.error as any)?.response?.data?.detail ?? "Erro ao listar clientes"}
-            </p>
-          ) : null}
+          {list.isError ? <p className="mt-3 text-sm text-destructive">Erro ao listar clientes.</p> : null}
           {remove.isError ? (
             <p className="mt-3 text-sm text-destructive">
-              {(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir cliente"}
+              Não foi possível excluir. Verifique vínculos com processos, documentos ou honorários.
             </p>
           ) : null}
         </CardContent>

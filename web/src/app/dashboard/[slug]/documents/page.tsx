@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
 
 type Doc = {
   id: string;
@@ -30,6 +31,7 @@ type BillingStatus = {
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [linkType, setLinkType] = useState<"none" | "process" | "client" | "honorario">("none");
   const [processId, setProcessId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
@@ -98,6 +100,13 @@ export default function DocumentsPage() {
       setClientId("");
       setHonorarioId("");
       await qc.invalidateQueries({ queryKey: ["documents"] });
+      toast("Documento enviado com sucesso.", { variant: "success" });
+    },
+    onError: (error: any) => {
+      const message = error?.message === "Selecione um arquivo"
+        ? "Selecione um arquivo para enviar."
+        : "Não foi possível enviar o documento. Tente novamente.";
+      toast(message, { variant: "error" });
     }
   });
 
@@ -116,6 +125,10 @@ export default function DocumentsPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast("Documento baixado.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível baixar o documento.", { variant: "error" });
     }
   });
 
@@ -138,6 +151,10 @@ export default function DocumentsPage() {
 
       // Give the browser some time to load the blob URL before revoking it.
       window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+      toast("Documento aberto para visualização.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível visualizar o documento.", { variant: "error" });
     }
   });
 
@@ -147,6 +164,10 @@ export default function DocumentsPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["documents"] });
+      toast("Documento excluído.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível excluir o documento.", { variant: "error" });
     }
   });
 
@@ -172,8 +193,8 @@ export default function DocumentsPage() {
         <CardContent>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div className="space-y-1">
-              <Label>Categoria</Label>
-              <Select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              <Label htmlFor="doc_categoria">Categoria *</Label>
+              <Select id="doc_categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
                 <option value="outros">outros</option>
                 <option value="identidade">identidade</option>
                 <option value="comprovante_endereco">comprovante_endereco</option>
@@ -186,8 +207,9 @@ export default function DocumentsPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Vínculo</Label>
+              <Label htmlFor="doc_vinculo">Vínculo (opcional)</Label>
               <Select
+                id="doc_vinculo"
                 value={linkType}
                 onChange={(e) => {
                   const v = e.target.value as any;
@@ -197,7 +219,7 @@ export default function DocumentsPage() {
                   setHonorarioId("");
                 }}
               >
-                <option value="none">sem vínculo</option>
+                <option value="none">Sem vínculo</option>
                 <option value="process">processo</option>
                 <option value="client">cliente</option>
                 <option value="honorario">honorário</option>
@@ -205,8 +227,9 @@ export default function DocumentsPage() {
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <Label>Arquivo</Label>
+              <Label htmlFor="doc_arquivo">Arquivo *</Label>
               <Input
+                id="doc_arquivo"
                 type="file"
                 accept="application/pdf,image/jpeg,image/png"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -215,8 +238,8 @@ export default function DocumentsPage() {
 
             {linkType === "process" ? (
               <div className="space-y-1 md:col-span-2">
-                <Label>Processo</Label>
-                <Select value={processId} onChange={(e) => setProcessId(e.target.value)}>
+                <Label htmlFor="doc_processo">Processo *</Label>
+                <Select id="doc_processo" value={processId} onChange={(e) => setProcessId(e.target.value)}>
                   <option value="">Selecione o processo</option>
                   {processes.data?.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -229,8 +252,8 @@ export default function DocumentsPage() {
 
             {linkType === "client" ? (
               <div className="space-y-1 md:col-span-2">
-                <Label>Cliente</Label>
-                <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                <Label htmlFor="doc_cliente">Cliente *</Label>
+                <Select id="doc_cliente" value={clientId} onChange={(e) => setClientId(e.target.value)}>
                   <option value="">Selecione o cliente</option>
                   {clients.data?.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -243,8 +266,8 @@ export default function DocumentsPage() {
 
             {linkType === "honorario" ? (
               <div className="space-y-1 md:col-span-2">
-                <Label>Honorário</Label>
-                <Select value={honorarioId} onChange={(e) => setHonorarioId(e.target.value)}>
+                <Label htmlFor="doc_honorario">Honorário *</Label>
+                <Select id="doc_honorario" value={honorarioId} onChange={(e) => setHonorarioId(e.target.value)}>
                   <option value="">Selecione o honorário</option>
                   {honorarios.data?.map((h) => (
                     <option key={h.id} value={h.id}>
@@ -262,11 +285,7 @@ export default function DocumentsPage() {
             </div>
           </div>
 
-          {upload.isError ? (
-            <p className="mt-2 text-sm text-destructive">
-              {(upload.error as any)?.response?.data?.detail ?? (upload.error as Error).message}
-            </p>
-          ) : null}
+          {upload.isError ? <p className="mt-2 text-sm text-destructive">Não foi possível enviar o documento.</p> : null}
         </CardContent>
       </Card>
 
@@ -277,13 +296,19 @@ export default function DocumentsPage() {
         <CardContent>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <div className="space-y-1 md:col-span-2">
-            <Label>Buscar por nome do arquivo</Label>
-            <Input placeholder="ex: contrato, procuração..." value={q} onChange={(e) => setQ(e.target.value)} />
+            <Label htmlFor="doc_busca">Buscar por nome do arquivo</Label>
+            <Input
+              id="doc_busca"
+              placeholder="ex: contrato, procuração..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           </div>
 
           <div className="space-y-1">
-            <Label>Filtro</Label>
+            <Label htmlFor="doc_filtro">Filtro</Label>
             <Select
+              id="doc_filtro"
               value={filterType}
               onChange={(e) => {
                 const v = e.target.value as any;
@@ -291,7 +316,7 @@ export default function DocumentsPage() {
                 setFilterId("");
               }}
             >
-              <option value="all">todos</option>
+              <option value="all">Todos</option>
               <option value="process">processo</option>
               <option value="client">cliente</option>
               <option value="honorario">honorário</option>
@@ -299,14 +324,20 @@ export default function DocumentsPage() {
           </div>
 
           <div className="space-y-1">
-            <Label>Categoria</Label>
-            <Input placeholder="ex: identidade" value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)} />
+            <Label htmlFor="doc_categoria_filtro">Categoria</Label>
+            <Input
+              id="doc_categoria_filtro"
+              placeholder="ex: identidade"
+              value={filterCategoria}
+              onChange={(e) => setFilterCategoria(e.target.value)}
+            />
           </div>
 
           <div className="space-y-1 md:col-span-2">
-            <Label>ID</Label>
+            <Label htmlFor="doc_id">ID (opcional)</Label>
             <Input
-              placeholder={filterType === "all" ? "(opcional)" : "uuid"}
+              id="doc_id"
+              placeholder={filterType === "all" ? "ID (opcional)" : "ID do vínculo"}
               value={filterId}
               onChange={(e) => setFilterId(e.target.value)}
               disabled={filterType === "all"}
@@ -314,7 +345,7 @@ export default function DocumentsPage() {
             {filterType !== "all" ? (
               <div className="mt-2">
                 <Select value={filterId} onChange={(e) => setFilterId(e.target.value)}>
-                  <option value="">Selecionar…</option>
+                  <option value="">Selecionar ID</option>
                   {filterType === "process"
                     ? processes.data?.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -337,14 +368,26 @@ export default function DocumentsPage() {
                       ))
                     : null}
                 </Select>
-                <p className="mt-1 text-xs text-muted-foreground">Dica: use o seletor acima para evitar erro de UUID.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Dica: use o seletor acima para evitar erros de ID.</p>
               </div>
             ) : null}
           </div>
         </div>
 
         {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
-        {list.data ? (
+        {list.data && list.data.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
+            <p>Nenhum documento cadastrado ainda.</p>
+            <Button
+              className="mt-3"
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            >
+              Enviar primeiro documento
+            </Button>
+          </div>
+        ) : null}
+        {list.data && list.data.length > 0 ? (
           <div className="mt-3 overflow-x-auto">
             <Table>
               <TableHeader>
@@ -390,18 +433,10 @@ export default function DocumentsPage() {
             </Table>
           </div>
         ) : null}
-        {list.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar documentos"}</p>
-        ) : null}
-        {view.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(view.error as any)?.response?.data?.detail ?? "Erro ao visualizar documento"}</p>
-        ) : null}
-        {download.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(download.error as any)?.response?.data?.detail ?? "Erro ao baixar documento"}</p>
-        ) : null}
-        {remove.isError ? (
-          <p className="mt-2 text-sm text-destructive">{(remove.error as any)?.response?.data?.detail ?? "Erro ao excluir documento"}</p>
-        ) : null}
+        {list.isError ? <p className="mt-2 text-sm text-destructive">Erro ao listar documentos.</p> : null}
+        {view.isError ? <p className="mt-2 text-sm text-destructive">Erro ao visualizar documento.</p> : null}
+        {download.isError ? <p className="mt-2 text-sm text-destructive">Erro ao baixar documento.</p> : null}
+        {remove.isError ? <p className="mt-2 text-sm text-destructive">Erro ao excluir documento.</p> : null}
         </CardContent>
       </Card>
     </div>

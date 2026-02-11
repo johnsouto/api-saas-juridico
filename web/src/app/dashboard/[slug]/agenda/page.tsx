@@ -29,13 +29,23 @@ type AgendaCreateResponse = {
   email_sent: boolean;
 };
 
-const schema = z.object({
-  titulo: z.string().min(2),
-  tipo: z.string().min(2).default("reuniao"),
-  client_id: z.string().uuid().optional().or(z.literal("")),
-  inicio_em: z.string().min(8),
-  fim_em: z.string().optional()
-});
+const schema = z
+  .object({
+    titulo: z.string().min(2, "Informe o título do evento."),
+    tipo: z.string().min(2).default("reuniao"),
+    client_id: z.string().uuid().optional().or(z.literal("")),
+    inicio_em: z.string().min(8, "Informe a data/hora de início."),
+    fim_em: z.string().optional()
+  })
+  .refine(
+    (values) => {
+      if (!values.fim_em || !values.inicio_em) return true;
+      const inicio = new Date(values.inicio_em);
+      const fim = new Date(values.fim_em);
+      return fim.getTime() >= inicio.getTime();
+    },
+    { path: ["fim_em"], message: "O fim não pode ser anterior ao início." }
+  );
 type FormValues = z.infer<typeof schema>;
 
 function toIsoOrThrow(value: string, label: string): string {
@@ -69,6 +79,9 @@ export default function AgendaPage() {
     mutationFn: async (values: FormValues) => {
       const inicioIso = toIsoOrThrow(values.inicio_em, "Data/hora de início");
       const fimIso = values.fim_em ? toIsoOrThrow(values.fim_em, "Data/hora de fim") : null;
+      if (fimIso && new Date(fimIso).getTime() < new Date(inicioIso).getTime()) {
+        throw new Error("O fim não pode ser anterior ao início.");
+      }
       return (
         await api.post("/v1/agenda", {
           ...values,
@@ -92,6 +105,12 @@ export default function AgendaPage() {
           durationMs: 4200
         });
       }
+    },
+    onError: () => {
+      toast("Não foi possível cadastrar o evento. Verifique os dados e tente novamente.", {
+        variant: "error",
+        durationMs: 4200
+      });
     }
   });
 
@@ -101,6 +120,10 @@ export default function AgendaPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["agenda"] });
+      toast("Evento excluído.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível excluir o evento. Tente novamente.", { variant: "error" });
     }
   });
 
@@ -120,8 +143,9 @@ export default function AgendaPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-6" onSubmit={form.handleSubmit((v) => create.mutate(v))}>
             <div className="space-y-1 md:col-span-2">
-              <Label>Atalho (tipo de evento)</Label>
+              <Label htmlFor="agenda_atalho">Atalho (opcional)</Label>
               <Select
+                id="agenda_atalho"
                 value=""
                 onChange={(e) => {
                   const v = e.target.value;
@@ -138,7 +162,7 @@ export default function AgendaPage() {
                   }
                 }}
               >
-                <option value="">(opcional) Escolher</option>
+                <option value="">Selecione um atalho</option>
                 <option value="reuniao_interna">Reunião interna</option>
                 <option value="video_conferencia">Video-conferência</option>
                 <option value="video_novo_cliente">Vídeo com novo cliente</option>
@@ -147,13 +171,17 @@ export default function AgendaPage() {
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <Label>Título</Label>
-              <Input placeholder="Audiência / Reunião..." {...form.register("titulo")} />
+              <Label htmlFor="agenda_titulo">Título *</Label>
+              <Input id="agenda_titulo" placeholder="Audiência ou reunião..." {...form.register("titulo")} />
+              {form.formState.errors.titulo ? (
+                <p className="text-xs text-destructive">{form.formState.errors.titulo.message}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <Label>Cliente (opcional)</Label>
+              <Label htmlFor="agenda_cliente">Cliente (opcional)</Label>
               <Select
+                id="agenda_cliente"
                 value={form.watch("client_id") ?? ""}
                 onChange={(e) => {
                   const id = e.target.value;
@@ -176,8 +204,8 @@ export default function AgendaPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Tipo</Label>
-              <Select {...form.register("tipo")}>
+              <Label htmlFor="agenda_tipo">Tipo *</Label>
+              <Select id="agenda_tipo" {...form.register("tipo")}>
                 <option value="reuniao">Reunião</option>
                 <option value="audiencia">Audiência</option>
                 <option value="reuniao_interna">Reunião interna</option>
@@ -188,12 +216,18 @@ export default function AgendaPage() {
 
             <div className="grid grid-cols-1 gap-3 md:col-span-4 md:grid-cols-2">
               <div className="space-y-1">
-                <Label>Início</Label>
-                <Input className="min-w-[260px]" type="datetime-local" {...form.register("inicio_em")} />
+                <Label htmlFor="agenda_inicio">Início *</Label>
+                <Input id="agenda_inicio" className="min-w-[260px]" type="datetime-local" {...form.register("inicio_em")} />
+                {form.formState.errors.inicio_em ? (
+                  <p className="text-xs text-destructive">{form.formState.errors.inicio_em.message}</p>
+                ) : null}
               </div>
               <div className="space-y-1">
-                <Label>Fim (opcional)</Label>
-                <Input className="min-w-[260px]" type="datetime-local" {...form.register("fim_em")} />
+                <Label htmlFor="agenda_fim">Fim (opcional)</Label>
+                <Input id="agenda_fim" className="min-w-[260px]" type="datetime-local" {...form.register("fim_em")} />
+                {form.formState.errors.fim_em ? (
+                  <p className="text-xs text-destructive">{form.formState.errors.fim_em.message}</p>
+                ) : null}
               </div>
             </div>
 
@@ -204,11 +238,7 @@ export default function AgendaPage() {
             </div>
           </form>
 
-          {create.isError ? (
-            <p className="mt-3 text-sm text-destructive">
-              {(create.error as any)?.response?.data?.detail ?? (create.error as Error).message ?? "Erro ao criar evento"}
-            </p>
-          ) : null}
+          {create.isError ? <p className="mt-3 text-sm text-destructive">Não foi possível criar o evento.</p> : null}
         </CardContent>
       </Card>
 
@@ -218,7 +248,19 @@ export default function AgendaPage() {
         </CardHeader>
         <CardContent>
           {list.isLoading ? <p className="mt-2 text-sm text-muted-foreground">Carregando…</p> : null}
-          {list.data ? (
+          {list.data && list.data.length === 0 ? (
+            <div className="mt-3 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
+              <p>Nenhum evento cadastrado ainda.</p>
+              <Button
+                className="mt-3"
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              >
+                Cadastrar primeiro evento
+              </Button>
+            </div>
+          ) : null}
+          {list.data && list.data.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -254,9 +296,7 @@ export default function AgendaPage() {
               </Table>
             </div>
           ) : null}
-          {list.isError ? (
-            <p className="mt-2 text-sm text-destructive">{(list.error as any)?.response?.data?.detail ?? "Erro ao listar eventos"}</p>
-          ) : null}
+          {list.isError ? <p className="mt-2 text-sm text-destructive">Erro ao listar eventos.</p> : null}
         </CardContent>
       </Card>
     </div>
