@@ -3,7 +3,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Download } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ type BillingStatus = {
 };
 type DocumentsUsage = { used_bytes: number };
 type KanbanSummary = { due_today: number; pendente: number; em_andamento: number; concluido: number };
+type AgendaEvent = { id: string; titulo: string; inicio_em: string };
 
 export default function DashboardHome() {
   const params = useParams<{ slug: string }>();
@@ -50,12 +52,8 @@ export default function DashboardHome() {
   const stats = useQuery({
     queryKey: ["stats"],
     queryFn: async () => {
-      const [clients, processes] = await Promise.all([
-        api.get<any[]>("/v1/clients").then((r) => r.data),
-        api.get<Proc[]>("/v1/processes").then((r) => r.data)
-      ]);
+      const processes = await api.get<Proc[]>("/v1/processes").then((r) => r.data);
       return {
-        clients: clients.length,
         processes: processes.length,
         processesData: processes
       };
@@ -67,6 +65,39 @@ export default function DashboardHome() {
     queryFn: async () => (await api.get<KanbanSummary>("/v1/kanban/summary")).data,
     retry: false
   });
+
+  const [calendarMonth, setCalendarMonth] = useState(() => getMonthStart(new Date()));
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
+  const monthBounds = useMemo(() => getMonthBounds(calendarMonth), [calendarMonth]);
+
+  const agenda = useQuery({
+    queryKey: ["dashboard-agenda", monthBounds.from, monthBounds.to],
+    queryFn: async () =>
+      (
+        await api.get<AgendaEvent[]>("/v1/agenda", {
+          params: { from: monthBounds.from, to: monthBounds.to }
+        })
+      ).data,
+    retry: false
+  });
+
+  const eventsByDay = useMemo(() => {
+    const entries = new Map<number, AgendaEvent[]>();
+    for (const event of agenda.data ?? []) {
+      const day = getDayInSaoPaulo(event.inicio_em);
+      if (!day) continue;
+      if (!entries.has(day)) entries.set(day, []);
+      entries.get(day)!.push(event);
+    }
+    return entries;
+  }, [agenda.data]);
+
+  const daysInMonth = useMemo(
+    () => new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate(),
+    [calendarMonth]
+  );
+  const safeSelectedDay = Math.max(1, Math.min(selectedDay, daysInMonth));
+  const selectedDayEvents = eventsByDay.get(safeSelectedDay) ?? [];
 
   const exportXlsx = useMutation({
     mutationFn: async () => {
@@ -189,22 +220,101 @@ export default function DashboardHome() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-        <Card className="md:col-span-3">
+        <Card className="flex min-h-[320px] flex-col md:col-span-4">
           <CardHeader>
-            <CardTitle className="text-sm">Clientes</CardTitle>
+            <CardTitle className="text-sm">Calendário</CardTitle>
+            <CardDescription className="text-xs">Eventos da sua agenda.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats.data?.clients ?? "—"}</div>
-            <Link
-              className="mt-2 inline-block text-sm text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
-              href={`/dashboard/${slug}/clients`}
-            >
-              Abrir clientes
-            </Link>
+          <CardContent className="flex flex-1 flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  setCalendarMonth((current) => shiftMonth(current, -1));
+                  setSelectedDay(1);
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <p className="text-sm font-medium capitalize">{formatMonthLabel(calendarMonth)}</p>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  setCalendarMonth((current) => shiftMonth(current, 1));
+                  setSelectedDay(1);
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
+              {["D", "S", "T", "Q", "Q", "S", "S"].map((label, index) => (
+                <span key={`${label}-${index}`}>{label}</span>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {buildMonthGrid(calendarMonth).map((day, index) =>
+                day === null ? (
+                  <span key={`blank-${index}`} className="h-9 rounded-md" />
+                ) : (
+                  <button
+                    key={`day-${day}`}
+                    type="button"
+                    onClick={() => setSelectedDay(day)}
+                    className={[
+                      "relative flex h-9 items-center justify-center rounded-md text-sm transition-colors",
+                      day === safeSelectedDay ? "bg-primary text-primary-foreground" : "hover:bg-card/40",
+                      eventsByDay.has(day) ? "font-semibold" : "text-muted-foreground"
+                    ].join(" ")}
+                  >
+                    {day}
+                    {eventsByDay.has(day) ? (
+                      <span
+                        className={[
+                          "absolute bottom-1 h-1.5 w-1.5 rounded-full",
+                          day === safeSelectedDay ? "bg-primary-foreground" : "bg-emerald-400"
+                        ].join(" ")}
+                      />
+                    ) : null}
+                  </button>
+                )
+              )}
+            </div>
+
+            <div className="min-h-[92px] rounded-lg border border-border/15 bg-card/20 p-2">
+              {agenda.isLoading ? <p className="text-xs text-muted-foreground">Carregando eventos…</p> : null}
+              {!agenda.isLoading && (agenda.data?.length ?? 0) === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum evento cadastrado.</p>
+              ) : null}
+              {selectedDayEvents.length > 0 ? (
+                <div className="space-y-1">
+                  {selectedDayEvents.map((event) => (
+                    <div key={event.id} className="rounded-md border border-border/10 bg-card/40 px-2 py-1.5">
+                      <p className="truncate text-xs font-medium">{event.titulo}</p>
+                      <p className="text-[11px] text-muted-foreground">{formatTimeInSaoPaulo(event.inicio_em)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : agenda.data && agenda.data.length > 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum evento neste dia.</p>
+              ) : null}
+            </div>
+
+            {agenda.isError ? <p className="text-xs text-destructive">Erro ao carregar agenda.</p> : null}
+
+            <Button asChild className="w-full" size="sm" variant="outline">
+              <Link href={`/dashboard/${slug}/agenda`}>Abrir agenda</Link>
+            </Button>
           </CardContent>
         </Card>
 
-        <Card className="flex min-h-[320px] flex-col md:col-span-6">
+        <Card className="flex min-h-[300px] flex-col md:col-span-4">
           <CardHeader>
             <CardTitle className="text-sm">Tarefas</CardTitle>
             <CardDescription className="text-xs">Resumo do Kanban.</CardDescription>
@@ -263,7 +373,7 @@ export default function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col md:col-span-3">
+        <Card className="flex flex-col md:col-span-4">
           <CardHeader>
             <CardTitle className="text-sm">Relatório</CardTitle>
             <CardDescription className="text-xs">Exporte seus dados em Excel.</CardDescription>
@@ -329,6 +439,66 @@ export default function DashboardHome() {
       ) : null}
     </div>
   );
+}
+
+function getMonthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function shiftMonth(date: Date, amount: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function getMonthBounds(date: Date): { from: string; to: string } {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const from = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const to = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return { from, to };
+}
+
+function buildMonthGrid(date: Date): Array<number | null> {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDayWeek = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<number | null> = [];
+
+  for (let i = 0; i < firstDayWeek; i += 1) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function formatMonthLabel(date: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo"
+  }).format(date);
+}
+
+function getDayInSaoPaulo(input: string): number | null {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return null;
+  const value = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    timeZone: "America/Sao_Paulo"
+  }).format(date);
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatTimeInSaoPaulo(input: string): string {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return "--:--";
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Sao_Paulo"
+  }).format(date);
 }
 
 function StackedProgressBar({

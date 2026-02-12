@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import date, datetime, time, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,8 +68,16 @@ def _build_agenda_email_body(*, user: User, event: AgendaEvento, location: str |
 async def list_eventos(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
+    from_date: date | None = Query(default=None, alias="from", description="Data inicial (YYYY-MM-DD)"),
+    to_date: date | None = Query(default=None, alias="to", description="Data final (YYYY-MM-DD)"),
 ):
     stmt = select(AgendaEvento).where(AgendaEvento.tenant_id == user.tenant_id).order_by(AgendaEvento.inicio_em.asc())
+    if from_date is not None:
+        start_dt = datetime.combine(from_date, time.min, tzinfo=timezone.utc)
+        stmt = stmt.where(AgendaEvento.inicio_em >= start_dt)
+    if to_date is not None:
+        end_dt = datetime.combine(to_date, time.max, tzinfo=timezone.utc)
+        stmt = stmt.where(AgendaEvento.inicio_em <= end_dt)
     return list((await db.execute(stmt)).scalars().all())
 
 
