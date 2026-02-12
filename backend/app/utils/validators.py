@@ -80,6 +80,14 @@ def has_valid_phone_length(raw: str) -> bool:
     return True
 
 
+def has_valid_cep_length(raw: str) -> bool:
+    return len(only_digits(raw)) == 8
+
+
+def has_valid_process_cnj_length(raw: str) -> bool:
+    return len(only_digits(raw)) == 20
+
+
 DOCUMENT_CATEGORY_ALIASES: dict[str, str] = {
     "sentenca": "sentencas",
     "sentencas": "sentencas",

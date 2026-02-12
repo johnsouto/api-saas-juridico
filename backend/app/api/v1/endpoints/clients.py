@@ -12,16 +12,19 @@ from app.api.deps import get_current_user
 from app.core.exceptions import NotFoundError
 from app.db.session import get_db
 from app.models.client import Client
+from app.models.client_case import ClientCase
 from app.models.document import Document
 from app.models.parceria import Parceria
 from app.models.process import Process
 from app.models.user import User
 from app.schemas.client import ClientCreate, ClientDetailsOut, ClientOut, ClientUpdate
+from app.schemas.client_case import ClientCaseCreate, ClientCaseOut, ClientCaseUpdate
 from app.schemas.document import DocumentOut
 from app.services.plan_limit_service import PlanLimitService
 from app.services.s3_service import S3Service
 from app.services.upload_security_service import UploadSecurityService
 from app.utils.validators import (
+    has_valid_cep_length,
     has_valid_cnpj_length,
     has_valid_cpf_length,
     has_valid_phone_length,
@@ -35,6 +38,13 @@ router = APIRouter()
 _s3 = S3Service()
 _limits = PlanLimitService()
 _uploads = UploadSecurityService()
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = value.strip()
+    return text or None
 
 
 @router.get("", response_model=list[ClientOut])
@@ -67,6 +77,15 @@ async def create_client(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CPF incompleto. Informe 11 dígitos.")
     if payload.tipo_documento == "cnpj" and not has_valid_cnpj_length(documento):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CNPJ incompleto. Informe 14 dígitos.")
+    address_zip = None
+    if payload.address_zip:
+        zip_digits = only_digits(payload.address_zip)
+        if not has_valid_cep_length(zip_digits):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="CEP incompleto. Informe 8 dígitos.",
+            )
+        address_zip = zip_digits
 
     phone_mobile = None
     if payload.phone_mobile:
@@ -90,7 +109,7 @@ async def create_client(
             existing.is_active = True
             existing.nome = payload.nome
             existing.tipo_documento = payload.tipo_documento
-            existing.phone_mobile = payload.phone_mobile
+            existing.phone_mobile = phone_mobile
             existing.email = str(payload.email).strip().lower() if payload.email else None
             existing.address_street = payload.address_street
             existing.address_number = payload.address_number
@@ -98,7 +117,7 @@ async def create_client(
             existing.address_neighborhood = payload.address_neighborhood
             existing.address_city = payload.address_city
             existing.address_state = (payload.address_state or None)
-            existing.address_zip = payload.address_zip
+            existing.address_zip = address_zip
             db.add(existing)
             await db.commit()
             await db.refresh(existing)
@@ -118,7 +137,7 @@ async def create_client(
         address_neighborhood=payload.address_neighborhood,
         address_city=payload.address_city,
         address_state=(payload.address_state or None),
-        address_zip=payload.address_zip,
+        address_zip=address_zip,
     )
     db.add(client)
     try:
@@ -193,6 +212,17 @@ async def update_client(
                 setattr(client, key, None)
         elif key == "email":
             setattr(client, key, str(value).strip().lower() if value else None)
+        elif key == "address_zip":
+            if value:
+                zip_digits = only_digits(value)
+                if not has_valid_cep_length(zip_digits):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="CEP incompleto. Informe 8 dígitos.",
+                    )
+                setattr(client, key, zip_digits)
+            else:
+                setattr(client, key, None)
         else:
             setattr(client, key, value)
 
@@ -290,6 +320,132 @@ async def get_client_details(
     parcerias = list((await db.execute(partners_stmt)).scalars().all())
 
     return ClientDetailsOut(client=client, parcerias=parcerias, documents=documents)
+
+
+@router.get("/{client_id}/cases", response_model=list[ClientCaseOut])
+async def list_client_cases(
+    client_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
+    client = (await db.execute(client_stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    stmt = (
+        select(ClientCase)
+        .where(ClientCase.tenant_id == user.tenant_id)
+        .where(ClientCase.client_id == client_id)
+        .order_by(ClientCase.criado_em.asc())
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+@router.post("/{client_id}/cases", response_model=ClientCaseOut, status_code=status.HTTP_201_CREATED)
+async def create_client_case(
+    client_id: uuid.UUID,
+    payload: ClientCaseCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
+    client = (await db.execute(client_stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    case = ClientCase(
+        tenant_id=user.tenant_id,
+        client_id=client_id,
+        title=_normalize_optional_text(payload.title),
+        content=payload.content.strip(),
+    )
+    db.add(case)
+    await db.commit()
+    await db.refresh(case)
+    return case
+
+
+@router.patch("/{client_id}/cases/{case_id}", response_model=ClientCaseOut)
+async def update_client_case(
+    client_id: uuid.UUID,
+    case_id: uuid.UUID,
+    payload: ClientCaseUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
+    client = (await db.execute(client_stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    case_stmt = (
+        select(ClientCase)
+        .where(ClientCase.id == case_id)
+        .where(ClientCase.client_id == client_id)
+        .where(ClientCase.tenant_id == user.tenant_id)
+    )
+    case = (await db.execute(case_stmt)).scalar_one_or_none()
+    if not case:
+        raise NotFoundError("Caso concreto não encontrado")
+
+    data = payload.model_dump(exclude_unset=True)
+    if "title" in data:
+        case.title = _normalize_optional_text(payload.title)
+    if "content" in data and payload.content is not None:
+        case.content = payload.content.strip()
+
+    db.add(case)
+    await db.commit()
+    await db.refresh(case)
+    return case
+
+
+@router.delete("/{client_id}/cases/{case_id}")
+async def delete_client_case(
+    client_id: uuid.UUID,
+    case_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
+    client = (await db.execute(client_stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    case_stmt = (
+        select(ClientCase)
+        .where(ClientCase.id == case_id)
+        .where(ClientCase.client_id == client_id)
+        .where(ClientCase.tenant_id == user.tenant_id)
+    )
+    case = (await db.execute(case_stmt)).scalar_one_or_none()
+    if not case:
+        raise NotFoundError("Caso concreto não encontrado")
+
+    await db.delete(case)
+    await db.commit()
+    return {"message": "Caso concreto removido"}
 
 
 @router.post("/{client_id}/documents/upload", response_model=DocumentOut)

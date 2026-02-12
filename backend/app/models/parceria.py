@@ -23,7 +23,16 @@ class Parceria(UUIDBaseMixin, Base):
     nome: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     email: Mapped[str | None] = mapped_column(String(254), nullable=True, index=True)
     telefone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    oab_uf: Mapped[str | None] = mapped_column(String(2), nullable=True)
     oab_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    address_street: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    address_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    address_complement: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    address_neighborhood: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    address_city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    address_state: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    address_zip: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     tipo_documento: Mapped[TenantDocumentoTipo] = mapped_column(
         Enum(TenantDocumentoTipo, name="tenant_documento_tipo"),

@@ -15,6 +15,8 @@ class ProcessCreate(APIModel):
     numero: str = Field(min_length=3, max_length=64)
     status: ProcessStatus = ProcessStatus.ativo
     nicho: str | None = Field(default=None, min_length=2, max_length=60)
+    tribunal_code: str | None = Field(default=None, max_length=32)
+    tribunal_login_url: str | None = Field(default=None, max_length=500)
 
 
 class ProcessUpdate(APIModel):
@@ -23,6 +25,8 @@ class ProcessUpdate(APIModel):
     numero: str | None = Field(default=None, min_length=3, max_length=64)
     status: ProcessStatus | None = None
     nicho: str | None = Field(default=None, min_length=2, max_length=60)
+    tribunal_code: str | None = Field(default=None, max_length=32)
+    tribunal_login_url: str | None = Field(default=None, max_length=500)
 
 
 class ProcessOut(APIModel):
@@ -33,5 +37,7 @@ class ProcessOut(APIModel):
     numero: str
     status: ProcessStatus
     nicho: str | None
+    tribunal_code: str | None = None
+    tribunal_login_url: str | None = None
     client_nome: str | None = None
     criado_em: datetime

@@ -1,4 +1,11 @@
-from app.utils.validators import is_disposable_email, is_valid_cnpj, is_valid_cpf, only_digits
+from app.utils.validators import (
+    has_valid_cep_length,
+    has_valid_process_cnj_length,
+    is_disposable_email,
+    is_valid_cnpj,
+    is_valid_cpf,
+    only_digits,
+)
 
 
 def test_only_digits():
@@ -26,3 +33,10 @@ def test_is_disposable_email():
     assert is_disposable_email("test@10minutemail.com")
     assert not is_disposable_email("test@gmail.com")
 
+
+def test_length_helpers_for_cep_and_cnj():
+    assert has_valid_cep_length("01310-100")
+    assert not has_valid_cep_length("01310-10")
+
+    assert has_valid_process_cnj_length("00012345620258160000")
+    assert not has_valid_process_cnj_length("0001234562025816000")

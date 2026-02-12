@@ -9,7 +9,17 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
-import { formatCNPJ, formatCPF, formatPhoneBR, isValidCNPJLength, isValidCPFLength, isValidPhoneLength, onlyDigits } from "@/lib/masks";
+import {
+  formatCEP,
+  formatCNPJ,
+  formatCPF,
+  formatPhoneBR,
+  isValidCEPLength,
+  isValidCNPJLength,
+  isValidCPFLength,
+  isValidPhoneLength,
+  onlyDigits
+} from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -59,7 +69,7 @@ const schema = z.object({
     .string()
     .optional()
     .or(z.literal(""))
-    .refine((v) => !v || v.replace(/\D/g, "").length === 8, { message: "CEP inválido. Use 8 dígitos." })
+    .refine((v) => !v || isValidCEPLength(v), { message: "CEP incompleto. Informe 8 dígitos." })
 }).superRefine((data, ctx) => {
   const digits = onlyDigits(data.documento);
   if (data.tipo_documento === "cpf" && !isValidCPFLength(digits)) {
@@ -109,6 +119,8 @@ export default function ClientsPage() {
   const docValid = docType === "cpf" ? isValidCPFLength(docDigits) : isValidCNPJLength(docDigits);
   const phoneDigits = onlyDigits(form.watch("phone_mobile") ?? "");
   const phoneValid = !phoneDigits || isValidPhoneLength(phoneDigits);
+  const zipDigits = onlyDigits(form.watch("address_zip") ?? "");
+  const zipValid = !zipDigits || isValidCEPLength(zipDigits);
 
   const list = useQuery({
     queryKey: ["clients", q],
@@ -131,7 +143,7 @@ export default function ClientsPage() {
         address_neighborhood: values.address_neighborhood ? values.address_neighborhood : null,
         address_city: values.address_city ? values.address_city : null,
         address_state: values.address_state ? values.address_state.toUpperCase() : null,
-        address_zip: values.address_zip ? values.address_zip : null
+        address_zip: values.address_zip ? onlyDigits(values.address_zip) : null
       };
       if (editingId) {
         const r = await api.put<Client>(`/v1/clients/${editingId}`, payload);
@@ -221,7 +233,6 @@ export default function ClientsPage() {
               <Input
                 id="cliente_documento"
                 inputMode="numeric"
-                pattern="[0-9./-]*"
                 placeholder="Somente números"
                 {...form.register("documento", {
                   onChange: (e) => {
@@ -304,16 +315,30 @@ export default function ClientsPage() {
                 </div>
                 <div className="space-y-1 md:col-span-2">
                   <Label htmlFor="cliente_cep">CEP</Label>
-                  <Input id="cliente_cep" placeholder="01001000" {...form.register("address_zip")} />
+                  <Input
+                    id="cliente_cep"
+                    inputMode="numeric"
+                    placeholder="00000-000"
+                    {...form.register("address_zip", {
+                      onChange: (event) => {
+                        const digits = onlyDigits(event.target.value);
+                        const limited = digits.slice(0, 8);
+                        const formatted = formatCEP(limited);
+                        form.setValue("address_zip", formatted, { shouldValidate: true });
+                      }
+                    })}
+                  />
                   {form.formState.errors.address_zip ? (
                     <p className="text-xs text-destructive">{form.formState.errors.address_zip.message}</p>
+                  ) : zipDigits && !zipValid ? (
+                    <p className="text-xs text-destructive">CEP incompleto. Informe 8 dígitos.</p>
                   ) : null}
                 </div>
               </div>
             </div>
 
             <div className="flex items-end gap-2 md:col-span-6">
-              <Button disabled={create.isPending || !docValid || !phoneValid} type="submit">
+              <Button disabled={create.isPending || !docValid || !phoneValid || !zipValid} type="submit">
                 {create.isPending ? "Salvando…" : editingId ? "Atualizar" : "Salvar"}
               </Button>
               {editingId ? (
@@ -409,6 +434,9 @@ export default function ClientsPage() {
                           <Button asChild variant="outline" size="sm">
                             <Link href={`/dashboard/${slug}/clients/${c.id}`}>Abrir</Link>
                           </Button>
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/dashboard/${slug}/clients/${c.id}#caso-concreto`}>Caso concreto</Link>
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -427,7 +455,7 @@ export default function ClientsPage() {
                                 address_neighborhood: c.address_neighborhood ?? "",
                                 address_city: c.address_city ?? "",
                                 address_state: c.address_state ?? "",
-                                address_zip: c.address_zip ?? ""
+                                address_zip: c.address_zip ? formatCEP(c.address_zip) : ""
                               });
                             }}
                           >

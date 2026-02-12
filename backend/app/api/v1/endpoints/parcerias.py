@@ -16,10 +16,17 @@ from app.models.process import Process
 from app.models.user import User
 from app.schemas.parceria import ParceriaCreate, ParceriaOut, ParceriaUpdate
 from app.schemas.process import ProcessOut
-from app.utils.validators import has_valid_cnpj_length, has_valid_cpf_length, has_valid_phone_length, only_digits
+from app.utils.validators import has_valid_cep_length, has_valid_cnpj_length, has_valid_cpf_length, has_valid_phone_length, only_digits
 
 
 router = APIRouter()
+
+
+def _normalize_optional_str(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
 
 
 @router.get("", response_model=list[ParceriaOut])
@@ -53,14 +60,41 @@ async def create_parceria(
             )
         telefone = digits
 
+    oab_uf = _normalize_optional_str(payload.oab_uf)
+    if oab_uf is not None:
+        oab_uf = oab_uf.upper()
+        if len(oab_uf) != 2 or not oab_uf.isalpha():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="UF da OAB inválida. Use 2 letras.")
+
+    address_state = _normalize_optional_str(payload.address_state)
+    if address_state is not None:
+        address_state = address_state.upper()
+        if len(address_state) != 2 or not address_state.isalpha():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="UF inválida. Use 2 letras (ex: SP).")
+
+    address_zip = None
+    if payload.address_zip:
+        digits = only_digits(payload.address_zip)
+        if not has_valid_cep_length(digits):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CEP incompleto. Informe 8 dígitos.")
+        address_zip = digits
+
     parceria = Parceria(
         tenant_id=user.tenant_id,
         nome=payload.nome,
         email=str(payload.email) if payload.email else None,
         telefone=telefone,
-        oab_number=payload.oab_number,
+        oab_uf=oab_uf,
+        oab_number=_normalize_optional_str(payload.oab_number),
         tipo_documento=payload.tipo_documento,
         documento=documento,
+        address_street=_normalize_optional_str(payload.address_street),
+        address_number=_normalize_optional_str(payload.address_number),
+        address_complement=_normalize_optional_str(payload.address_complement),
+        address_neighborhood=_normalize_optional_str(payload.address_neighborhood),
+        address_city=_normalize_optional_str(payload.address_city),
+        address_state=address_state,
+        address_zip=address_zip,
     )
     db.add(parceria)
     try:
@@ -125,6 +159,49 @@ async def update_parceria(
                 setattr(parceria, key, digits)
             else:
                 setattr(parceria, key, None)
+        elif key == "oab_uf":
+            if value:
+                uf = value.strip().upper()
+                if len(uf) != 2 or not uf.isalpha():
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="UF da OAB inválida. Use 2 letras.",
+                    )
+                setattr(parceria, key, uf)
+            else:
+                setattr(parceria, key, None)
+        elif key == "oab_number":
+            setattr(parceria, key, _normalize_optional_str(value))
+        elif key == "address_state":
+            if value:
+                uf = value.strip().upper()
+                if len(uf) != 2 or not uf.isalpha():
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="UF inválida. Use 2 letras (ex: SP).",
+                    )
+                setattr(parceria, key, uf)
+            else:
+                setattr(parceria, key, None)
+        elif key == "address_zip":
+            if value:
+                digits = only_digits(value)
+                if not has_valid_cep_length(digits):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="CEP incompleto. Informe 8 dígitos.",
+                    )
+                setattr(parceria, key, digits)
+            else:
+                setattr(parceria, key, None)
+        elif key in {
+            "address_street",
+            "address_number",
+            "address_complement",
+            "address_neighborhood",
+            "address_city",
+        }:
+            setattr(parceria, key, _normalize_optional_str(value))
         else:
             setattr(parceria, key, value)
     db.add(parceria)

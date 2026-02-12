@@ -7,7 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
-import { formatCNPJ, formatCPF } from "@/lib/masks";
+import { formatCEP, formatCNPJ, formatCPF, isValidCEPLength, onlyDigits } from "@/lib/masks";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,8 @@ const schema = z.object({
     .max(16)
     .optional()
     .or(z.literal(""))
-    .refine((v) => !v || v.replace(/\D/g, "").length === 8, {
-      message: "CEP inválido. Use 8 dígitos (ex: 01001000)."
+    .refine((v) => !v || isValidCEPLength(v), {
+      message: "CEP incompleto. Informe 8 dígitos."
     })
 });
 
@@ -62,6 +62,8 @@ export default function PerfilPage() {
       address_zip: ""
     }
   });
+  const zipDigits = onlyDigits(form.watch("address_zip") ?? "");
+  const zipValid = !zipDigits || isValidCEPLength(zipDigits);
 
   useEffect(() => {
     if (!user || !tenant) return;
@@ -75,7 +77,7 @@ export default function PerfilPage() {
       address_neighborhood: tenant.address_neighborhood ?? "",
       address_city: tenant.address_city ?? "",
       address_state: tenant.address_state ?? "",
-      address_zip: tenant.address_zip ?? ""
+      address_zip: tenant.address_zip ? formatCEP(tenant.address_zip) : ""
     });
   }, [form, tenant, user]);
 
@@ -92,7 +94,7 @@ export default function PerfilPage() {
         address_neighborhood: values.address_neighborhood ? values.address_neighborhood : null,
         address_city: values.address_city ? values.address_city : null,
         address_state: values.address_state ? values.address_state.toUpperCase() : null,
-        address_zip: values.address_zip ? values.address_zip : null
+        address_zip: values.address_zip ? onlyDigits(values.address_zip) : null
       };
       const r = await api.patch("/v1/profile/me", payload);
       return r.data;
@@ -206,9 +208,22 @@ export default function PerfilPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>CEP</Label>
-                  <Input placeholder="01001000" {...form.register("address_zip")} />
+                  <Input
+                    inputMode="numeric"
+                    placeholder="00000-000"
+                    {...form.register("address_zip", {
+                      onChange: (event) => {
+                        const digits = onlyDigits(event.target.value);
+                        const limited = digits.slice(0, 8);
+                        const formatted = formatCEP(limited);
+                        form.setValue("address_zip", formatted, { shouldValidate: true });
+                      }
+                    })}
+                  />
                   {form.formState.errors.address_zip ? (
                     <p className="text-xs text-destructive">{form.formState.errors.address_zip.message}</p>
+                  ) : zipDigits && !zipValid ? (
+                    <p className="text-xs text-destructive">CEP incompleto. Informe 8 dígitos.</p>
                   ) : null}
                 </div>
               </div>
@@ -221,7 +236,7 @@ export default function PerfilPage() {
             ) : null}
 
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button type="submit" disabled={save.isPending}>
+              <Button type="submit" disabled={save.isPending || !zipValid}>
                 {save.isPending ? "Salvando…" : "Salvar alterações"}
               </Button>
             </div>
