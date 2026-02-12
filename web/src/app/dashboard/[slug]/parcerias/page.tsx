@@ -192,7 +192,7 @@ export default function ParceriasPage() {
               <Input
                 id="parceria_documento"
                 inputMode="numeric"
-                pattern="[0-9]*"
+                pattern="[0-9./-]*"
                 placeholder="Somente números"
                 {...form.register("documento", {
                   onChange: (e) => {

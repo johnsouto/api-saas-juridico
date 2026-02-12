@@ -365,7 +365,7 @@ export default function LoginPage() {
                     <Input
                       id="reg_documento"
                       inputMode="numeric"
-                      pattern="[0-9]*"
+                      pattern="[0-9./-]*"
                       placeholder="Somente números"
                       {...registerForm.register("tenant_documento", {
                         onChange: (e) => {

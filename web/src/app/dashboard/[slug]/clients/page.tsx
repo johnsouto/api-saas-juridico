@@ -221,7 +221,7 @@ export default function ClientsPage() {
               <Input
                 id="cliente_documento"
                 inputMode="numeric"
-                pattern="[0-9]*"
+                pattern="[0-9./-]*"
                 placeholder="Somente números"
                 {...form.register("documento", {
                   onChange: (e) => {
