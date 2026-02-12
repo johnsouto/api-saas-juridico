@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FilePicker } from "@/components/ui/FilePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -264,11 +265,12 @@ export default function DocumentsPage() {
 
             <div className="space-y-1 md:col-span-2">
               <Label htmlFor="doc_arquivo">Arquivo *</Label>
-              <Input
+              <FilePicker
                 id="doc_arquivo"
-                type="file"
+                value={file}
+                onChange={setFile}
                 accept="application/pdf,image/jpeg,image/png"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                helperText="Formatos suportados: PDF, JPG e PNG."
               />
             </div>
 

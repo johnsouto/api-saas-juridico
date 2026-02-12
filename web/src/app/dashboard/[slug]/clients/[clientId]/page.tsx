@@ -14,6 +14,7 @@ import { formatCNPJ, formatCPF, formatPhoneBR, formatProcessCNJ } from "@/lib/ma
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
+import { FilePicker } from "@/components/ui/FilePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -534,7 +535,7 @@ export default function ClientDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Parcerias relacionadas</CardTitle>
-          <CardDescription>Parcerias vinculadas a processos deste cliente.</CardDescription>
+          <CardDescription>Parcerias vinculadas diretamente ao cliente e/ou por processos.</CardDescription>
         </CardHeader>
         <CardContent>
           {details.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
@@ -709,7 +710,13 @@ export default function ClientDetailPage() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div className="space-y-1 md:col-span-2">
               <Label>Arquivo (PDF/JPEG)</Label>
-              <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <FilePicker
+                value={file}
+                onChange={setFile}
+                accept="application/pdf,image/*"
+                helperText="Formato recomendado: PDF (máx. 10MB)."
+                maxSizeMb={10}
+              />
             </div>
             <div className="space-y-1">
               <Label>Categoria</Label>
@@ -1051,19 +1058,15 @@ export default function ClientDetailPage() {
                   <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
                     <div className="space-y-1">
                       <Label htmlFor="movement_file">Upload do documento *</Label>
-                      <Input
+                      <FilePicker
                         id="movement_file"
-                        type="file"
+                        value={movementFile}
+                        onChange={setMovementFile}
                         accept="application/pdf,image/*"
-                        onChange={(event) => setMovementFile(event.target.files?.[0] ?? null)}
+                        helperText="Formato recomendado: PDF (máx. 10MB)."
+                        maxSizeMb={10}
                       />
-                      {movementFile ? (
-                        <p className="text-xs text-muted-foreground">
-                          {movementFile.name} • {formatFileSize(movementFile.size)}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Formato recomendado: PDF (máx. 10MB).</p>
-                      )}
+                      {movementFile ? <p className="text-xs text-muted-foreground">{formatFileSize(movementFile.size)}</p> : null}
                     </div>
 
                     <div className="space-y-1">

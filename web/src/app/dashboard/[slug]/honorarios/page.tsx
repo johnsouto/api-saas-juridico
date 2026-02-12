@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { centsToDecimalString, formatDateBR, maskCurrencyBRL, parseCurrencyToCents } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FilePicker } from "@/components/ui/FilePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -365,7 +366,13 @@ export default function HonorariosPage() {
 
               <div className="space-y-1">
                 <Label htmlFor="honorario_comprovante">Comprovante</Label>
-                <Input id="honorario_comprovante" type="file" onChange={(e) => setComprovante(e.target.files?.[0] ?? null)} />
+                <FilePicker
+                  id="honorario_comprovante"
+                  value={comprovante}
+                  onChange={setComprovante}
+                  accept="application/pdf,image/jpeg,image/png"
+                  helperText="Comprovante opcional."
+                />
               </div>
             </div>
 
