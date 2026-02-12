@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -43,6 +43,7 @@ type Client = {
   address_state?: string | null;
   address_zip?: string | null;
 };
+type Parceria = { id: string; nome: string };
 
 const schema = z.object({
   nome: z.string().min(2, "Informe o nome do cliente."),
@@ -97,6 +98,8 @@ export default function ClientsPage() {
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [q, setQ] = useState<string>("");
+  const [partnershipCandidateId, setPartnershipCandidateId] = useState<string>("");
+  const [selectedPartnershipIds, setSelectedPartnershipIds] = useState<string[]>([]);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -129,6 +132,17 @@ export default function ClientsPage() {
       return r.data;
     }
   });
+  const partnerships = useQuery({
+    queryKey: ["parcerias"],
+    queryFn: async () => {
+      const response = await api.get<Parceria[]>("/v1/parcerias");
+      return response.data;
+    }
+  });
+  const partnershipsById = useMemo(
+    () => new Map((partnerships.data ?? []).map((item) => [item.id, item.nome])),
+    [partnerships.data]
+  );
 
   const create = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -152,11 +166,19 @@ export default function ClientsPage() {
       const r = await api.post<Client>("/v1/clients", payload);
       return r.data;
     },
-    onSuccess: async () => {
+    onSuccess: async (savedClient) => {
+      try {
+        await api.put(`/v1/clients/${savedClient.id}/partnerships`, { partnership_ids: selectedPartnershipIds });
+      } catch {
+        toast("Cliente salvo, mas não foi possível atualizar parcerias vinculadas.", { variant: "error" });
+      }
       const wasEditing = Boolean(editingId);
       setEditingId(null);
+      setSelectedPartnershipIds([]);
+      setPartnershipCandidateId("");
       form.reset();
       await qc.invalidateQueries({ queryKey: ["clients"] });
+      await qc.invalidateQueries({ queryKey: ["client-details", savedClient.id] });
       toast(wasEditing ? "Cliente atualizado com sucesso." : "Cliente cadastrado com sucesso.", {
         variant: "success"
       });
@@ -284,6 +306,57 @@ export default function ClientsPage() {
             </div>
 
             <div className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur md:col-span-6">
+              <div className="text-sm font-semibold">Parcerias vinculadas (opcional)</div>
+              <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+                <Select value={partnershipCandidateId} onChange={(event) => setPartnershipCandidateId(event.target.value)}>
+                  <option value="">Selecione uma parceria</option>
+                  {(partnerships.data ?? []).map((partnership) => (
+                    <option key={partnership.id} value={partnership.id}>
+                      {partnership.nome}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (!partnershipCandidateId) return;
+                    setSelectedPartnershipIds((current) =>
+                      current.includes(partnershipCandidateId) ? current : [...current, partnershipCandidateId]
+                    );
+                    setPartnershipCandidateId("");
+                  }}
+                >
+                  Vincular parceria
+                </Button>
+              </div>
+              {selectedPartnershipIds.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedPartnershipIds.map((partnershipId) => (
+                    <div
+                      key={partnershipId}
+                      className="inline-flex items-center gap-2 rounded-full border border-border/25 bg-card/40 px-3 py-1 text-xs"
+                    >
+                      <span>{partnershipsById.get(partnershipId) ?? partnershipId}</span>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() =>
+                          setSelectedPartnershipIds((current) => current.filter((item) => item !== partnershipId))
+                        }
+                        aria-label="Remover parceria vinculada"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-muted-foreground">Nenhuma parceria vinculada.</p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur md:col-span-6">
               <div className="text-sm font-semibold">Endereço (opcional)</div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-6">
                 <div className="space-y-1 md:col-span-4">
@@ -347,6 +420,8 @@ export default function ClientsPage() {
                   type="button"
                   onClick={() => {
                     setEditingId(null);
+                    setSelectedPartnershipIds([]);
+                    setPartnershipCandidateId("");
                     form.reset();
                   }}
                 >
@@ -441,8 +516,15 @@ export default function ClientsPage() {
                             variant="outline"
                             size="sm"
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               setEditingId(c.id);
+                              try {
+                                const linked = await api.get<Parceria[]>(`/v1/clients/${c.id}/partnerships`);
+                                setSelectedPartnershipIds(linked.data.map((item) => item.id));
+                              } catch {
+                                setSelectedPartnershipIds([]);
+                                toast("Não foi possível carregar parcerias vinculadas deste cliente.", { variant: "error" });
+                              }
                               form.reset({
                                 nome: c.nome,
                                 tipo_documento: c.tipo_documento,

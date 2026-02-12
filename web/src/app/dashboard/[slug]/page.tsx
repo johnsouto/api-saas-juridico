@@ -308,9 +308,11 @@ export default function DashboardHome() {
 
             {agenda.isError ? <p className="text-xs text-destructive">Erro ao carregar agenda.</p> : null}
 
-            <Button asChild className="w-full" size="sm" variant="outline">
-              <Link href={`/dashboard/${slug}/agenda`}>Abrir agenda</Link>
-            </Button>
+            <div className="mt-auto flex flex-wrap items-center gap-2">
+              <Button asChild className="h-10 w-full" variant="outline">
+                <Link href={`/dashboard/${slug}/agenda`}>Abrir agenda</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -365,9 +367,11 @@ export default function DashboardHome() {
               </div>
             </div>
 
-            <Button asChild className="w-full" size="sm" variant="outline">
-              <Link href={`/dashboard/${slug}/tarefas`}>Kanban</Link>
-            </Button>
+            <div className="mt-auto flex w-full flex-wrap items-center gap-2">
+              <Button asChild className="h-10 w-full" variant="outline">
+                <Link href={`/dashboard/${slug}/tarefas`}>Abrir kanban</Link>
+              </Button>
+            </div>
 
             {kanban.isError ? <p className="text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
           </CardContent>
@@ -383,10 +387,9 @@ export default function DashboardHome() {
               <ExcelIcon />
             </div>
 
-            <div className="mt-4">
+            <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
               <Button
-                className="w-full"
-                size="sm"
+                className="h-10 w-full"
                 variant="outline"
                 type="button"
                 disabled={exportXlsx.isPending}
@@ -472,11 +475,8 @@ function buildMonthGrid(date: Date): Array<number | null> {
 }
 
 function formatMonthLabel(date: Date): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    month: "long",
-    year: "numeric",
-    timeZone: "America/Sao_Paulo"
-  }).format(date);
+  const MONTHS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+  return `${MONTHS[date.getMonth()]}/${date.getFullYear()}`;
 }
 
 function getDayInSaoPaulo(input: string): number | null {

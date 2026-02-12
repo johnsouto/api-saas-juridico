@@ -273,21 +273,6 @@ export default function ParceriasPage() {
               ) : null}
             </div>
             <div className="space-y-1 md:col-span-1">
-              <Label htmlFor="parceria_oab_uf">UF OAB (opcional)</Label>
-              <Select id="parceria_oab_uf" {...form.register("oab_uf")}>
-                <option value="">UF</option>
-                {UFS.map((uf) => (
-                  <option key={uf} value={uf}>
-                    {uf}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1 md:col-span-1">
-              <Label htmlFor="parceria_oab">Nº OAB (opcional)</Label>
-              <Input id="parceria_oab" placeholder="Ex: 123456" {...form.register("oab_number")} />
-            </div>
-            <div className="space-y-1 md:col-span-1">
               <Label htmlFor="parceria_tipo">Tipo *</Label>
               <Select
                 id="parceria_tipo"
@@ -329,6 +314,21 @@ export default function ParceriasPage() {
                     : "CNPJ incompleto. Informe 14 dígitos."}
                 </p>
               ) : null}
+            </div>
+            <div className="space-y-1 md:col-span-1">
+              <Label htmlFor="parceria_oab_uf">UF OAB (opcional)</Label>
+              <Select id="parceria_oab_uf" {...form.register("oab_uf")}>
+                <option value="">UF</option>
+                {UFS.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1 md:col-span-1">
+              <Label htmlFor="parceria_oab">Nº OAB (opcional)</Label>
+              <Input id="parceria_oab" placeholder="Ex: 123456" {...form.register("oab_number")} />
             </div>
 
             <div className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur md:col-span-6">

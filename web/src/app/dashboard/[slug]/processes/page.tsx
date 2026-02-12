@@ -10,6 +10,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
+import { NICHOS } from "@/constants/nichos";
 import { formatProcessCNJ, isValidProcessCNJLength, onlyDigits } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +45,7 @@ const schema = z.object({
     }),
   status: z.enum(["ativo", "inativo", "outros"]).default("ativo"),
   nicho: z.string().optional().or(z.literal("")),
-  tribunal_code: z.string().optional().or(z.literal("")),
+  tribunal_code: z.string().max(32, "Tribunal deve ter no máximo 32 caracteres.").optional().or(z.literal("")),
   tribunal_login_url: z
     .string()
     .optional()
@@ -54,30 +55,6 @@ const schema = z.object({
     })
 });
 type FormValues = z.infer<typeof schema>;
-
-const NICHOS = [
-  { value: "Militar", label: "Militar" },
-  { value: "Bancário", label: "Bancário" },
-  { value: "trabalhista", label: "Trabalhista" },
-  { value: "civel", label: "Cível" },
-  { value: "familia", label: "Família" },
-  { value: "penal", label: "Penal" },
-  { value: "previdenciario", label: "Previdenciário" },
-  { value: "tributario", label: "Tributário" },
-  { value: "consumidor", label: "Consumidor" },
-  { value: "imobiliario", label: "Imobiliário" },
-  { value: "empresarial", label: "Empresarial" },
-  { value: "outros", label: "Outros" }
-];
-
-const TRIBUNAIS = [
-  { value: "TJSP", label: "TJSP" },
-  { value: "TJRJ", label: "TJRJ" },
-  { value: "TRT", label: "TRT" },
-  { value: "TJ", label: "TJ" },
-  { value: "TRF", label: "TRF" },
-  { value: "OUTRO", label: "Outro" }
-];
 
 export default function ProcessesPage() {
   const qc = useQueryClient();
@@ -255,14 +232,10 @@ export default function ProcessesPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="processo_tribunal">Tribunal (opcional)</Label>
-              <Select id="processo_tribunal" {...form.register("tribunal_code")}>
-                <option value="">Selecione</option>
-                {TRIBUNAIS.map((tribunal) => (
-                  <option key={tribunal.value} value={tribunal.value}>
-                    {tribunal.label}
-                  </option>
-                ))}
-              </Select>
+              <Input id="processo_tribunal" placeholder="Ex: TJSP" {...form.register("tribunal_code")} />
+              {form.formState.errors.tribunal_code ? (
+                <p className="text-xs text-destructive">{form.formState.errors.tribunal_code.message}</p>
+              ) : null}
             </div>
             <div className="space-y-1 md:col-span-2">
               <div className="flex items-center gap-2">

@@ -4,7 +4,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,13 +13,16 @@ from app.core.exceptions import NotFoundError
 from app.db.session import get_db
 from app.models.client import Client
 from app.models.client_case import ClientCase
+from app.models.client_partnership import ClientPartnership
 from app.models.document import Document
 from app.models.parceria import Parceria
 from app.models.process import Process
 from app.models.user import User
 from app.schemas.client import ClientCreate, ClientDetailsOut, ClientOut, ClientUpdate
 from app.schemas.client_case import ClientCaseCreate, ClientCaseOut, ClientCaseUpdate
+from app.schemas.client_partnership import ClientPartnershipsUpdate
 from app.schemas.document import DocumentOut
+from app.schemas.parceria import ParceriaOut
 from app.services.plan_limit_service import PlanLimitService
 from app.services.s3_service import S3Service
 from app.services.upload_security_service import UploadSecurityService
@@ -308,8 +311,18 @@ async def get_client_details(
     )
     documents = list((await db.execute(docs_stmt)).scalars().all())
 
-    # Parcerias relacionadas ao cliente via processos.
-    partners_stmt = (
+    # Parcerias vinculadas diretamente ao cliente.
+    direct_partners_stmt = (
+        select(Parceria)
+        .join(ClientPartnership, ClientPartnership.partnership_id == Parceria.id)
+        .where(ClientPartnership.tenant_id == user.tenant_id)
+        .where(ClientPartnership.client_id == client_id)
+        .order_by(Parceria.nome.asc())
+    )
+    direct_partners = list((await db.execute(direct_partners_stmt)).scalars().all())
+
+    # Parcerias relacionadas ao cliente via processos (legado).
+    process_partners_stmt = (
         select(Parceria)
         .join(Process, Process.parceria_id == Parceria.id)
         .where(Process.tenant_id == user.tenant_id)
@@ -317,9 +330,91 @@ async def get_client_details(
         .distinct()
         .order_by(Parceria.nome.asc())
     )
-    parcerias = list((await db.execute(partners_stmt)).scalars().all())
+    process_partners = list((await db.execute(process_partners_stmt)).scalars().all())
+    merged_by_id: dict[uuid.UUID, Parceria] = {p.id: p for p in direct_partners}
+    for parceria in process_partners:
+        merged_by_id.setdefault(parceria.id, parceria)
+    parcerias = sorted(merged_by_id.values(), key=lambda item: item.nome.lower())
 
     return ClientDetailsOut(client=client, parcerias=parcerias, documents=documents)
+
+
+@router.get("/{client_id}/partnerships", response_model=list[ParceriaOut])
+async def list_client_partnerships(
+    client_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
+    client = (await db.execute(client_stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    stmt = (
+        select(Parceria)
+        .join(ClientPartnership, ClientPartnership.partnership_id == Parceria.id)
+        .where(ClientPartnership.tenant_id == user.tenant_id)
+        .where(ClientPartnership.client_id == client_id)
+        .order_by(Parceria.nome.asc())
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+@router.put("/{client_id}/partnerships", response_model=list[ParceriaOut])
+async def replace_client_partnerships(
+    client_id: uuid.UUID,
+    payload: ClientPartnershipsUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    client_stmt = (
+        select(Client)
+        .where(Client.id == client_id)
+        .where(Client.tenant_id == user.tenant_id)
+        .where(Client.is_active.is_(True))
+    )
+    client = (await db.execute(client_stmt)).scalar_one_or_none()
+    if not client:
+        raise NotFoundError("Cliente não encontrado")
+
+    partnership_ids = list(dict.fromkeys(payload.partnership_ids))
+    partnerships: list[Parceria] = []
+    if partnership_ids:
+        partnerships_stmt = (
+            select(Parceria)
+            .where(Parceria.tenant_id == user.tenant_id)
+            .where(Parceria.id.in_(partnership_ids))
+        )
+        partnerships = list((await db.execute(partnerships_stmt)).scalars().all())
+        if len(partnerships) != len(partnership_ids):
+            raise NotFoundError("Uma ou mais parcerias não foram encontradas")
+
+    await db.execute(
+        delete(ClientPartnership)
+        .where(ClientPartnership.tenant_id == user.tenant_id)
+        .where(ClientPartnership.client_id == client_id)
+    )
+
+    for partnership_id in partnership_ids:
+        db.add(
+            ClientPartnership(
+                tenant_id=user.tenant_id,
+                client_id=client_id,
+                partnership_id=partnership_id,
+            )
+        )
+    await db.commit()
+
+    if not partnership_ids:
+        return []
+
+    partnerships_by_id = {partnership.id: partnership for partnership in partnerships}
+    return [partnerships_by_id[partnership_id] for partnership_id in partnership_ids if partnership_id in partnerships_by_id]
 
 
 @router.get("/{client_id}/cases", response_model=list[ClientCaseOut])

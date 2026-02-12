@@ -4,6 +4,7 @@ from app.models.billing_event import BillingEvent
 from app.models.bug_report import BugReport
 from app.models.client import Client
 from app.models.client_case import ClientCase
+from app.models.client_partnership import ClientPartnership
 from app.models.document import Document
 from app.models.enums import BillingPeriod, BillingProvider, HonorarioStatus, PlanCode, SubscriptionStatus, TarefaStatus, UserRole
 from app.models.honorario import Honorario
@@ -28,6 +29,7 @@ __all__ = [
     "BugReport",
     "Client",
     "ClientCase",
+    "ClientPartnership",
     "Document",
     "Honorario",
     "HonorarioStatus",
