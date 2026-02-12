@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import calendar
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -32,6 +34,9 @@ from app.schemas.platform import (
     PlatformOverviewRecentTenant,
     PlatformOverviewTopTenant,
     PlatformPingOut,
+    PlatformRevenueMonthlyPoint,
+    PlatformRevenueOverviewOut,
+    PlatformRevenueTenantOut,
     PlatformResendInviteOut,
     PlatformTenantStorageOut,
     PlatformTenantCreate,
@@ -64,6 +69,85 @@ _auth_service = AuthService(email_service=EmailService(), plan_limit_service=Pla
 _platform_service = PlatformService(email_service=EmailService())
 
 logger = logging.getLogger(__name__)
+PLUS_MONTHLY_PRICE_FALLBACK_BRL = 47.0
+
+
+def _to_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _month_bounds_utc(year: int, month: int) -> tuple[datetime, datetime]:
+    _, month_last_day = calendar.monthrange(year, month)
+    start = datetime(year, month, 1, tzinfo=timezone.utc)
+    end = datetime(year, month, month_last_day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    return start, end
+
+
+def _rolling_months(reference_year: int, reference_month: int, total: int = 12) -> list[tuple[int, int]]:
+    months: list[tuple[int, int]] = []
+    year = reference_year
+    month = reference_month
+    for _ in range(total):
+        months.append((year, month))
+        month -= 1
+        if month < 1:
+            month = 12
+            year -= 1
+    months.reverse()
+    return months
+
+
+def _is_active_plus_monthly(subscription: Subscription) -> bool:
+    return subscription.plan_code == PlanCode.PLUS_MONTHLY_CARD and subscription.status == SubscriptionStatus.active
+
+
+def _is_active_now(subscription: Subscription, reference_now: datetime) -> bool:
+    if not _is_active_plus_monthly(subscription):
+        return False
+    starts_at = _to_utc(subscription.current_period_start) or _to_utc(subscription.criado_em)
+    ends_at = _to_utc(subscription.current_period_end)
+    if starts_at and starts_at > reference_now:
+        return False
+    if ends_at and ends_at < reference_now:
+        return False
+    return True
+
+
+def _is_active_in_month(subscription: Subscription, month_start: datetime, month_end: datetime) -> bool:
+    if not _is_active_plus_monthly(subscription):
+        return False
+    starts_at = _to_utc(subscription.current_period_start) or _to_utc(subscription.criado_em)
+    ends_at = _to_utc(subscription.current_period_end)
+    if starts_at and starts_at > month_end:
+        return False
+    if ends_at and ends_at < month_start:
+        return False
+    return True
+
+
+async def _plus_monthly_price_brl(db: AsyncSession) -> float:
+    row = (
+        await db.execute(
+            select(
+                Plan.price_cents,
+                Plan.price,
+            ).where(Plan.code == PlanCode.PLUS_MONTHLY_CARD)
+        )
+    ).first()
+    if not row:
+        return PLUS_MONTHLY_PRICE_FALLBACK_BRL
+
+    price_cents = int(row[0] or 0)
+    legacy_price = row[1]
+    if price_cents > 0:
+        return round(price_cents / 100, 2)
+    if legacy_price is not None:
+        return round(float(legacy_price), 2)
+    return PLUS_MONTHLY_PRICE_FALLBACK_BRL
 
 
 def _normalize_subscription_status(raw: str | None) -> SubscriptionStatus | None:
@@ -411,6 +495,130 @@ async def platform_overview(
             for tenant_id, nome, slug, created_at in recent
         ],
     )
+
+
+@router.get("/metrics/revenue/overview", response_model=PlatformRevenueOverviewOut)
+async def platform_revenue_overview(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    year: int | None = None,
+):
+    now = datetime.now(timezone.utc)
+    selected_year = year or now.year
+    if selected_year < 2000 or selected_year > now.year + 5:
+        raise BadRequestError("Ano inválido para consulta de faturamento.")
+
+    reference_month = now.month if selected_year == now.year else 12
+    rolling_months = _rolling_months(selected_year, reference_month, total=12)
+
+    price_monthly = await _plus_monthly_price_brl(db)
+    rows = (
+        await db.execute(
+            select(Subscription, Tenant)
+            .join(Tenant, Tenant.id == Subscription.tenant_id)
+            .where(Tenant.is_active.is_(True))
+            .where(Subscription.plan_code == PlanCode.PLUS_MONTHLY_CARD)
+        )
+    ).all()
+    subscriptions = [subscription for subscription, _tenant in rows]
+
+    active_plus_tenants = sum(1 for subscription in subscriptions if _is_active_now(subscription, now))
+    mrr = round(active_plus_tenants * price_monthly, 2)
+    arr_estimated = round(mrr * 12, 2)
+
+    monthly_series: list[PlatformRevenueMonthlyPoint] = []
+    for month_year, month_number in rolling_months:
+        month_start, month_end = _month_bounds_utc(month_year, month_number)
+        # TODO: substituir essa aproximacao por receita real de invoices/webhooks
+        # quando Stripe/MercadoPago estiverem integrados.
+        active_count = sum(
+            1
+            for subscription in subscriptions
+            if _is_active_in_month(subscription, month_start, month_end)
+        )
+        monthly_series.append(
+            PlatformRevenueMonthlyPoint(
+                month=f"{month_year:04d}-{month_number:02d}",
+                value=round(active_count * price_monthly, 2),
+            )
+        )
+
+    if selected_year > now.year:
+        ytd_month_limit = 0
+    elif selected_year == now.year:
+        ytd_month_limit = now.month
+    else:
+        ytd_month_limit = 12
+
+    revenue_ytd = 0.0
+    for month_number in range(1, ytd_month_limit + 1):
+        month_start, month_end = _month_bounds_utc(selected_year, month_number)
+        active_count = sum(
+            1
+            for subscription in subscriptions
+            if _is_active_in_month(subscription, month_start, month_end)
+        )
+        revenue_ytd += active_count * price_monthly
+
+    return PlatformRevenueOverviewOut(
+        currency="BRL",
+        plan_price_monthly=price_monthly,
+        active_plus_tenants=active_plus_tenants,
+        mrr=mrr,
+        arr_estimated=arr_estimated,
+        revenue_ytd=round(revenue_ytd, 2),
+        monthly_series=monthly_series,
+    )
+
+
+@router.get("/metrics/revenue/tenants", response_model=list[PlatformRevenueTenantOut])
+async def platform_revenue_tenants(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status: str = "ACTIVE",
+    plan: str = "plus",
+):
+    normalized_plan = (plan or "plus").strip().lower()
+    normalized_status = (status or "ACTIVE").strip().upper()
+
+    if normalized_plan not in {"plus", "plus_monthly", "plus_monthly_card"}:
+        return []
+    if normalized_status not in {"ACTIVE", "ALL"}:
+        return []
+
+    now = datetime.now(timezone.utc)
+    price_monthly = await _plus_monthly_price_brl(db)
+    rows = (
+        await db.execute(
+            select(Subscription, Tenant)
+            .join(Tenant, Tenant.id == Subscription.tenant_id)
+            .where(Tenant.is_active.is_(True))
+            .where(Subscription.plan_code == PlanCode.PLUS_MONTHLY_CARD)
+        )
+    ).all()
+
+    items: list[PlatformRevenueTenantOut] = []
+    for subscription, tenant in rows:
+        active_now = _is_active_now(subscription, now)
+        if normalized_status == "ACTIVE" and not active_now:
+            continue
+
+        status_value = str(subscription.status.value if hasattr(subscription.status, "value") else subscription.status).upper()
+        items.append(
+            PlatformRevenueTenantOut(
+                tenant_id=tenant.id,
+                tenant_name=tenant.nome,
+                tenant_slug=tenant.slug,
+                plan="plus",
+                status=status_value,
+                started_at=subscription.current_period_start or subscription.criado_em,
+                next_billing_at=subscription.current_period_end,
+                last_payment_at=subscription.last_payment_at,
+                price_monthly=price_monthly,
+            )
+        )
+
+    fallback_sort_date = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    items.sort(key=lambda item: item.started_at or item.next_billing_at or fallback_sort_date, reverse=True)
+    return items
 
 
 @router.patch("/tenants/{tenant_id}/limits", response_model=PlatformTenantLimitsOut)
