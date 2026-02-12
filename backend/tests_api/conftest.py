@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 import random
 import string
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import AsyncIterator
 
 import httpx
@@ -14,19 +16,30 @@ import pytest_asyncio
 from fastapi import Request
 from httpx import ASGITransport, AsyncClient
 
-from app.api.deps import get_current_user
-from app.api.v1.endpoints import auth as auth_endpoint
-from app.api.v1.endpoints import clients as clients_endpoint
-from app.api.v1.endpoints import documents as documents_endpoint
-from app.api.v1.endpoints import users as users_endpoint
-from app.core.exceptions import AuthError
-from app.core.security import hash_password, verify_password
-from app.db.session import get_db
-from app.main import app
-from app.models.client import Client
-from app.models.document import Document
-from app.models.enums import UserRole
-from app.models.user import User
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("S3_ENDPOINT_URL", "http://localhost:9000")
+os.environ.setdefault("S3_ACCESS_KEY", "test-access-key")
+os.environ.setdefault("S3_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("S3_BUCKET_NAME", "test-bucket")
+
+from app.api.deps import get_current_user  # noqa: E402
+from app.api.v1.endpoints import auth as auth_endpoint  # noqa: E402
+from app.api.v1.endpoints import clients as clients_endpoint  # noqa: E402
+from app.api.v1.endpoints import documents as documents_endpoint  # noqa: E402
+from app.api.v1.endpoints import users as users_endpoint  # noqa: E402
+from app.core.exceptions import AuthError  # noqa: E402
+from app.core.security import hash_password, verify_password  # noqa: E402
+from app.db.session import get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models.client import Client  # noqa: E402
+from app.models.document import Document  # noqa: E402
+from app.models.enums import UserRole  # noqa: E402
+from app.models.user import User  # noqa: E402
 
 
 PRODUCTION_DOMAIN_SUBSTR = "elementojuris.cloud"
