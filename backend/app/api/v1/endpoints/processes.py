@@ -80,9 +80,15 @@ async def list_processes(
     user: Annotated[User, Depends(get_current_user)],
     q: str | None = Query(default=None, description="Busca por número/nicho/status"),
     client_id: uuid.UUID | None = Query(default=None, description="Filtrar por cliente"),
+    client_name: str | None = Query(default=None, description="Filtrar por nome do cliente"),
     parceria_id: uuid.UUID | None = Query(default=None, description="Filtrar por parceria"),
 ):
-    stmt = select(Process).where(Process.tenant_id == user.tenant_id).order_by(Process.criado_em.desc())
+    stmt = (
+        select(Process, Client.nome)
+        .join(Client, Client.id == Process.client_id)
+        .where(Process.tenant_id == user.tenant_id)
+        .order_by(Process.criado_em.desc())
+    )
     if q:
         like = f"%{q}%"
         stmt = stmt.where(
@@ -94,9 +100,16 @@ async def list_processes(
         )
     if client_id:
         stmt = stmt.where(Process.client_id == client_id)
+    if client_name:
+        stmt = stmt.where(Client.nome.ilike(f"%{client_name.strip()}%"))
     if parceria_id:
         stmt = stmt.where(Process.parceria_id == parceria_id)
-    return list((await db.execute(stmt)).scalars().all())
+    rows = (await db.execute(stmt)).all()
+    out: list[ProcessOut] = []
+    for proc, nome in rows:
+        base = ProcessOut.model_validate(proc)
+        out.append(base.model_copy(update={"client_nome": nome}))
+    return out
 
 
 @router.post("", response_model=ProcessOut)

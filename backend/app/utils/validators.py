@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 
 _NON_DIGITS_RE = re.compile(r"\D+")
@@ -62,6 +63,69 @@ def is_valid_cnpj(raw: str) -> bool:
     return numbers[13] == d2
 
 
+def has_valid_cpf_length(raw: str) -> bool:
+    return len(only_digits(raw)) == 11
+
+
+def has_valid_cnpj_length(raw: str) -> bool:
+    return len(only_digits(raw)) == 14
+
+
+def has_valid_phone_length(raw: str) -> bool:
+    digits = only_digits(raw)
+    if len(digits) != 11:
+        return False
+    if len(digits) >= 3 and digits[2] != "9":
+        return False
+    return True
+
+
+DOCUMENT_CATEGORY_ALIASES: dict[str, str] = {
+    "sentenca": "sentencas",
+    "sentencas": "sentencas",
+    "sentença": "sentencas",
+    "sentenças": "sentencas",
+    "acordao": "acordao",
+    "acordão": "acordao",
+}
+
+DOCUMENT_CATEGORIES_ALLOWED: set[str] = {
+    "despacho",
+    "sentencas",
+    "acordao",
+    "identidade",
+    "comprovante_endereco",
+    "declaracao_pobreza",
+    "contrato",
+    "peticao",
+    "procuracao",
+    "comprovante_pagamento",
+    "ultima_movimentacao",
+    "outros",
+}
+
+
+def normalize_document_category(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    value = raw.strip().lower()
+    if not value:
+        return None
+    value = unicodedata.normalize("NFD", value)
+    value = "".join(ch for ch in value if unicodedata.category(ch) != "Mn")
+    value = value.replace("-", "_").replace(" ", "_")
+    if value in DOCUMENT_CATEGORY_ALIASES:
+        value = DOCUMENT_CATEGORY_ALIASES[value]
+    return value
+
+
+def is_allowed_document_category(raw: str | None) -> bool:
+    normalized = normalize_document_category(raw)
+    if normalized is None:
+        return True
+    return normalized in DOCUMENT_CATEGORIES_ALLOWED
+
+
 # Minimal blacklist. We can expand as needed.
 DISPOSABLE_EMAIL_DOMAINS: set[str] = {
     # Mailinator
@@ -112,4 +176,3 @@ def is_disposable_email(email: str) -> bool:
         if domain == bad or domain.endswith(f".{bad}"):
             return True
     return False
-

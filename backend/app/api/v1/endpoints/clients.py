@@ -21,7 +21,14 @@ from app.schemas.document import DocumentOut
 from app.services.plan_limit_service import PlanLimitService
 from app.services.s3_service import S3Service
 from app.services.upload_security_service import UploadSecurityService
-from app.utils.validators import only_digits
+from app.utils.validators import (
+    has_valid_cnpj_length,
+    has_valid_cpf_length,
+    has_valid_phone_length,
+    is_allowed_document_category,
+    normalize_document_category,
+    only_digits,
+)
 
 
 router = APIRouter()
@@ -56,6 +63,20 @@ async def create_client(
 ):
     await _limits.enforce_client_limit(db, tenant_id=user.tenant_id)
     documento = only_digits(payload.documento)
+    if payload.tipo_documento == "cpf" and not has_valid_cpf_length(documento):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CPF incompleto. Informe 11 dígitos.")
+    if payload.tipo_documento == "cnpj" and not has_valid_cnpj_length(documento):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CNPJ incompleto. Informe 14 dígitos.")
+
+    phone_mobile = None
+    if payload.phone_mobile:
+        phone_digits = only_digits(payload.phone_mobile)
+        if not has_valid_phone_length(phone_digits):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Telefone incompleto. Informe DDD + número com 11 dígitos.",
+            )
+        phone_mobile = phone_digits
 
     # If a client with the same document was previously "deleted", reactivate it instead of failing.
     existing_stmt = (
@@ -89,7 +110,7 @@ async def create_client(
         nome=payload.nome,
         tipo_documento=payload.tipo_documento,
         documento=documento,
-        phone_mobile=payload.phone_mobile,
+        phone_mobile=phone_mobile,
         email=str(payload.email).strip().lower() if payload.email else None,
         address_street=payload.address_street,
         address_number=payload.address_number,
@@ -146,7 +167,30 @@ async def update_client(
 
     for key, value in payload.model_dump(exclude_unset=True).items():
         if key == "documento":
-            setattr(client, key, only_digits(value) if value else value)
+            tipo_doc = payload.tipo_documento or client.tipo_documento
+            digits = only_digits(value) if value else value
+            if tipo_doc == "cpf" and not has_valid_cpf_length(digits or ""):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="CPF incompleto. Informe 11 dígitos.",
+                )
+            if tipo_doc == "cnpj" and not has_valid_cnpj_length(digits or ""):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="CNPJ incompleto. Informe 14 dígitos.",
+                )
+            setattr(client, key, digits)
+        elif key == "phone_mobile":
+            if value:
+                digits = only_digits(value)
+                if not has_valid_phone_length(digits):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Telefone incompleto. Informe DDD + número com 11 dígitos.",
+                    )
+                setattr(client, key, digits)
+            else:
+                setattr(client, key, None)
         elif key == "email":
             setattr(client, key, str(value).strip().lower() if value else None)
         else:
@@ -269,6 +313,10 @@ async def upload_client_document(
     file.file.seek(0, 2)
     size_bytes = int(file.file.tell())
     file.file.seek(0)
+    if categoria and not is_allowed_document_category(categoria):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Categoria de documento inválida.")
+    normalized_categoria = normalize_document_category(categoria)
+
     safe_filename = _uploads.validate_upload(
         filename=file.filename or "arquivo",
         content_type=file.content_type,
@@ -284,7 +332,7 @@ async def upload_client_document(
     doc = Document(
         tenant_id=user.tenant_id,
         client_id=client_id,
-        categoria=categoria,
+        categoria=normalized_categoria,
         mime_type=file.content_type,
         s3_key=key,
         filename=safe_filename,

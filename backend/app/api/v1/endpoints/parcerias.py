@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from app.models.process import Process
 from app.models.user import User
 from app.schemas.parceria import ParceriaCreate, ParceriaOut, ParceriaUpdate
 from app.schemas.process import ProcessOut
+from app.utils.validators import has_valid_cnpj_length, has_valid_cpf_length, has_valid_phone_length, only_digits
 
 
 router = APIRouter()
@@ -36,14 +37,30 @@ async def create_parceria(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
+    documento = only_digits(payload.documento)
+    if payload.tipo_documento == "cpf" and not has_valid_cpf_length(documento):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CPF incompleto. Informe 11 dígitos.")
+    if payload.tipo_documento == "cnpj" and not has_valid_cnpj_length(documento):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CNPJ incompleto. Informe 14 dígitos.")
+
+    telefone = None
+    if payload.telefone:
+        digits = only_digits(payload.telefone)
+        if not has_valid_phone_length(digits):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Telefone incompleto. Informe DDD + número com 11 dígitos.",
+            )
+        telefone = digits
+
     parceria = Parceria(
         tenant_id=user.tenant_id,
         nome=payload.nome,
         email=str(payload.email) if payload.email else None,
-        telefone=payload.telefone,
+        telefone=telefone,
         oab_number=payload.oab_number,
         tipo_documento=payload.tipo_documento,
-        documento=payload.documento,
+        documento=documento,
     )
     db.add(parceria)
     try:
@@ -83,6 +100,31 @@ async def update_parceria(
     for key, value in payload.model_dump(exclude_unset=True).items():
         if key == "email":
             setattr(parceria, key, str(value) if value else None)
+        elif key == "documento":
+            tipo_doc = payload.tipo_documento or parceria.tipo_documento
+            digits = only_digits(value) if value else value
+            if tipo_doc == "cpf" and not has_valid_cpf_length(digits or ""):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="CPF incompleto. Informe 11 dígitos.",
+                )
+            if tipo_doc == "cnpj" and not has_valid_cnpj_length(digits or ""):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="CNPJ incompleto. Informe 14 dígitos.",
+                )
+            setattr(parceria, key, digits)
+        elif key == "telefone":
+            if value:
+                digits = only_digits(value)
+                if not has_valid_phone_length(digits):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Telefone incompleto. Informe DDD + número com 11 dígitos.",
+                    )
+                setattr(parceria, key, digits)
+            else:
+                setattr(parceria, key, None)
         else:
             setattr(parceria, key, value)
     db.add(parceria)

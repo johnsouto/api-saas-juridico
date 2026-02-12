@@ -21,6 +21,7 @@ from app.schemas.document import DocumentOut, PresignedUrlOut
 from app.services.plan_limit_service import PlanLimitService
 from app.services.s3_service import S3Service
 from app.services.upload_security_service import UploadSecurityService
+from app.utils.validators import is_allowed_document_category, normalize_document_category
 
 
 router = APIRouter()
@@ -49,7 +50,11 @@ async def list_documents(
     if honorario_id:
         stmt = stmt.where(Document.honorario_id == honorario_id)
     if categoria:
-        stmt = stmt.where(Document.categoria == categoria)
+        if not is_allowed_document_category(categoria):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Categoria de documento inválida.")
+        normalized = normalize_document_category(categoria)
+        if normalized:
+            stmt = stmt.where(Document.categoria == normalized)
     return list((await db.execute(stmt)).scalars().all())
 
 
@@ -115,12 +120,16 @@ async def upload_document(
     key = _s3.build_tenant_key(tenant_id=str(user.tenant_id), filename=safe_filename)
     _s3.upload_fileobj(key=key, fileobj=file.file, content_type=file.content_type)
 
+    if categoria and not is_allowed_document_category(categoria):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Categoria de documento inválida.")
+    normalized_categoria = normalize_document_category(categoria)
+
     doc = Document(
         tenant_id=user.tenant_id,
         process_id=process_id,
         client_id=client_id,
         honorario_id=honorario_id,
-        categoria=categoria,
+        categoria=normalized_categoria,
         mime_type=file.content_type,
         s3_key=key,
         filename=safe_filename,

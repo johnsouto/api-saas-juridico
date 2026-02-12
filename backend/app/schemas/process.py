@@ -33,4 +33,5 @@ class ProcessOut(APIModel):
     numero: str
     status: ProcessStatus
     nicho: str | None
+    client_nome: str | None = None
     criado_em: datetime
