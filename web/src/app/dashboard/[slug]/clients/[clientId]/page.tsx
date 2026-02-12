@@ -1,9 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CircleHelp, Upload } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
 import { formatDateTimeBR } from "@/lib/datetime";
@@ -14,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
 
 type Client = {
   id: string;
@@ -43,6 +46,18 @@ type Parceria = {
 };
 
 type Proc = { id: string; numero: string; status: string };
+type LastMovementStatus = {
+  can_create: boolean;
+  blocking_task_id?: string;
+  blocking_task_title?: string;
+  blocking_due_at?: string;
+};
+type LastMovementStatusMap = Record<string, LastMovementStatus>;
+type LastMovementCreateResponse = {
+  ok: boolean;
+  movement: { id: string };
+  task: { id: string };
+};
 
 type Doc = {
   id: string;
@@ -69,10 +84,20 @@ const CATEGORIAS = [
 export default function ClientDetailPage() {
   const params = useParams<{ clientId: string; slug: string }>();
   const qc = useQueryClient();
+  const { toast } = useToast();
   const clientId = params.clientId;
+  const slug = params.slug;
 
   const [categoria, setCategoria] = useState<string>(CATEGORIAS[0].value);
   const [file, setFile] = useState<File | null>(null);
+  const [movementOpen, setMovementOpen] = useState(false);
+  const [movementProcess, setMovementProcess] = useState<Proc | null>(null);
+  const [movementFile, setMovementFile] = useState<File | null>(null);
+  const [movementTitle, setMovementTitle] = useState("");
+  const [movementDate, setMovementDate] = useState("");
+  const [movementTime, setMovementTime] = useState("");
+  const [movementError, setMovementError] = useState<string | null>(null);
+  const [movementConflict, setMovementConflict] = useState<string | null>(null);
 
   const details = useQuery({
     queryKey: ["client-details", clientId],
@@ -82,6 +107,21 @@ export default function ClientDetailPage() {
   const processes = useQuery({
     queryKey: ["processes", "client", clientId],
     queryFn: async () => (await api.get<Proc[]>("/v1/processes", { params: { client_id: clientId } })).data
+  });
+  const processIdsKey = useMemo(() => (processes.data ?? []).map((item) => item.id).join(","), [processes.data]);
+  const processLastMovementStatus = useQuery({
+    queryKey: ["process-last-movement-status", clientId, processIdsKey],
+    enabled: Boolean(processIdsKey),
+    queryFn: async () => {
+      const items = processes.data ?? [];
+      const entries = await Promise.all(
+        items.map(async (proc) => {
+          const resp = await api.get<LastMovementStatus>(`/v1/processes/${proc.id}/last-movement/status`);
+          return [proc.id, resp.data] as const;
+        })
+      );
+      return Object.fromEntries(entries) as LastMovementStatusMap;
+    }
   });
 
   const upload = useMutation({
@@ -144,12 +184,68 @@ export default function ClientDetailPage() {
       await qc.invalidateQueries({ queryKey: ["client-details", clientId] });
     }
   });
+  const createLastMovement = useMutation({
+    mutationFn: async (vars: {
+      processId: string;
+      title: string;
+      dueAtIso: string;
+      file: File;
+    }) => {
+      const fd = new FormData();
+      fd.append("file", vars.file);
+      fd.append("title", vars.title);
+      fd.append("due_at", vars.dueAtIso);
+      fd.append("client_id", clientId);
+      const resp = await api.post<LastMovementCreateResponse>(`/v1/processes/${vars.processId}/last-movement`, fd, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      return resp.data;
+    },
+    onSuccess: async () => {
+      toast("Movimentação registrada e tarefa criada no Kanban.", { variant: "success" });
+      setMovementOpen(false);
+      setMovementProcess(null);
+      setMovementFile(null);
+      setMovementTitle("");
+      setMovementDate("");
+      setMovementTime("");
+      setMovementError(null);
+      setMovementConflict(null);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["process-last-movement-status", clientId] }),
+        qc.invalidateQueries({ queryKey: ["kanban-summary"] }),
+        qc.invalidateQueries({ queryKey: ["tarefas"] })
+      ]);
+    },
+    onError: (error: any) => {
+      const statusCode = error?.response?.status;
+      const detail = error?.response?.data?.detail;
+      const code = typeof detail === "object" && detail !== null ? detail.code : undefined;
+      const message =
+        typeof detail === "object" && detail !== null && typeof detail.message === "string"
+          ? detail.message
+          : typeof detail === "string"
+            ? detail
+            : "Não foi possível criar a tarefa da movimentação.";
+
+      if (statusCode === 409 || code === "PREVIOUS_TASK_NOT_COMPLETED") {
+        setMovementConflict(message);
+        setMovementError(null);
+        toast(message, { variant: "error" });
+        return;
+      }
+
+      setMovementConflict(null);
+      setMovementError(message);
+      toast(message, { variant: "error" });
+    }
+  });
 
   const client = details.data?.client;
   const parcerias = details.data?.parcerias ?? [];
-  const documents = details.data?.documents ?? [];
 
   const docsByCategoria = useMemo(() => {
+    const documents = details.data?.documents ?? [];
     const groups: Record<string, Doc[]> = {};
     for (const d of documents) {
       const key = d.categoria ?? "sem_categoria";
@@ -157,7 +253,88 @@ export default function ClientDetailPage() {
       groups[key].push(d);
     }
     return groups;
-  }, [documents]);
+  }, [details.data?.documents]);
+
+  useEffect(() => {
+    if (!movementOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !createLastMovement.isPending) {
+        setMovementOpen(false);
+        setMovementProcess(null);
+        setMovementFile(null);
+        setMovementTitle("");
+        setMovementDate("");
+        setMovementTime("");
+        setMovementError(null);
+        setMovementConflict(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [createLastMovement.isPending, movementOpen]);
+
+  function openMovementModal(processItem: Proc) {
+    const defaults = getNowDateTimeFields();
+    setMovementProcess(processItem);
+    setMovementDate(defaults.date);
+    setMovementTime(defaults.time);
+    setMovementTitle("");
+    setMovementFile(null);
+    setMovementError(null);
+    setMovementConflict(null);
+    setMovementOpen(true);
+  }
+
+  function closeMovementModal() {
+    setMovementOpen(false);
+    setMovementProcess(null);
+    setMovementFile(null);
+    setMovementTitle("");
+    setMovementDate("");
+    setMovementTime("");
+    setMovementError(null);
+    setMovementConflict(null);
+  }
+
+  function submitLastMovement() {
+    if (!movementProcess) return;
+    if (!movementFile) {
+      setMovementError("Selecione o arquivo da última movimentação.");
+      setMovementConflict(null);
+      return;
+    }
+    const cleanTitle = movementTitle.trim();
+    if (cleanTitle.length < 2) {
+      setMovementError("Informe um título válido para a tarefa.");
+      setMovementConflict(null);
+      return;
+    }
+
+    const dueAtIso = parsePtBrDateTimeToIso(movementDate, movementTime);
+    if (!dueAtIso) {
+      setMovementError("Prazo inválido. Use o formato dd/mm/aaaa e HH:mm.");
+      setMovementConflict(null);
+      return;
+    }
+
+    setMovementError(null);
+    setMovementConflict(null);
+    createLastMovement.mutate({
+      processId: movementProcess.id,
+      title: cleanTitle,
+      dueAtIso,
+      file: movementFile
+    });
+  }
+
+  const movementHelpText =
+    'Envie o documento da última movimentação do processo (ex.: despacho do EPROC), informe o prazo e criaremos uma tarefa no Kanban. Para adicionar uma nova movimentação deste processo, conclua a tarefa anterior e clique em "Excluir".';
+  const blockingTooltip = "Conclua a tarefa anterior para registrar uma nova movimentação.";
 
   return (
     <div className="space-y-4">
@@ -400,7 +577,8 @@ export default function ClientDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Número</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Status do Processo</TableHead>
+                    <TableHead className="w-[320px] text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -408,6 +586,43 @@ export default function ClientDetailPage() {
                     <TableRow key={p.id}>
                       <TableCell>{p.numero}</TableCell>
                       <TableCell>{p.status}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span
+                            title={
+                              processLastMovementStatus.data?.[p.id]?.can_create === false
+                                ? blockingTooltip
+                                : "Registrar última movimentação"
+                            }
+                          >
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                createLastMovement.isPending ||
+                                processLastMovementStatus.data?.[p.id]?.can_create === false
+                              }
+                              onClick={() => openMovementModal(p)}
+                            >
+                              <Upload className="mr-2 h-4 w-4" />
+                              Última Movimentação
+                            </Button>
+                          </span>
+
+                          <button
+                            type="button"
+                            aria-label="Ajuda sobre última movimentação"
+                            title={movementHelpText}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/20 bg-card/40 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          >
+                            <CircleHelp className="h-4 w-4" />
+                          </button>
+                        </div>
+                        {processLastMovementStatus.data?.[p.id]?.can_create === false ? (
+                          <p className="mt-1 text-right text-xs text-amber-500">{blockingTooltip}</p>
+                        ) : null}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -421,6 +636,128 @@ export default function ClientDetailPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      {movementOpen && movementProcess && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-50">
+              <div
+                aria-hidden="true"
+                className="fixed inset-0 bg-black/50 backdrop-blur"
+                onClick={() => {
+                  if (createLastMovement.isPending) return;
+                  closeMovementModal();
+                }}
+              />
+
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Registrar última movimentação"
+                className="fixed left-1/2 top-1/2 w-[95vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border/20 bg-background/95 shadow-xl backdrop-blur"
+              >
+                <div className="flex max-h-[90vh] flex-col">
+                  <header className="border-b border-border/10 bg-background/95 p-4 sm:p-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-semibold">Última Movimentação</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Processo: <span className="font-mono text-xs">{movementProcess.numero}</span>
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        aria-label="Fechar modal"
+                        disabled={createLastMovement.isPending}
+                        onClick={closeMovementModal}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </header>
+
+                  <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+                    <div className="space-y-1">
+                      <Label htmlFor="movement_file">Upload do documento *</Label>
+                      <Input
+                        id="movement_file"
+                        type="file"
+                        accept="application/pdf,image/*"
+                        onChange={(event) => setMovementFile(event.target.files?.[0] ?? null)}
+                      />
+                      {movementFile ? (
+                        <p className="text-xs text-muted-foreground">
+                          {movementFile.name} • {formatFileSize(movementFile.size)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Formato recomendado: PDF (máx. 10MB).</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="movement_title">Título da tarefa *</Label>
+                      <Input
+                        id="movement_title"
+                        value={movementTitle}
+                        onChange={(event) => setMovementTitle(event.target.value)}
+                        placeholder="Ex.: Cumprir despacho — juntar documentos"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="movement_due_date">Prazo (data) *</Label>
+                        <Input
+                          id="movement_due_date"
+                          value={movementDate}
+                          onChange={(event) => setMovementDate(event.target.value)}
+                          placeholder="dd/mm/aaaa"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="movement_due_time">Prazo (hora) *</Label>
+                        <Input
+                          id="movement_due_time"
+                          value={movementTime}
+                          onChange={(event) => setMovementTime(event.target.value)}
+                          placeholder="HH:mm"
+                        />
+                      </div>
+                    </div>
+
+                    {movementError ? <p className="text-sm text-destructive">{movementError}</p> : null}
+                    {movementConflict ? (
+                      <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-sm">
+                        <p className="text-amber-700 dark:text-amber-300">{movementConflict}</p>
+                        <Button asChild variant="outline" size="sm" className="mt-3">
+                          <Link href={`/dashboard/${slug}/tarefas`}>Abrir Kanban</Link>
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <footer className="border-t border-border/10 bg-background/95 p-4 sm:p-6">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        variant="outline"
+                        type="button"
+                        disabled={createLastMovement.isPending}
+                        onClick={closeMovementModal}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="button" disabled={createLastMovement.isPending} onClick={submitLastMovement}>
+                        {createLastMovement.isPending ? "Criando..." : "Criar tarefa"}
+                      </Button>
+                    </div>
+                  </footer>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
@@ -435,4 +772,48 @@ function InfoItem({ label, value }: { label: string; value: string | null }) {
       {value ? <CopyButton value={value} label={`Copiar ${label}`} /> : null}
     </div>
   );
+}
+
+function getNowDateTimeFields() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = String(now.getFullYear());
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  return { date: `${dd}/${mm}/${yyyy}`, time: `${hh}:${min}` };
+}
+
+function parsePtBrDateTimeToIso(dateStr: string, timeStr: string): string | null {
+  const dateMatch = dateStr.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const timeMatch = timeStr.trim().match(/^(\d{2}):(\d{2})$/);
+  if (!dateMatch || !timeMatch) return null;
+
+  const day = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const year = Number(dateMatch[3]);
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date.toISOString();
+}
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }

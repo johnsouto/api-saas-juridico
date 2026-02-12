@@ -18,7 +18,18 @@ import { formatDateTimeBR } from "@/lib/datetime";
 import { useToast } from "@/components/ui/toast";
 
 type Client = { id: string; nome: string };
-type Tarefa = { id: string; titulo: string; descricao?: string | null; status: string; prazo_em?: string | null; client_id?: string | null };
+type Tarefa = {
+  id: string;
+  titulo: string;
+  descricao?: string | null;
+  status: string;
+  prazo_em?: string | null;
+  client_id?: string | null;
+  related_process_id?: string | null;
+  attachment_document_id?: string | null;
+  source?: string | null;
+  attachment_is_temporary?: boolean;
+};
 
 const schema = z.object({
   titulo: z.string().min(2, "Informe o título da tarefa."),
@@ -97,14 +108,40 @@ export default function TarefasPage() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/v1/tarefas/${id}`);
+      const r = await api.delete<{ message: string; temporary_attachment_removed?: boolean }>(`/v1/tarefas/${id}`);
+      return r.data;
     },
-    onSuccess: async () => {
+    onSuccess: async (payload) => {
       await qc.invalidateQueries({ queryKey: ["tarefas"] });
-      toast("Tarefa excluída.", { variant: "success" });
+      const withCleanup = payload?.temporary_attachment_removed;
+      if (withCleanup) {
+        toast("Tarefa excluída. O anexo temporário também foi removido para economizar armazenamento.", { variant: "success" });
+      } else {
+        toast("Tarefa excluída.", { variant: "success" });
+      }
     },
     onError: () => {
       toast("Não foi possível excluir a tarefa. Tente novamente.", { variant: "error" });
+    }
+  });
+  const downloadAttachment = useMutation({
+    mutationFn: async ({ documentId, title }: { documentId: string; title: string }) => {
+      const r = await api.get(`/v1/documents/${documentId}/content`, {
+        params: { disposition: "attachment" },
+        responseType: "blob"
+      });
+      const blob = r.data as Blob;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${title.trim().replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 60) || "movimentacao"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
+    onError: () => {
+      toast("Não foi possível baixar o anexo da tarefa.", { variant: "error" });
     }
   });
 
@@ -228,6 +265,26 @@ export default function TarefasPage() {
                         ) : null}
                         {t.descricao ? <div className="text-xs text-muted-foreground">{t.descricao}</div> : null}
                         {t.prazo_em ? <div className="text-xs text-muted-foreground">Prazo: {formatDateTimeBR(t.prazo_em)}</div> : null}
+                        {t.attachment_document_id ? (
+                          <div className="rounded-md border border-border/20 bg-card/30 p-2 text-xs">
+                            <div className="font-medium text-muted-foreground">Anexo</div>
+                            <Button
+                              className="mt-2 w-full"
+                              size="sm"
+                              variant="outline"
+                              type="button"
+                              disabled={downloadAttachment.isPending}
+                              onClick={() =>
+                                downloadAttachment.mutate({
+                                  documentId: t.attachment_document_id as string,
+                                  title: t.titulo
+                                })
+                              }
+                            >
+                              {downloadAttachment.isPending ? "Baixando..." : "Baixar anexo"}
+                            </Button>
+                          </div>
+                        ) : null}
 
                         <div className="flex flex-wrap gap-2">
                           <Button
