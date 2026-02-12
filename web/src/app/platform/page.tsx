@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { PlatformNav } from "@/components/platform/PlatformNav";
 
 type PlatformOverviewTopTenant = {
   tenant_id: string;
@@ -442,6 +443,9 @@ export default function PlatformAdminPage() {
             </Button>
           </div>
         </CardHeader>
+        <CardContent className="pt-0">
+          <PlatformNav />
+        </CardContent>
       </Card>
 
       <Card>
