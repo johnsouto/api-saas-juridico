@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from typing import Optional
 
 from sqlalchemy import Boolean, Enum, String
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDBaseMixin

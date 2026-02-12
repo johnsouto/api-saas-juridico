@@ -19,6 +19,9 @@ web/.env
 node_modules/
 .next/
 out/
+web/artifacts/
+web/test-results/
+web/playwright-report/
 
 ## IDE
 .vscode/
@@ -31,6 +34,9 @@ Desktop.ini
 ## Local uploads / storage
 uploads/
 app/uploads/
+
+## QA artifacts
+artifacts/
 
 ## Legacy (not used in monorepo)
 /app/

@@ -23,12 +23,14 @@ async def test_rate_limit_blocks_after_threshold(monkeypatch):
     monkeypatch.setattr("app.services.auth_security_service.settings.AUTH_RL_ENABLED", True)
     monkeypatch.setattr("app.services.auth_security_service.settings.AUTH_RL_WINDOW_SEC", 60)
     monkeypatch.setattr("app.services.auth_security_service.settings.AUTH_RL_MAX", 2)
+    monkeypatch.setattr("app.services.auth_security_service.settings.ERROR_SCHEMA_ENFORCE_429_413", True)
 
     svc.enforce_rate_limit(request=req, action="login", principal="user@example.com")
     svc.enforce_rate_limit(request=req, action="login", principal="user@example.com")
     with pytest.raises(HTTPException) as exc:
         svc.enforce_rate_limit(request=req, action="login", principal="user@example.com")
     assert exc.value.status_code == 429
+    assert exc.value.detail == "Muitas tentativas. Tente novamente em instantes."
 
 
 @pytest.mark.asyncio
@@ -47,4 +49,4 @@ async def test_lockout_after_failed_attempts(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         svc.enforce_login_lockout(request=req, email=email)
     assert exc.value.status_code == 429
-
+    assert exc.value.detail == "Muitas tentativas. Tente novamente em instantes."

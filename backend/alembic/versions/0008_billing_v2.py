@@ -416,15 +416,15 @@ def upgrade() -> None:
         SELECT DISTINCT ON (s.tenant_id)
           s.id, s.criado_em, s.atualizado_em,
           s.tenant_id,
-          COALESCE(p.code, 'FREE') AS plan_code,
+          COALESCE(p.code, 'FREE'::plan_code) AS plan_code,
           CASE
-            WHEN COALESCE(p.code, 'FREE') = 'FREE' THEN 'free'
-            WHEN s.status = 'trialing' THEN 'active'
-            ELSE s.status
+            WHEN COALESCE(p.code, 'FREE'::plan_code) = 'FREE'::plan_code THEN 'free'::subscription_status
+            WHEN s.status::text = 'trialing' THEN 'active'::subscription_status
+            ELSE s.status::text::subscription_status
           END AS status,
           CASE
-            WHEN s.stripe_id IS NOT NULL THEN 'STRIPE'
-            ELSE 'FAKE'
+            WHEN s.stripe_id IS NOT NULL THEN 'STRIPE'::billing_provider
+            ELSE 'FAKE'::billing_provider
           END AS provider,
           s.criado_em AS current_period_start,
           s.validade AS current_period_end,

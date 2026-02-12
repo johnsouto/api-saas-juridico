@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TaskPieChart } from "@/components/dashboard/TaskPieChart";
 
 type Proc = { id: string; status: "ativo" | "inativo" | "outros"; criado_em: string };
 type BillingStatus = {
@@ -17,6 +18,7 @@ type BillingStatus = {
   limits?: { max_users: number; max_storage_mb: number };
 };
 type DocumentsUsage = { used_bytes: number };
+type KanbanSummary = { due_today: number; pendente: number; em_andamento: number; concluido: number };
 
 export default function DashboardHome() {
   const params = useParams<{ slug: string }>();
@@ -48,20 +50,22 @@ export default function DashboardHome() {
   const stats = useQuery({
     queryKey: ["stats"],
     queryFn: async () => {
-      const [clients, processes, honorarios] = await Promise.all([
+      const [clients, processes] = await Promise.all([
         api.get<any[]>("/v1/clients").then((r) => r.data),
-        api.get<Proc[]>("/v1/processes").then((r) => r.data),
-        api.get<any[]>("/v1/honorarios").then((r) => r.data)
+        api.get<Proc[]>("/v1/processes").then((r) => r.data)
       ]);
-      const honorariosAbertos = honorarios.filter((h: any) => String(h.status).toLowerCase() === "aberto").length;
       return {
         clients: clients.length,
         processes: processes.length,
-        processesData: processes,
-        honorarios: honorarios.length,
-        honorariosAbertos
+        processesData: processes
       };
     }
+  });
+
+  const kanban = useQuery({
+    queryKey: ["kanban-summary"],
+    queryFn: async () => (await api.get<KanbanSummary>("/v1/kanban/summary")).data,
+    retry: false
   });
 
   const exportXlsx = useMutation({
@@ -215,19 +219,66 @@ export default function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle className="text-sm">Honorários (abertos)</CardTitle>
+            <CardTitle className="text-sm">Tarefas</CardTitle>
+            <CardDescription className="text-xs">Resumo do Kanban.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats.data?.honorariosAbertos ?? "—"}</div>
-            <div className="text-xs text-muted-foreground">Total: {stats.data?.honorarios ?? "—"}</div>
-            <Link
-              className="mt-2 inline-block text-sm text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
-              href={`/dashboard/${slug}/honorarios`}
-            >
-              Abrir honorários
-            </Link>
+          <CardContent className="flex flex-1 flex-col">
+            <div className="flex flex-1 flex-col gap-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center justify-center md:justify-start">
+                  <TaskPieChart
+                    dueToday={kanban.data?.due_today ?? 0}
+                    pendente={kanban.data?.pendente ?? 0}
+                    emAndamento={kanban.data?.em_andamento ?? 0}
+                    concluido={kanban.data?.concluido ?? 0}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">Prazo expira hoje</span>
+                    <div className="min-w-[72px] rounded-lg bg-red-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.due_today : "—"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">Pendente</span>
+                    <div className="min-w-[72px] rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.pendente : "—"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">Em andamento</span>
+                    <div className="min-w-[72px] rounded-lg bg-yellow-400 px-3 py-2 text-center text-sm font-semibold tabular-nums text-zinc-950 shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.em_andamento : "—"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span
+                      className={[
+                        "text-xs",
+                        (kanban.data?.concluido ?? 0) > 0 ? "font-medium text-emerald-600" : "text-muted-foreground"
+                      ].join(" ")}
+                      title="Concluídas"
+                    >
+                      Sem pendências
+                      <span className="ml-1 text-[10px] font-normal text-muted-foreground">(concluídas)</span>
+                    </span>
+                    <div className="min-w-[72px] rounded-lg bg-green-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.concluido : "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Button asChild className="w-full" size="sm" variant="outline">
+                <Link href={`/dashboard/${slug}/tarefas`}>Kanban</Link>
+              </Button>
+
+              {kanban.isError ? <p className="text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
+            </div>
           </CardContent>
         </Card>
 
