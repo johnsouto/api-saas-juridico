@@ -78,7 +78,7 @@ async def update_my_profile(
         if cep is not None:
             digits = only_digits(cep)
             if len(digits) != 8:
-                raise BadRequestError("CEP inválido. Use 8 dígitos (ex: 01001000).")
+                raise BadRequestError("CEP incompleto. Informe 8 dígitos.")
             cep = digits
         tenant.address_zip = cep
 
@@ -87,4 +87,3 @@ async def update_my_profile(
     await db.refresh(user)
     await db.refresh(tenant)
     return ProfileOut(user=user, tenant=tenant)
-
