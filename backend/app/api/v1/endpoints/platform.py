@@ -14,19 +14,26 @@ from app.models.audit_log import AuditLog
 from app.models.billing_event import BillingEvent
 from app.models.client import Client
 from app.models.document import Document
+from app.models.enums import BillingProvider, PlanCode, SubscriptionStatus, UserRole
 from app.models.honorario import Honorario
 from app.models.password_reset import PasswordReset
 from app.models.parceria import Parceria
 from app.models.plan import Plan
+from app.models.platform_audit_log import PlatformAuditLog
 from app.models.process import Process
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.user_invitation import UserInvitation
-from app.models.enums import UserRole
 from app.schemas.platform import (
+    PlatformAuditLogOut,
     PlatformBillingEventOut,
+    PlatformOverviewOut,
+    PlatformOverviewRecentTenant,
+    PlatformOverviewTopTenant,
+    PlatformPingOut,
     PlatformResendInviteOut,
+    PlatformTenantStorageOut,
     PlatformTenantCreate,
     PlatformTenantCreatedOut,
     PlatformTenantDeletedOut,
@@ -34,6 +41,8 @@ from app.schemas.platform import (
     PlatformTenantLimitsOut,
     PlatformTenantLimitsUpdate,
     PlatformTenantListItem,
+    PlatformTenantSubscriptionOut,
+    PlatformTenantSubscriptionUpdate,
     PlatformTenantStatusOut,
     PlatformTrialTenantCreate,
 )
@@ -57,9 +66,66 @@ _platform_service = PlatformService(email_service=EmailService())
 logger = logging.getLogger(__name__)
 
 
+def _normalize_subscription_status(raw: str | None) -> SubscriptionStatus | None:
+    if not raw:
+        return None
+    value = raw.strip().lower()
+    mapping = {
+        "free": SubscriptionStatus.free,
+        "active": SubscriptionStatus.active,
+        "past_due": SubscriptionStatus.past_due,
+        "expired": SubscriptionStatus.expired,
+        "canceled": SubscriptionStatus.canceled,
+        "trialing": SubscriptionStatus.trialing,
+    }
+    return mapping.get(value)
+
+
+def _matches_plan_filter(sub: Subscription | None, plan_filter: str | None) -> bool:
+    if not plan_filter:
+        return True
+    value = plan_filter.strip().upper()
+    code = sub.plan_code if sub else PlanCode.FREE
+    if value == "PLUS":
+        return code in {PlanCode.PLUS_ANNUAL_PIX, PlanCode.PLUS_MONTHLY_CARD}
+    if value == "FREE":
+        return code == PlanCode.FREE
+    return str(code.value if hasattr(code, "value") else code) == value
+
+
+def _storage_limit_bytes(sub: Subscription | None, plan: Plan | None) -> int | None:
+    limit_mb: int | None = None
+    if sub and sub.max_storage_mb_override is not None:
+        limit_mb = sub.max_storage_mb_override
+    elif plan:
+        limit_mb = plan.max_storage_mb
+    return limit_mb * 1024 * 1024 if limit_mb is not None else None
+
+
+async def _log_platform_action(
+    db: AsyncSession,
+    *,
+    action: str,
+    tenant_id: uuid.UUID | None = None,
+    payload: dict | None = None,
+) -> None:
+    db.add(PlatformAuditLog(action=action, tenant_id=tenant_id, payload=payload or {}))
+
+
+@router.get("/ping", response_model=PlatformPingOut)
+async def ping_platform() -> PlatformPingOut:
+    return PlatformPingOut(ok=True, message="Chave válida")
+
+
 @router.get("/tenants", response_model=list[PlatformTenantListItem])
 async def list_tenants(
     db: Annotated[AsyncSession, Depends(get_db)],
+    search: str | None = None,
+    plan: str | None = None,
+    status: str | None = None,
+    storage_gt: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
     q: str | None = None,
     documento: str | None = None,
     admin_email: str | None = None,
@@ -91,8 +157,9 @@ async def list_tenants(
                 )
             )
 
-    if q:
-        qv = q.strip()
+    search_value = search if search is not None else q
+    if search_value:
+        qv = search_value.strip()
         if qv:
             pattern = f"%{qv}%"
             stmt = stmt.where(
@@ -147,6 +214,20 @@ async def list_tenants(
     for tenant_id, total, active in (await db.execute(users_stmt)).all():
         users_counts[tenant_id] = (int(total), int(active))
 
+    clients_stmt = (
+        select(Client.tenant_id, func.count(Client.id).label("clients_total"))
+        .where(Client.tenant_id.in_(tenant_ids))
+        .group_by(Client.tenant_id)
+    )
+    clients_counts: dict[uuid.UUID, int] = {tid: int(total) for tid, total in (await db.execute(clients_stmt)).all()}
+
+    processes_stmt = (
+        select(Process.tenant_id, func.count(Process.id).label("processes_total"))
+        .where(Process.tenant_id.in_(tenant_ids))
+        .group_by(Process.tenant_id)
+    )
+    processes_counts: dict[uuid.UUID, int] = {tid: int(total) for tid, total in (await db.execute(processes_stmt)).all()}
+
     # Storage usage (sum of documents)
     storage_stmt = (
         select(Document.tenant_id, func.coalesce(func.sum(Document.size_bytes), 0).label("storage_used"))
@@ -157,10 +238,14 @@ async def list_tenants(
 
     items: list[PlatformTenantListItem] = []
     for t in tenants:
-        sub, plan = sub_by_tenant.get(t.id, (None, None))  # type: ignore[assignment]
+        sub, plan_obj = sub_by_tenant.get(t.id, (None, None))  # type: ignore[assignment]
         admin = admin_by_tenant.get(t.id)
         total_users, active_users = users_counts.get(t.id, (0, 0))
         storage_used = storage_by_tenant.get(t.id, 0)
+        clients_total = clients_counts.get(t.id, 0)
+        processes_total = processes_counts.get(t.id, 0)
+        storage_limit = _storage_limit_bytes(sub, plan_obj)
+        storage_percent = round((storage_used / storage_limit) * 100, 2) if storage_limit and storage_limit > 0 else None
 
         items.append(
             PlatformTenantListItem(
@@ -177,9 +262,13 @@ async def list_tenants(
                 admin_is_active=admin.is_active if admin else None,
                 users_total=total_users,
                 users_active=active_users,
+                clients_total=clients_total,
+                processes_total=processes_total,
                 storage_used_bytes=storage_used,
+                storage_limit_bytes=storage_limit,
+                storage_percent_used=storage_percent,
                 plan_code=sub.plan_code if sub else None,
-                plan_nome=plan.nome if plan else None,
+                plan_nome=plan_obj.nome if plan_obj else None,
                 subscription_status=sub.status if sub else None,
                 current_period_end=sub.current_period_end if sub else None,
                 grace_period_end=sub.grace_period_end if sub else None,
@@ -188,7 +277,96 @@ async def list_tenants(
                 max_storage_mb_override=sub.max_storage_mb_override if sub else None,
             )
         )
-    return items
+
+    if plan:
+        items = [item for item in items if _matches_plan_filter(sub_by_tenant.get(item.id, (None, None))[0], plan)]
+
+    normalized_status = _normalize_subscription_status(status)
+    if status and not normalized_status:
+        return []
+    if normalized_status:
+        items = [item for item in items if item.subscription_status == normalized_status]
+
+    if storage_gt is not None:
+        items = [item for item in items if (item.storage_percent_used or 0) >= storage_gt]
+
+    safe_offset = max(0, int(offset))
+    safe_limit = max(1, min(int(limit), 200))
+    return items[safe_offset : safe_offset + safe_limit]
+
+
+@router.get("/metrics/overview", response_model=PlatformOverviewOut)
+async def platform_overview(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    tenants_total = int((await db.execute(select(func.count(Tenant.id)))).scalar_one() or 0)
+    users_total = int((await db.execute(select(func.count(User.id)))).scalar_one() or 0)
+
+    sub_rows = (
+        await db.execute(select(Subscription.tenant_id, Subscription.plan_code))
+    ).all()
+    sub_by_tenant = {tenant_id: plan_code for tenant_id, plan_code in sub_rows}
+
+    all_tenants = (await db.execute(select(Tenant.id, Tenant.nome, Tenant.slug, Tenant.criado_em))).all()
+
+    tenants_free = 0
+    tenants_plus = 0
+    for tenant_id, *_ in all_tenants:
+        plan_code = sub_by_tenant.get(tenant_id, PlanCode.FREE)
+        if plan_code in {PlanCode.PLUS_MONTHLY_CARD, PlanCode.PLUS_ANNUAL_PIX}:
+            tenants_plus += 1
+        else:
+            tenants_free += 1
+
+    storage_used_bytes_total = int((await db.execute(select(func.coalesce(func.sum(Document.size_bytes), 0)))).scalar_one() or 0)
+
+    storage_rows = (
+        await db.execute(
+            select(
+                Tenant.id,
+                Tenant.nome,
+                Tenant.slug,
+                func.coalesce(func.sum(Document.size_bytes), 0).label("storage_used"),
+            )
+            .join(Document, Document.tenant_id == Tenant.id, isouter=True)
+            .group_by(Tenant.id)
+            .order_by(func.coalesce(func.sum(Document.size_bytes), 0).desc())
+            .limit(5)
+        )
+    ).all()
+
+    clients_rows = (await db.execute(select(Client.tenant_id, func.count(Client.id)).group_by(Client.tenant_id))).all()
+    processes_rows = (await db.execute(select(Process.tenant_id, func.count(Process.id)).group_by(Process.tenant_id))).all()
+
+    clients_map = {tenant_id: int(total) for tenant_id, total in clients_rows}
+    processes_map = {tenant_id: int(total) for tenant_id, total in processes_rows}
+
+    volume_candidates: list[PlatformOverviewTopTenant] = []
+    for tenant_id, nome, slug, _ in all_tenants:
+        volume = clients_map.get(tenant_id, 0) + processes_map.get(tenant_id, 0)
+        volume_candidates.append(
+            PlatformOverviewTopTenant(tenant_id=tenant_id, tenant_nome=nome, tenant_slug=slug, value=volume)
+        )
+    volume_candidates.sort(key=lambda item: item.value, reverse=True)
+
+    recent = sorted(all_tenants, key=lambda row: row[3], reverse=True)[:10]
+
+    return PlatformOverviewOut(
+        tenants_total=tenants_total,
+        users_total=users_total,
+        tenants_free=tenants_free,
+        tenants_plus=tenants_plus,
+        storage_used_bytes_total=storage_used_bytes_total,
+        top_storage_tenants=[
+            PlatformOverviewTopTenant(tenant_id=tenant_id, tenant_nome=nome, tenant_slug=slug, value=int(storage_used))
+            for tenant_id, nome, slug, storage_used in storage_rows
+        ],
+        top_volume_tenants=volume_candidates[:5],
+        recent_tenants=[
+            PlatformOverviewRecentTenant(tenant_id=tenant_id, tenant_nome=nome, tenant_slug=slug, created_at=created_at)
+            for tenant_id, nome, slug, created_at in recent
+        ],
+    )
 
 
 @router.patch("/tenants/{tenant_id}/limits", response_model=PlatformTenantLimitsOut)
@@ -209,10 +387,15 @@ async def update_tenant_limits(
     sub = (await db.execute(select(Subscription).where(Subscription.tenant_id == tenant_id))).scalar_one_or_none()
     if not sub:
         # Keep defaults consistent with BillingService.
-        sub = Subscription(tenant_id=tenant_id)
+        sub = Subscription(tenant_id=tenant_id, plan_code=PlanCode.FREE, status=SubscriptionStatus.free, provider=BillingProvider.FAKE)
         db.add(sub)
         await db.commit()
         await db.refresh(sub)
+
+    old_limits = {
+        "max_clients_override": sub.max_clients_override,
+        "max_storage_mb_override": sub.max_storage_mb_override,
+    }
 
     data = payload.model_dump(exclude_unset=True)
     if "max_clients_override" in data:
@@ -221,6 +404,18 @@ async def update_tenant_limits(
         sub.max_storage_mb_override = data["max_storage_mb_override"]
 
     db.add(sub)
+    await _log_platform_action(
+        db,
+        action="limits_updated",
+        tenant_id=tenant_id,
+        payload={
+            "old": old_limits,
+            "new": {
+                "max_clients_override": sub.max_clients_override,
+                "max_storage_mb_override": sub.max_storage_mb_override,
+            },
+        },
+    )
     await db.commit()
     await db.refresh(sub)
 
@@ -254,6 +449,18 @@ async def tenant_detail(
     ).scalars().all()
 
     sub = (await db.execute(select(Subscription).where(Subscription.tenant_id == tenant_id))).scalar_one_or_none()
+    plan = None
+    if sub:
+        plan = (await db.execute(select(Plan).where(Plan.code == sub.plan_code))).scalar_one_or_none()
+
+    users_total = int((await db.execute(select(func.count(User.id)).where(User.tenant_id == tenant_id))).scalar_one() or 0)
+    clients_total = int((await db.execute(select(func.count(Client.id)).where(Client.tenant_id == tenant_id))).scalar_one() or 0)
+    processes_total = int((await db.execute(select(func.count(Process.id)).where(Process.tenant_id == tenant_id))).scalar_one() or 0)
+    storage_used = int(
+        (await db.execute(select(func.coalesce(func.sum(Document.size_bytes), 0)).where(Document.tenant_id == tenant_id))).scalar_one()
+        or 0
+    )
+    storage_limit = _storage_limit_bytes(sub, plan)
 
     events = (
         await db.execute(
@@ -269,7 +476,108 @@ async def tenant_detail(
         admin_users=[UserOut.model_validate(u) for u in admins],
         subscription=sub,  # parsed via from_attributes
         billing_events=[PlatformBillingEventOut.model_validate(e) for e in events],
+        users_total=users_total,
+        clients_total=clients_total,
+        processes_total=processes_total,
+        storage_used_bytes=storage_used,
+        storage_limit_bytes=storage_limit,
     )
+
+
+@router.patch("/tenants/{tenant_id}/subscription", response_model=PlatformTenantSubscriptionOut)
+async def update_tenant_subscription(
+    tenant_id: uuid.UUID,
+    payload: PlatformTenantSubscriptionUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise NotFoundError("Tenant não encontrado")
+
+    sub = (await db.execute(select(Subscription).where(Subscription.tenant_id == tenant_id))).scalar_one_or_none()
+    if not sub:
+        sub = Subscription(tenant_id=tenant_id, plan_code=PlanCode.FREE, status=SubscriptionStatus.free, provider=BillingProvider.FAKE)
+
+    old_data = {
+        "plan_code": str(sub.plan_code.value if hasattr(sub.plan_code, "value") else sub.plan_code),
+        "status": str(sub.status.value if hasattr(sub.status, "value") else sub.status),
+    }
+
+    changed = False
+    if payload.plan_code is not None:
+        sub.plan_code = payload.plan_code
+        changed = True
+    if payload.status is not None:
+        sub.status = payload.status
+        changed = True
+
+    if not changed:
+        raise BadRequestError("Informe pelo menos um campo para atualizar.")
+
+    db.add(sub)
+    await _log_platform_action(
+        db,
+        action="subscription_updated",
+        tenant_id=tenant_id,
+        payload={
+            "old": old_data,
+            "new": {
+                "plan_code": str(sub.plan_code.value if hasattr(sub.plan_code, "value") else sub.plan_code),
+                "status": str(sub.status.value if hasattr(sub.status, "value") else sub.status),
+            },
+        },
+    )
+    await db.commit()
+    await db.refresh(sub)
+
+    return PlatformTenantSubscriptionOut(
+        message="Assinatura atualizada",
+        tenant_id=tenant_id,
+        plan_code=sub.plan_code,
+        status=sub.status,
+    )
+
+
+@router.post("/tenants/{tenant_id}/recalculate-storage", response_model=PlatformTenantStorageOut)
+async def recalculate_tenant_storage(
+    tenant_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise NotFoundError("Tenant não encontrado")
+
+    storage_used = int(
+        (await db.execute(select(func.coalesce(func.sum(Document.size_bytes), 0)).where(Document.tenant_id == tenant_id))).scalar_one()
+        or 0
+    )
+
+    await _log_platform_action(
+        db,
+        action="storage_recalculated",
+        tenant_id=tenant_id,
+        payload={"storage_used_bytes": storage_used},
+    )
+    await db.commit()
+
+    return PlatformTenantStorageOut(
+        message="Consumo recalculado com sucesso",
+        tenant_id=tenant_id,
+        storage_used_bytes=storage_used,
+    )
+
+
+@router.get("/audit", response_model=list[PlatformAuditLogOut])
+async def list_platform_audit_logs(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    tenant_id: uuid.UUID | None = None,
+    limit: int = 50,
+):
+    safe_limit = max(1, min(limit, 200))
+    stmt = select(PlatformAuditLog).order_by(PlatformAuditLog.created_at.desc()).limit(safe_limit)
+    if tenant_id is not None:
+        stmt = stmt.where(PlatformAuditLog.tenant_id == tenant_id)
+    return list((await db.execute(stmt)).scalars().all())
 
 
 @router.post("/billing/maintenance")
@@ -396,6 +704,7 @@ async def deactivate_tenant(
     if tenant.is_active:
         tenant.is_active = False
         db.add(tenant)
+        await _log_platform_action(db, action="tenant_deactivated", tenant_id=tenant.id, payload={"is_active": False})
         await db.commit()
 
     return PlatformTenantStatusOut(message="Tenant desativado", tenant_id=tenant.id, is_active=tenant.is_active)
@@ -413,6 +722,7 @@ async def activate_tenant(
     if not tenant.is_active:
         tenant.is_active = True
         db.add(tenant)
+        await _log_platform_action(db, action="tenant_activated", tenant_id=tenant.id, payload={"is_active": True})
         await db.commit()
 
     return PlatformTenantStatusOut(message="Tenant ativado", tenant_id=tenant.id, is_active=tenant.is_active)

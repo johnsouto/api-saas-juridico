@@ -9,6 +9,7 @@ from app.models.honorario import Honorario
 from app.models.parceria import Parceria
 from app.models.password_reset import PasswordReset
 from app.models.plan import Plan
+from app.models.platform_audit_log import PlatformAuditLog
 from app.models.process import Process
 from app.models.process_movement import ProcessMovement
 from app.models.subscription import Subscription
@@ -32,6 +33,7 @@ __all__ = [
     "PasswordReset",
     "Plan",
     "PlanCode",
+    "PlatformAuditLog",
     "Process",
     "ProcessMovement",
     "Subscription",

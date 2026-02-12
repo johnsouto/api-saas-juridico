@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import { getPlatformAdminKey } from "@/lib/platformAuth";
+import { clearPlatformAdminSession, getPlatformAdminKey, touchPlatformAdminActivity } from "@/lib/platformAuth";
 import { isIdleExpired } from "@/lib/session";
 
 const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
@@ -27,14 +27,35 @@ function emitAuthFailed() {
   window.dispatchEvent(new Event("authFailed"));
 }
 
+function emitPlatformAuthFailed() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("platformAuthFailed"));
+}
+
+function isPlatformEndpoint(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith("/v1/platform") || url.startsWith("v1/platform");
+}
+
 api.interceptors.request.use((config) => {
   // Platform (super-admin) key used only by /v1/platform/* endpoints.
-  const platformKey = getPlatformAdminKey();
   const url = config.url ?? "";
-  const isPlatform = url.startsWith("/v1/platform") || url.startsWith("v1/platform");
-  if (platformKey && isPlatform) {
+  const isPlatform = isPlatformEndpoint(url);
+  if (isPlatform) {
+    const explicitHeader =
+      (config.headers as any)?.["x-platform-admin-key"] ?? (config.headers as any)?.["X-Platform-Admin-Key"];
+
+    if (explicitHeader) return config;
+
+    const platformKey = getPlatformAdminKey();
+    if (!platformKey) {
+      emitPlatformAuthFailed();
+      return Promise.reject(new Error("Sessao da plataforma expirada. Faca login novamente."));
+    }
+
     config.headers = config.headers ?? {};
     (config.headers as any)["x-platform-admin-key"] = platformKey;
+    touchPlatformAdminActivity();
   }
   return config;
 });
@@ -62,6 +83,12 @@ api.interceptors.response.use(
 
     const status = error.response?.status;
     const url = original.url as string | undefined;
+
+    if (status === 401 && isPlatformEndpoint(url)) {
+      clearPlatformAdminSession();
+      emitPlatformAuthFailed();
+      throw error;
+    }
 
     if (status === 401 && !isAuthEndpoint(url)) {
       try {

@@ -69,7 +69,11 @@ class PlatformTenantListItem(APIModel):
 
     users_total: int = 0
     users_active: int = 0
+    clients_total: int = 0
+    processes_total: int = 0
     storage_used_bytes: int = 0
+    storage_limit_bytes: int | None = None
+    storage_percent_used: float | None = None
 
     plan_code: PlanCode | None = None
     plan_nome: str | None = None
@@ -99,6 +103,54 @@ class PlatformTenantLimitsOut(APIModel):
     tenant_id: uuid.UUID
     max_clients_override: int | None = None
     max_storage_mb_override: int | None = None
+
+
+class PlatformPingOut(APIModel):
+    ok: bool = True
+    message: str = "Chave válida"
+
+
+class PlatformOverviewTopTenant(APIModel):
+    tenant_id: uuid.UUID
+    tenant_nome: str
+    tenant_slug: str
+    value: int
+
+
+class PlatformOverviewRecentTenant(APIModel):
+    tenant_id: uuid.UUID
+    tenant_nome: str
+    tenant_slug: str
+    created_at: datetime
+
+
+class PlatformOverviewOut(APIModel):
+    tenants_total: int = 0
+    users_total: int = 0
+    tenants_free: int = 0
+    tenants_plus: int = 0
+    storage_used_bytes_total: int = 0
+    top_storage_tenants: list[PlatformOverviewTopTenant] = []
+    top_volume_tenants: list[PlatformOverviewTopTenant] = []
+    recent_tenants: list[PlatformOverviewRecentTenant] = []
+
+
+class PlatformTenantSubscriptionUpdate(APIModel):
+    plan_code: PlanCode | None = None
+    status: SubscriptionStatus | None = None
+
+
+class PlatformTenantSubscriptionOut(APIModel):
+    message: str
+    tenant_id: uuid.UUID
+    plan_code: PlanCode
+    status: SubscriptionStatus
+
+
+class PlatformTenantStorageOut(APIModel):
+    message: str
+    tenant_id: uuid.UUID
+    storage_used_bytes: int
 
 
 class PlatformResendInviteOut(APIModel):
@@ -132,3 +184,16 @@ class PlatformTenantDetailOut(APIModel):
     admin_users: list[UserOut]
     subscription: SubscriptionOut | None = None
     billing_events: list[PlatformBillingEventOut] = []
+    users_total: int = 0
+    clients_total: int = 0
+    processes_total: int = 0
+    storage_used_bytes: int = 0
+    storage_limit_bytes: int | None = None
+
+
+class PlatformAuditLogOut(APIModel):
+    id: uuid.UUID
+    action: str
+    tenant_id: uuid.UUID | None = None
+    payload: dict[str, Any] | None = None
+    created_at: datetime
