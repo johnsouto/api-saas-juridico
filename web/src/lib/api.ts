@@ -37,15 +37,21 @@ function isPlatformEndpoint(url: string | undefined): boolean {
   return url.startsWith("/v1/platform") || url.startsWith("v1/platform");
 }
 
+function hasExplicitPlatformHeader(headers: unknown): boolean {
+  if (!headers) return false;
+  const maybeHeaders = headers as any;
+  if (typeof maybeHeaders.get === "function") {
+    return Boolean(maybeHeaders.get("x-platform-admin-key") || maybeHeaders.get("X-Platform-Admin-Key"));
+  }
+  return Boolean(maybeHeaders["x-platform-admin-key"] ?? maybeHeaders["X-Platform-Admin-Key"]);
+}
+
 api.interceptors.request.use((config) => {
   // Platform (super-admin) key used only by /v1/platform/* endpoints.
   const url = config.url ?? "";
   const isPlatform = isPlatformEndpoint(url);
   if (isPlatform) {
-    const explicitHeader =
-      (config.headers as any)?.["x-platform-admin-key"] ?? (config.headers as any)?.["X-Platform-Admin-Key"];
-
-    if (explicitHeader) return config;
+    if (hasExplicitPlatformHeader(config.headers)) return config;
 
     const platformKey = getPlatformAdminKey();
     if (!platformKey) {
