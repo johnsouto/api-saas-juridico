@@ -5,7 +5,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
-from sqlalchemy import case, delete, func, or_, select, update
+from sqlalchemy import String, case, cast, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
@@ -81,11 +81,26 @@ def _normalize_subscription_status(raw: str | None) -> SubscriptionStatus | None
     return mapping.get(value)
 
 
-def _matches_plan_filter(sub: Subscription | None, plan_filter: str | None) -> bool:
+def _normalize_plan_code(raw: str | PlanCode | None) -> PlanCode | None:
+    if raw is None:
+        return None
+    if isinstance(raw, PlanCode):
+        return raw
+
+    value = str(raw).strip().upper()
+    mapping = {
+        "FREE": PlanCode.FREE,
+        "PLUS_MONTHLY_CARD": PlanCode.PLUS_MONTHLY_CARD,
+        "PLUS_ANNUAL_PIX": PlanCode.PLUS_ANNUAL_PIX,
+    }
+    return mapping.get(value)
+
+
+def _matches_plan_filter(plan_code: PlanCode | None, plan_filter: str | None) -> bool:
     if not plan_filter:
         return True
     value = plan_filter.strip().upper()
-    code = sub.plan_code if sub else PlanCode.FREE
+    code = plan_code or PlanCode.FREE
     if value == "PLUS":
         return code in {PlanCode.PLUS_ANNUAL_PIX, PlanCode.PLUS_MONTHLY_CARD}
     if value == "FREE":
@@ -99,6 +114,11 @@ def _storage_limit_bytes(sub: Subscription | None, plan: Plan | None) -> int | N
         limit_mb = sub.max_storage_mb_override
     elif plan:
         limit_mb = plan.max_storage_mb
+    return limit_mb * 1024 * 1024 if limit_mb is not None else None
+
+
+def _storage_limit_bytes_from_values(override_mb: int | None, plan_mb: int | None) -> int | None:
+    limit_mb = override_mb if override_mb is not None else plan_mb
     return limit_mb * 1024 * 1024 if limit_mb is not None else None
 
 
@@ -180,13 +200,34 @@ async def list_tenants(
 
     # Subscription + plan per tenant (1 row per tenant)
     sub_stmt = (
-        select(Subscription, Plan)
-        .join(Plan, Plan.code == Subscription.plan_code)
+        select(
+            Subscription.tenant_id,
+            cast(Subscription.plan_code, String).label("plan_code_raw"),
+            cast(Subscription.status, String).label("status_raw"),
+            Subscription.current_period_end,
+            Subscription.grace_period_end,
+            cast(Subscription.provider, String).label("provider_raw"),
+            Subscription.max_clients_override,
+            Subscription.max_storage_mb_override,
+            Plan.nome.label("plan_nome"),
+            Plan.max_storage_mb.label("plan_max_storage_mb"),
+        )
+        .join(Plan, Plan.code == Subscription.plan_code, isouter=True)
         .where(Subscription.tenant_id.in_(tenant_ids))
     )
-    sub_by_tenant: dict[uuid.UUID, tuple[Subscription, Plan]] = {}
-    for sub, plan in (await db.execute(sub_stmt)).all():
-        sub_by_tenant[sub.tenant_id] = (sub, plan)
+    sub_by_tenant: dict[uuid.UUID, dict] = {}
+    for row in (await db.execute(sub_stmt)).all():
+        sub_by_tenant[row.tenant_id] = {
+            "plan_code": _normalize_plan_code(row.plan_code_raw),
+            "status": _normalize_subscription_status(row.status_raw),
+            "current_period_end": row.current_period_end,
+            "grace_period_end": row.grace_period_end,
+            "provider": row.provider_raw,
+            "max_clients_override": row.max_clients_override,
+            "max_storage_mb_override": row.max_storage_mb_override,
+            "plan_nome": row.plan_nome,
+            "plan_max_storage_mb": row.plan_max_storage_mb,
+        }
 
     # Oldest admin per tenant (default contact)
     admin_stmt = (
@@ -238,13 +279,16 @@ async def list_tenants(
 
     items: list[PlatformTenantListItem] = []
     for t in tenants:
-        sub, plan_obj = sub_by_tenant.get(t.id, (None, None))  # type: ignore[assignment]
+        sub_info = sub_by_tenant.get(t.id, {})
         admin = admin_by_tenant.get(t.id)
         total_users, active_users = users_counts.get(t.id, (0, 0))
         storage_used = storage_by_tenant.get(t.id, 0)
         clients_total = clients_counts.get(t.id, 0)
         processes_total = processes_counts.get(t.id, 0)
-        storage_limit = _storage_limit_bytes(sub, plan_obj)
+        storage_limit = _storage_limit_bytes_from_values(
+            sub_info.get("max_storage_mb_override"),
+            sub_info.get("plan_max_storage_mb"),
+        )
         storage_percent = round((storage_used / storage_limit) * 100, 2) if storage_limit and storage_limit > 0 else None
 
         items.append(
@@ -267,19 +311,19 @@ async def list_tenants(
                 storage_used_bytes=storage_used,
                 storage_limit_bytes=storage_limit,
                 storage_percent_used=storage_percent,
-                plan_code=sub.plan_code if sub else None,
-                plan_nome=plan_obj.nome if plan_obj else None,
-                subscription_status=sub.status if sub else None,
-                current_period_end=sub.current_period_end if sub else None,
-                grace_period_end=sub.grace_period_end if sub else None,
-                provider=sub.provider.value if sub else None,
-                max_clients_override=sub.max_clients_override if sub else None,
-                max_storage_mb_override=sub.max_storage_mb_override if sub else None,
+                plan_code=sub_info.get("plan_code"),
+                plan_nome=sub_info.get("plan_nome"),
+                subscription_status=sub_info.get("status"),
+                current_period_end=sub_info.get("current_period_end"),
+                grace_period_end=sub_info.get("grace_period_end"),
+                provider=sub_info.get("provider"),
+                max_clients_override=sub_info.get("max_clients_override"),
+                max_storage_mb_override=sub_info.get("max_storage_mb_override"),
             )
         )
 
     if plan:
-        items = [item for item in items if _matches_plan_filter(sub_by_tenant.get(item.id, (None, None))[0], plan)]
+        items = [item for item in items if _matches_plan_filter(item.plan_code, plan)]
 
     normalized_status = _normalize_subscription_status(status)
     if status and not normalized_status:
