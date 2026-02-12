@@ -4,6 +4,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import or_, select
@@ -29,6 +30,7 @@ from app.schemas.process import ProcessCreate, ProcessOut, ProcessUpdate
 from app.services.plan_limit_service import PlanLimitService
 from app.services.s3_service import S3Service
 from app.services.upload_security_service import UploadSecurityService
+from app.utils.validators import has_valid_process_cnj_length, only_digits
 
 
 router = APIRouter()
@@ -54,6 +56,36 @@ def _parse_due_at_iso(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _normalize_process_numero(raw: str) -> str:
+    digits = only_digits(raw)
+    if not has_valid_process_cnj_length(digits):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Número do processo incompleto. Informe 20 dígitos.",
+        )
+    return digits
+
+
+def _normalize_optional_url(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    value = raw.strip()
+    if not value:
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Link do tribunal inválido. Use URL iniciando com http:// ou https://.",
+        )
+    if not parsed.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Link do tribunal inválido. Informe um domínio válido.",
+        )
+    return value
 
 
 async def _get_blocking_last_movement_task(
@@ -133,9 +165,11 @@ async def create_process(
         tenant_id=user.tenant_id,
         client_id=payload.client_id,
         parceria_id=payload.parceria_id,
-        numero=payload.numero,
+        numero=_normalize_process_numero(payload.numero),
         status=payload.status.value if hasattr(payload.status, "value") else str(payload.status),
         nicho=payload.nicho,
+        tribunal_code=payload.tribunal_code.strip().upper() if payload.tribunal_code else None,
+        tribunal_login_url=_normalize_optional_url(payload.tribunal_login_url),
     )
     db.add(proc)
     try:
@@ -334,6 +368,12 @@ async def update_process(
     for key, value in payload.model_dump(exclude_unset=True, exclude={"client_id"}).items():
         if key == "status" and value is not None:
             setattr(proc, key, value.value if hasattr(value, "value") else str(value))
+        elif key == "numero" and value is not None:
+            setattr(proc, key, _normalize_process_numero(value))
+        elif key == "tribunal_code":
+            setattr(proc, key, value.strip().upper() if value else None)
+        elif key == "tribunal_login_url":
+            setattr(proc, key, _normalize_optional_url(value))
         else:
             setattr(proc, key, value)
 

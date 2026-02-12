@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileUp } from "lucide-react";
+import { CircleHelp, ExternalLink, FileUp } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -10,6 +10,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
+import { formatProcessCNJ, isValidProcessCNJLength, onlyDigits } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,14 +29,29 @@ type Proc = {
   client_id: string;
   client_nome?: string | null;
   parceria_id?: string | null;
+  tribunal_code?: string | null;
+  tribunal_login_url?: string | null;
 };
 
 const schema = z.object({
   client_id: z.string().uuid("Selecione um cliente."),
   parceria_id: z.string().uuid().optional().or(z.literal("")),
-  numero: z.string().min(3, "Informe o número do processo."),
+  numero: z
+    .string()
+    .min(1, "Informe o número do processo.")
+    .refine((v) => isValidProcessCNJLength(v), {
+      message: "Número do processo incompleto. Informe 20 dígitos."
+    }),
   status: z.enum(["ativo", "inativo", "outros"]).default("ativo"),
-  nicho: z.string().optional().or(z.literal(""))
+  nicho: z.string().optional().or(z.literal("")),
+  tribunal_code: z.string().optional().or(z.literal("")),
+  tribunal_login_url: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((v) => !v || /^https?:\/\//i.test(v), {
+      message: "Link inválido. Use URL iniciando com http:// ou https://."
+    })
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -52,6 +68,15 @@ const NICHOS = [
   { value: "imobiliario", label: "Imobiliário" },
   { value: "empresarial", label: "Empresarial" },
   { value: "outros", label: "Outros" }
+];
+
+const TRIBUNAIS = [
+  { value: "TJSP", label: "TJSP" },
+  { value: "TJRJ", label: "TJRJ" },
+  { value: "TRT", label: "TRT" },
+  { value: "TJ", label: "TJ" },
+  { value: "TRF", label: "TRF" },
+  { value: "OUTRO", label: "Outro" }
 ];
 
 export default function ProcessesPage() {
@@ -84,17 +109,29 @@ export default function ProcessesPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { client_id: "", parceria_id: "", numero: "", status: "ativo", nicho: "" }
+    defaultValues: {
+      client_id: "",
+      parceria_id: "",
+      numero: "",
+      status: "ativo",
+      nicho: "",
+      tribunal_code: "",
+      tribunal_login_url: ""
+    }
   });
+  const numeroDigits = onlyDigits(form.watch("numero") ?? "");
+  const numeroValid = isValidProcessCNJLength(numeroDigits);
 
   const create = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload: any = {
         client_id: values.client_id,
         parceria_id: values.parceria_id ? values.parceria_id : null,
-        numero: values.numero,
+        numero: onlyDigits(values.numero),
         status: values.status,
-        nicho: values.nicho ? values.nicho : null
+        nicho: values.nicho ? values.nicho : null,
+        tribunal_code: values.tribunal_code ? values.tribunal_code : null,
+        tribunal_login_url: values.tribunal_login_url ? values.tribunal_login_url : null
       };
       if (editingId) {
         return (await api.put<Proc>(`/v1/processes/${editingId}`, payload)).data;
@@ -104,7 +141,15 @@ export default function ProcessesPage() {
     onSuccess: async () => {
       const wasEditing = Boolean(editingId);
       setEditingId(null);
-      form.reset({ client_id: "", parceria_id: "", numero: "", status: "ativo", nicho: "" });
+      form.reset({
+        client_id: "",
+        parceria_id: "",
+        numero: "",
+        status: "ativo",
+        nicho: "",
+        tribunal_code: "",
+        tribunal_login_url: ""
+      });
       await qc.invalidateQueries({ queryKey: ["processes"] });
       toast(wasEditing ? "Processo atualizado com sucesso." : "Processo cadastrado com sucesso.", {
         variant: "success"
@@ -170,9 +215,23 @@ export default function ProcessesPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="processo_numero">Número *</Label>
-              <Input id="processo_numero" placeholder="Ex: 0001234-56.2025.8.26.0000" {...form.register("numero")} />
+              <Input
+                id="processo_numero"
+                inputMode="numeric"
+                placeholder="0000000-00.0000.0.00.0000"
+                {...form.register("numero", {
+                  onChange: (event) => {
+                    const digits = onlyDigits(event.target.value);
+                    const limited = digits.slice(0, 20);
+                    const formatted = formatProcessCNJ(limited);
+                    form.setValue("numero", formatted, { shouldValidate: true });
+                  }
+                })}
+              />
               {form.formState.errors.numero ? (
                 <p className="text-xs text-destructive">{form.formState.errors.numero.message}</p>
+              ) : numeroDigits && !numeroValid ? (
+                <p className="text-xs text-destructive">Número do processo incompleto. Informe 20 dígitos.</p>
               ) : null}
             </div>
             <div className="space-y-1">
@@ -194,8 +253,35 @@ export default function ProcessesPage() {
                 ))}
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label htmlFor="processo_tribunal">Tribunal (opcional)</Label>
+              <Select id="processo_tribunal" {...form.register("tribunal_code")}>
+                <option value="">Selecione</option>
+                {TRIBUNAIS.map((tribunal) => (
+                  <option key={tribunal.value} value={tribunal.value}>
+                    {tribunal.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="processo_login_tribunal">Link de Login do Tribunal (opcional)</Label>
+                <span title='Cole aqui o link de login do tribunal do processo. Você pode preencher ou alterar quando quiser.'>
+                  <CircleHelp className="h-4 w-4 text-muted-foreground" />
+                </span>
+              </div>
+              <Input
+                id="processo_login_tribunal"
+                placeholder="https://..."
+                {...form.register("tribunal_login_url")}
+              />
+              {form.formState.errors.tribunal_login_url ? (
+                <p className="text-xs text-destructive">{form.formState.errors.tribunal_login_url.message}</p>
+              ) : null}
+            </div>
             <div className="flex items-end gap-2 md:col-span-1">
-              <Button className="w-full" disabled={create.isPending} type="submit">
+              <Button className="w-full" disabled={create.isPending || !numeroValid} type="submit">
                 {create.isPending ? "Salvando…" : editingId ? "Atualizar" : "Salvar"}
               </Button>
             </div>
@@ -208,7 +294,15 @@ export default function ProcessesPage() {
               type="button"
               onClick={() => {
                 setEditingId(null);
-                form.reset({ client_id: "", parceria_id: "", numero: "", status: "ativo", nicho: "" });
+                form.reset({
+                  client_id: "",
+                  parceria_id: "",
+                  numero: "",
+                  status: "ativo",
+                  nicho: "",
+                  tribunal_code: "",
+                  tribunal_login_url: ""
+                });
               }}
             >
               Cancelar edição
@@ -260,28 +354,45 @@ export default function ProcessesPage() {
         {list.data && list.data.length > 0 ? (
           <div className="mt-3 overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Nicho</TableHead>
-                  <TableHead>Parceria</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.data.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>{p.numero}</TableCell>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Nicho</TableHead>
+                    <TableHead>Tribunal</TableHead>
+                    <TableHead>Parceria</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {list.data.map((p) => (
+                    <TableRow key={p.id}>
+                    <TableCell className="font-mono text-xs">{formatProcessCNJ(p.numero)}</TableCell>
                     <TableCell>{p.client_nome ?? clients.data?.find((c) => c.id === p.client_id)?.nome ?? "—"}</TableCell>
                     <TableCell>{p.status}</TableCell>
                     <TableCell>{p.nicho ?? "—"}</TableCell>
+                    <TableCell>{p.tribunal_code ?? "—"}</TableCell>
                     <TableCell>
                       {p.parceria_id ? parcerias.data?.find((x) => x.id === p.parceria_id)?.nome ?? "—" : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <span title={p.tribunal_login_url ? "Abrir login do tribunal" : "Defina o link no cadastro do processo."}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            type="button"
+                            disabled={!p.tribunal_login_url}
+                            onClick={() => {
+                              if (!p.tribunal_login_url) return;
+                              window.open(p.tribunal_login_url, "_blank", "noopener,noreferrer");
+                            }}
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Login Tribunal
+                          </Button>
+                        </span>
                         <Button asChild size="sm" variant="outline">
                           <Link href={`/dashboard/${slug}/documents?process_id=${p.id}&category=despacho`}>
                             <FileUp className="mr-2 h-4 w-4" />
@@ -297,9 +408,11 @@ export default function ProcessesPage() {
                             form.reset({
                               client_id: p.client_id,
                               parceria_id: p.parceria_id ?? "",
-                              numero: p.numero,
+                              numero: formatProcessCNJ(p.numero),
                               status: p.status,
-                              nicho: p.nicho ?? ""
+                              nicho: p.nicho ?? "",
+                              tribunal_code: p.tribunal_code ?? "",
+                              tribunal_login_url: p.tribunal_login_url ?? ""
                             });
                           }}
                         >

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleHelp, Upload } from "lucide-react";
+import { CircleHelp, ExternalLink, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { formatFullAddress } from "@/lib/address";
 import { formatDateTimeBR } from "@/lib/datetime";
-import { formatCNPJ, formatCPF, formatPhoneBR } from "@/lib/masks";
+import { formatCNPJ, formatCPF, formatPhoneBR, formatProcessCNJ } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 
 type Client = {
@@ -41,13 +42,26 @@ type Parceria = {
   nome: string;
   email?: string | null;
   telefone?: string | null;
+  oab_uf?: string | null;
   oab_number?: string | null;
   tipo_documento: "cpf" | "cnpj";
   documento: string;
   criado_em: string;
 };
 
-type Proc = { id: string; numero: string; status: string };
+type Proc = {
+  id: string;
+  numero: string;
+  status: string;
+  tribunal_code?: string | null;
+  tribunal_login_url?: string | null;
+};
+type ClientCase = {
+  id: string;
+  title?: string | null;
+  content: string;
+  criado_em: string;
+};
 type LastMovementStatus = {
   can_create: boolean;
   blocking_task_id?: string;
@@ -60,6 +74,7 @@ type LastMovementCreateResponse = {
   movement: { id: string };
   task: { id: string };
 };
+type ClientCasePayload = { title: string | null; content: string };
 
 type Doc = {
   id: string;
@@ -103,10 +118,23 @@ export default function ClientDetailPage() {
   const [movementTime, setMovementTime] = useState("");
   const [movementError, setMovementError] = useState<string | null>(null);
   const [movementConflict, setMovementConflict] = useState<string | null>(null);
+  const [caseModalOpen, setCaseModalOpen] = useState(false);
+  const [caseDeleteOpen, setCaseDeleteOpen] = useState(false);
+  const [editingCase, setEditingCase] = useState<ClientCase | null>(null);
+  const [caseToDelete, setCaseToDelete] = useState<ClientCase | null>(null);
+  const [caseTitle, setCaseTitle] = useState("");
+  const [caseContent, setCaseContent] = useState("");
+  const [caseError, setCaseError] = useState<string | null>(null);
+  const [selectedCaseProcessId, setSelectedCaseProcessId] = useState<string>("");
 
   const details = useQuery({
     queryKey: ["client-details", clientId],
     queryFn: async () => (await api.get<ClientDetails>(`/v1/clients/${clientId}/details`)).data
+  });
+
+  const clientCases = useQuery({
+    queryKey: ["client-cases", clientId],
+    queryFn: async () => (await api.get<ClientCase[]>(`/v1/clients/${clientId}/cases`)).data
   });
 
   const processes = useQuery({
@@ -128,6 +156,16 @@ export default function ClientDetailPage() {
       return Object.fromEntries(entries) as LastMovementStatusMap;
     }
   });
+
+  useEffect(() => {
+    if (!processes.data?.length) {
+      setSelectedCaseProcessId("");
+      return;
+    }
+    if (!selectedCaseProcessId || !processes.data.some((item) => item.id === selectedCaseProcessId)) {
+      setSelectedCaseProcessId(processes.data[0].id);
+    }
+  }, [processes.data, selectedCaseProcessId]);
 
   const upload = useMutation({
     mutationFn: async () => {
@@ -246,6 +284,44 @@ export default function ClientDetailPage() {
     }
   });
 
+  const saveCase = useMutation({
+    mutationFn: async (payload: ClientCasePayload) => {
+      if (editingCase) {
+        const response = await api.patch<ClientCase>(`/v1/clients/${clientId}/cases/${editingCase.id}`, payload);
+        return response.data;
+      }
+      const response = await api.post<ClientCase>(`/v1/clients/${clientId}/cases`, payload);
+      return response.data;
+    },
+    onSuccess: async () => {
+      setCaseModalOpen(false);
+      setEditingCase(null);
+      setCaseTitle("");
+      setCaseContent("");
+      setCaseError(null);
+      await qc.invalidateQueries({ queryKey: ["client-cases", clientId] });
+      toast(editingCase ? "Caso concreto atualizado." : "Caso concreto criado.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível salvar o caso concreto.", { variant: "error" });
+    }
+  });
+
+  const deleteCase = useMutation({
+    mutationFn: async (caseId: string) => {
+      await api.delete(`/v1/clients/${clientId}/cases/${caseId}`);
+    },
+    onSuccess: async () => {
+      setCaseDeleteOpen(false);
+      setCaseToDelete(null);
+      await qc.invalidateQueries({ queryKey: ["client-cases", clientId] });
+      toast("Caso concreto removido.", { variant: "success" });
+    },
+    onError: () => {
+      toast("Não foi possível remover o caso concreto.", { variant: "error" });
+    }
+  });
+
   const client = details.data?.client;
   const parcerias = details.data?.parcerias ?? [];
 
@@ -260,12 +336,17 @@ export default function ClientDetailPage() {
     return groups;
   }, [details.data?.documents]);
 
+  const selectedCaseProcess = useMemo(() => {
+    return (processes.data ?? []).find((item) => item.id === selectedCaseProcessId) ?? null;
+  }, [processes.data, selectedCaseProcessId]);
+
   useEffect(() => {
-    if (!movementOpen) return;
+    if (!movementOpen && !caseModalOpen && !caseDeleteOpen) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !createLastMovement.isPending) {
+      if (event.key !== "Escape") return;
+      if (movementOpen && !createLastMovement.isPending) {
         setMovementOpen(false);
         setMovementProcess(null);
         setMovementFile(null);
@@ -274,6 +355,18 @@ export default function ClientDetailPage() {
         setMovementTime("");
         setMovementError(null);
         setMovementConflict(null);
+        return;
+      }
+      if (caseModalOpen && !saveCase.isPending) {
+        setCaseModalOpen(false);
+        setEditingCase(null);
+        setCaseTitle("");
+        setCaseContent("");
+        setCaseError(null);
+      }
+      if (caseDeleteOpen && !deleteCase.isPending) {
+        setCaseDeleteOpen(false);
+        setCaseToDelete(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -281,7 +374,14 @@ export default function ClientDetailPage() {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [createLastMovement.isPending, movementOpen]);
+  }, [
+    caseDeleteOpen,
+    caseModalOpen,
+    createLastMovement.isPending,
+    deleteCase.isPending,
+    movementOpen,
+    saveCase.isPending
+  ]);
 
   function openMovementModal(processItem: Proc) {
     const defaults = getNowDateTimeFields();
@@ -337,6 +437,32 @@ export default function ClientDetailPage() {
     });
   }
 
+  function openCreateCaseModal() {
+    setEditingCase(null);
+    setCaseTitle("");
+    setCaseContent("");
+    setCaseError(null);
+    setCaseModalOpen(true);
+  }
+
+  function openEditCaseModal(item: ClientCase) {
+    setEditingCase(item);
+    setCaseTitle(item.title ?? "");
+    setCaseContent(item.content);
+    setCaseError(null);
+    setCaseModalOpen(true);
+  }
+
+  function submitCase() {
+    const content = caseContent.trim();
+    if (content.length < 2) {
+      setCaseError("Informe o conteúdo do caso concreto.");
+      return;
+    }
+    setCaseError(null);
+    saveCase.mutate({ title: caseTitle.trim() || null, content });
+  }
+
   const movementHelpText =
     'Envie o documento da última movimentação do processo (ex.: despacho do EPROC), informe o prazo e criaremos uma tarefa no Kanban. Para adicionar uma nova movimentação deste processo, conclua a tarefa anterior e clique em "Excluir".';
   const blockingTooltip = "Conclua a tarefa anterior para registrar uma nova movimentação.";
@@ -356,9 +482,14 @@ export default function ClientDetailPage() {
                   : "Carregando…"}
               </CardDescription>
             </div>
-            <Button asChild variant="outline">
-              <Link href="../">Voltar</Link>
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button asChild variant="outline">
+                <Link href="#caso-concreto">Caso concreto</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="../">Voltar</Link>
+              </Button>
+            </div>
           </div>
           {details.isError ? (
             <p className="text-sm text-destructive">Erro ao carregar cliente.</p>
@@ -454,8 +585,8 @@ export default function ClientDetailPage() {
                       <TableCell>
                         {p.oab_number ? (
                           <div className="flex items-center justify-between gap-2">
-                            <span>{p.oab_number}</span>
-                            <CopyButton value={p.oab_number} label="Copiar OAB" />
+                            <span>{[p.oab_uf, p.oab_number].filter(Boolean).join(" ")}</span>
+                            <CopyButton value={[p.oab_uf, p.oab_number].filter(Boolean).join(" ")} label="Copiar OAB" />
                           </div>
                         ) : (
                           "—"
@@ -478,6 +609,95 @@ export default function ClientDetailPage() {
               </Table>
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card id="caso-concreto" className="scroll-mt-24">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="text-base">Caso concreto</CardTitle>
+              <CardDescription>Registre os casos concretos deste cliente (múltiplos itens).</CardDescription>
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+              <Select
+                value={selectedCaseProcessId}
+                onChange={(event) => setSelectedCaseProcessId(event.target.value)}
+                className="min-w-[220px]"
+              >
+                <option value="">Selecione o processo</option>
+                {processes.data?.map((processItem) => (
+                  <option key={processItem.id} value={processItem.id}>
+                    {formatProcessCNJ(processItem.numero)}
+                  </option>
+                ))}
+              </Select>
+              <span
+                title={
+                  selectedCaseProcess?.tribunal_login_url
+                    ? "Abrir login do tribunal"
+                    : "Defina o link no cadastro do processo."
+                }
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!selectedCaseProcess?.tribunal_login_url}
+                  onClick={() => {
+                    if (!selectedCaseProcess?.tribunal_login_url) return;
+                    window.open(selectedCaseProcess.tribunal_login_url, "_blank", "noopener,noreferrer");
+                  }}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Login Tribunal
+                </Button>
+              </span>
+              <Button type="button" onClick={openCreateCaseModal}>
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar caso
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {clientCases.isLoading ? <p className="text-sm text-muted-foreground">Carregando casos…</p> : null}
+          {clientCases.isError ? <p className="text-sm text-destructive">Erro ao carregar casos concretos.</p> : null}
+          {clientCases.isSuccess && clientCases.data.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum caso concreto cadastrado.</p>
+          ) : null}
+          <div className="space-y-3">
+            {clientCases.data?.map((caseItem, index) => (
+              <div key={caseItem.id} className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">
+                      Caso {index + 1}
+                      {caseItem.title ? ` — ${caseItem.title}` : ""}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{caseItem.content}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" type="button" onClick={() => openEditCaseModal(caseItem)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      type="button"
+                      onClick={() => {
+                        setCaseToDelete(caseItem);
+                        setCaseDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -600,16 +820,31 @@ export default function ClientDetailPage() {
                   <TableRow>
                     <TableHead>Número</TableHead>
                     <TableHead>Status do Processo</TableHead>
-                    <TableHead className="w-[320px] text-right">Ações</TableHead>
+                    <TableHead className="w-[420px] text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {processes.data.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell>{p.numero}</TableCell>
+                      <TableCell className="font-mono text-xs">{formatProcessCNJ(p.numero)}</TableCell>
                       <TableCell>{p.status}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span title={p.tribunal_login_url ? "Abrir login do tribunal" : "Defina o link no cadastro do processo."}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!p.tribunal_login_url}
+                              onClick={() => {
+                                if (!p.tribunal_login_url) return;
+                                window.open(p.tribunal_login_url, "_blank", "noopener,noreferrer");
+                              }}
+                            >
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              Login Tribunal
+                            </Button>
+                          </span>
                           <span
                             title={
                               processLastMovementStatus.data?.[p.id]?.can_create === false
@@ -659,6 +894,120 @@ export default function ClientDetailPage() {
         </CardContent>
       </Card>
 
+      {caseModalOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-50">
+              <div
+                aria-hidden="true"
+                className="fixed inset-0 bg-black/50 backdrop-blur"
+                onClick={() => {
+                  if (saveCase.isPending) return;
+                  setCaseModalOpen(false);
+                }}
+              />
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={editingCase ? "Editar caso concreto" : "Novo caso concreto"}
+                className="fixed left-1/2 top-1/2 w-[95vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border/20 bg-background/95 shadow-xl backdrop-blur"
+              >
+                <div className="flex max-h-[90vh] flex-col">
+                  <header className="border-b border-border/10 p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold">{editingCase ? "Editar caso concreto" : "Adicionar caso concreto"}</h2>
+                  </header>
+                  <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+                    <div className="space-y-1">
+                      <Label htmlFor="case_title">Título (opcional)</Label>
+                      <Input
+                        id="case_title"
+                        value={caseTitle}
+                        onChange={(event) => setCaseTitle(event.target.value)}
+                        placeholder="Ex.: Caso 1"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="case_content">Descrição *</Label>
+                      <Textarea
+                        id="case_content"
+                        rows={7}
+                        value={caseContent}
+                        onChange={(event) => setCaseContent(event.target.value)}
+                        placeholder="Descreva os fatos e detalhes do caso concreto."
+                      />
+                    </div>
+                    {caseError ? <p className="text-sm text-destructive">{caseError}</p> : null}
+                  </div>
+                  <footer className="border-t border-border/10 p-4 sm:p-6">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        variant="outline"
+                        type="button"
+                        disabled={saveCase.isPending}
+                        onClick={() => setCaseModalOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="button" disabled={saveCase.isPending} onClick={submitCase}>
+                        {saveCase.isPending ? "Salvando..." : editingCase ? "Atualizar caso" : "Criar caso"}
+                      </Button>
+                    </div>
+                  </footer>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+
+      {caseDeleteOpen && caseToDelete && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-50">
+              <div
+                aria-hidden="true"
+                className="fixed inset-0 bg-black/50 backdrop-blur"
+                onClick={() => {
+                  if (deleteCase.isPending) return;
+                  setCaseDeleteOpen(false);
+                  setCaseToDelete(null);
+                }}
+              />
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Confirmar exclusão de caso concreto"
+                className="fixed left-1/2 top-1/2 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border/20 bg-background/95 p-5 shadow-xl backdrop-blur"
+              >
+                <h2 className="text-lg font-semibold">Excluir caso concreto</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Tem certeza que deseja excluir este caso? Esta ação não poderá ser desfeita.
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={deleteCase.isPending}
+                    onClick={() => {
+                      setCaseDeleteOpen(false);
+                      setCaseToDelete(null);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    disabled={deleteCase.isPending}
+                    onClick={() => deleteCase.mutate(caseToDelete.id)}
+                  >
+                    {deleteCase.isPending ? "Excluindo..." : "Excluir"}
+                  </Button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+
       {movementOpen && movementProcess && typeof document !== "undefined"
         ? createPortal(
             <div className="fixed inset-0 z-50">
@@ -683,7 +1032,7 @@ export default function ClientDetailPage() {
                       <div>
                         <h2 className="text-lg font-semibold">Última Movimentação</h2>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Processo: <span className="font-mono text-xs">{movementProcess.numero}</span>
+                          Processo: <span className="font-mono text-xs">{formatProcessCNJ(movementProcess.numero)}</span>
                         </p>
                       </div>
                       <Button

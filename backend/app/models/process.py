@@ -33,6 +33,8 @@ class Process(UUIDBaseMixin, Base):
     numero: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="ativo")
     nicho: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)
+    tribunal_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    tribunal_login_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     client: Mapped["Client"] = relationship(back_populates="processos")
     parceria: Mapped["Parceria | None"] = relationship(back_populates="processos")

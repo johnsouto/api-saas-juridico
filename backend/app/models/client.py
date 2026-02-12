@@ -12,6 +12,7 @@ from app.db.base import Base, UUIDBaseMixin
 from app.models.enums import TenantDocumentoTipo
 
 if TYPE_CHECKING:
+    from app.models.client_case import ClientCase
     from app.models.document import Document
     from app.models.honorario import Honorario
     from app.models.process import Process
@@ -47,5 +48,6 @@ class Client(UUIDBaseMixin, Base):
     dados_contato: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     processos: Mapped[list["Process"]] = relationship(back_populates="client")
+    cases: Mapped[list["ClientCase"]] = relationship(back_populates="client")
     honorarios: Mapped[list["Honorario"]] = relationship(back_populates="client")
     documentos: Mapped[list["Document"]] = relationship(back_populates="client")
