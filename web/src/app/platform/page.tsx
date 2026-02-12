@@ -10,7 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
 import { formatDateTimeBR } from "@/lib/datetime";
-import { clearPlatformAdminSession, lockPlatformAdminSession } from "@/lib/platformAuth";
+import { clearPlatformAdminSession, getPlatformSessionState, lockPlatformAdminSession } from "@/lib/platformAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -190,13 +190,16 @@ export default function PlatformAdminPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "past_due" | "expired">("all");
   const [storageThreshold, setStorageThreshold] = useState<"all" | "80" | "90">("all");
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [platformReady, setPlatformReady] = useState(false);
+  const [platformAuthenticated, setPlatformAuthenticated] = useState(false);
   const [subscriptionPlan, setSubscriptionPlan] = useState<"FREE" | "PLUS_MONTHLY_CARD" | "PLUS_ANNUAL_PIX">("FREE");
   const [subscriptionStatus, setSubscriptionStatus] = useState<"free" | "active" | "past_due" | "expired" | "canceled" | "trialing">("active");
 
   const overview = useQuery({
     queryKey: ["platform-overview"],
     queryFn: async () => (await api.get<PlatformOverviewOut>("/v1/platform/metrics/overview")).data,
-    retry: false
+    retry: false,
+    enabled: platformReady && platformAuthenticated
   });
 
   const tenants = useQuery({
@@ -209,7 +212,8 @@ export default function PlatformAdminPage() {
       if (storageThreshold !== "all") params.storage_gt = Number.parseInt(storageThreshold, 10);
       return (await api.get<PlatformTenantListItem[]>("/v1/platform/tenants", { params })).data;
     },
-    retry: false
+    retry: false,
+    enabled: platformReady && platformAuthenticated
   });
 
   const selectedTenant = useMemo(
@@ -220,7 +224,7 @@ export default function PlatformAdminPage() {
   const tenantDetail = useQuery({
     queryKey: ["platform-tenant-detail", selectedTenantId],
     queryFn: async () => (await api.get<PlatformTenantDetailOut>(`/v1/platform/tenants/${selectedTenantId}`)).data,
-    enabled: !!selectedTenantId,
+    enabled: !!selectedTenantId && platformAuthenticated,
     retry: false
   });
 
@@ -228,9 +232,26 @@ export default function PlatformAdminPage() {
     queryKey: ["platform-tenant-audit", selectedTenantId],
     queryFn: async () =>
       (await api.get<PlatformAuditLogOut[]>("/v1/platform/audit", { params: { tenant_id: selectedTenantId, limit: 20 } })).data,
-    enabled: !!selectedTenantId,
+    enabled: !!selectedTenantId && platformAuthenticated,
     retry: false
   });
+
+  useEffect(() => {
+    const state = getPlatformSessionState();
+    setPlatformAuthenticated(state.valid);
+    setPlatformReady(true);
+    if (!state.valid) {
+      router.replace(`/platform/login?reason=${state.reason ?? "missing"}&next=/platform`);
+      return;
+    }
+
+    const onPlatformAuthFailed = () => {
+      setPlatformAuthenticated(false);
+      router.replace("/platform/login?reason=unauthorized&next=/platform");
+    };
+    window.addEventListener("platformAuthFailed", onPlatformAuthFailed);
+    return () => window.removeEventListener("platformAuthFailed", onPlatformAuthFailed);
+  }, [router]);
 
   useEffect(() => {
     if (!tenantDetail.data?.subscription) return;
@@ -391,6 +412,7 @@ export default function PlatformAdminPage() {
 
   return (
     <main className="mx-auto max-w-7xl space-y-4 p-6">
+      {!platformReady ? <p className="text-sm text-muted-foreground">Verificando sessão da plataforma...</p> : null}
       <Card>
         <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -884,7 +906,9 @@ export default function PlatformAdminPage() {
           ) : null}
           {tenants.isError ? (
             <p className="mt-2 text-sm text-destructive">
-              {(tenants.error as any)?.response?.data?.detail ?? "Erro ao carregar tenants (confira a chave e o backend)"}
+              {(tenants.error as any)?.response?.data?.detail ??
+                (tenants.error as any)?.message ??
+                "Erro ao carregar tenants (confira a chave e o backend)"}
             </p>
           ) : null}
         </CardContent>

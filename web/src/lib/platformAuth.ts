@@ -18,31 +18,74 @@ function nowMs(): number {
   return Date.now();
 }
 
+function readSession(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function removeSession(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function readLocal(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function removeLocal(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore storage failures
+  }
+}
+
 function migrateLegacyKeyToSession() {
   if (typeof window === "undefined") return;
-  const current = window.sessionStorage.getItem(STORAGE_KEY);
+  const current = readSession(STORAGE_KEY);
   if (current) return;
 
-  const legacy = window.localStorage.getItem(LEGACY_LOCAL_STORAGE_KEY);
+  const legacy = readLocal(LEGACY_LOCAL_STORAGE_KEY);
   if (!legacy) return;
 
   const now = nowMs();
-  window.sessionStorage.setItem(STORAGE_KEY, legacy);
-  window.sessionStorage.setItem(SET_AT_KEY, String(now));
-  window.sessionStorage.setItem(LAST_ACTIVITY_KEY, String(now));
-  window.localStorage.removeItem(LEGACY_LOCAL_STORAGE_KEY);
+  writeSession(STORAGE_KEY, legacy);
+  writeSession(SET_AT_KEY, String(now));
+  writeSession(LAST_ACTIVITY_KEY, String(now));
+  removeLocal(LEGACY_LOCAL_STORAGE_KEY);
 }
 
 export function clearPlatformAdminSession() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(STORAGE_KEY);
-  window.sessionStorage.removeItem(SET_AT_KEY);
-  window.sessionStorage.removeItem(LAST_ACTIVITY_KEY);
+  removeSession(STORAGE_KEY);
+  removeSession(SET_AT_KEY);
+  removeSession(LAST_ACTIVITY_KEY);
 }
 
 export function clearPlatformAdminKey() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(STORAGE_KEY);
+  removeSession(STORAGE_KEY);
 }
 
 export function lockPlatformAdminSession() {
@@ -50,16 +93,14 @@ export function lockPlatformAdminSession() {
 }
 
 export function setPlatformAdminKey(value: string) {
-  if (typeof window === "undefined") return;
   const now = nowMs();
-  window.sessionStorage.setItem(STORAGE_KEY, value);
-  window.sessionStorage.setItem(SET_AT_KEY, String(now));
-  window.sessionStorage.setItem(LAST_ACTIVITY_KEY, String(now));
+  writeSession(STORAGE_KEY, value);
+  writeSession(SET_AT_KEY, String(now));
+  writeSession(LAST_ACTIVITY_KEY, String(now));
 }
 
 export function touchPlatformAdminActivity(now: number = nowMs()) {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(LAST_ACTIVITY_KEY, String(now));
+  writeSession(LAST_ACTIVITY_KEY, String(now));
 }
 
 export function getPlatformSessionState(now: number = nowMs()): { valid: boolean; reason?: ExpiryReason } {
@@ -67,15 +108,15 @@ export function getPlatformSessionState(now: number = nowMs()): { valid: boolean
 
   migrateLegacyKeyToSession();
 
-  const key = window.sessionStorage.getItem(STORAGE_KEY);
+  const key = readSession(STORAGE_KEY);
   if (!key) return { valid: false, reason: "missing" };
 
-  const setAt = safeParseInt(window.sessionStorage.getItem(SET_AT_KEY));
-  const lastActivity = safeParseInt(window.sessionStorage.getItem(LAST_ACTIVITY_KEY));
+  const setAt = safeParseInt(readSession(SET_AT_KEY));
+  const lastActivity = safeParseInt(readSession(LAST_ACTIVITY_KEY));
 
   if (!setAt || !lastActivity) {
-    window.sessionStorage.setItem(SET_AT_KEY, String(now));
-    window.sessionStorage.setItem(LAST_ACTIVITY_KEY, String(now));
+    writeSession(SET_AT_KEY, String(now));
+    writeSession(LAST_ACTIVITY_KEY, String(now));
     return { valid: true };
   }
 
@@ -96,5 +137,5 @@ export function getPlatformAdminKey(): string | null {
   if (typeof window === "undefined") return null;
   const state = getPlatformSessionState();
   if (!state.valid) return null;
-  return window.sessionStorage.getItem(STORAGE_KEY);
+  return readSession(STORAGE_KEY);
 }
