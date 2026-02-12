@@ -9,6 +9,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
+import { formatCNPJ, formatCPF, formatPhoneBR, isValidCNPJLength, isValidCPFLength, isValidPhoneLength, onlyDigits } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,23 +34,15 @@ type Client = {
   address_zip?: string | null;
 };
 
-function onlyDigits(input: string): string {
-  return input.replace(/\D/g, "");
-}
-
 const schema = z.object({
   nome: z.string().min(2, "Informe o nome do cliente."),
   tipo_documento: z.enum(["cpf", "cnpj"]).default("cpf"),
-  documento: z
-    .string()
-    .min(8, "Informe o documento (CPF/CNPJ).")
-    .refine((v) => onlyDigits(v).length >= 8, { message: "Informe um documento válido." })
-    .refine((v) => onlyDigits(v) === v, { message: "Use somente números." }),
+  documento: z.string().min(1, "Informe o documento (CPF/CNPJ)."),
   phone_mobile: z
     .string()
     .optional()
     .or(z.literal(""))
-    .refine((v) => !v || onlyDigits(v).length >= 10, { message: "Informe um celular válido." }),
+    .refine((v) => !v || isValidPhoneLength(v), { message: "Telefone incompleto. Informe DDD + número com 11 dígitos." }),
   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
 
   address_street: z.string().optional().or(z.literal("")),
@@ -67,6 +60,22 @@ const schema = z.object({
     .optional()
     .or(z.literal(""))
     .refine((v) => !v || v.replace(/\D/g, "").length === 8, { message: "CEP inválido. Use 8 dígitos." })
+}).superRefine((data, ctx) => {
+  const digits = onlyDigits(data.documento);
+  if (data.tipo_documento === "cpf" && !isValidCPFLength(digits)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["documento"],
+      message: "CPF incompleto. Informe 11 dígitos."
+    });
+  }
+  if (data.tipo_documento === "cnpj" && !isValidCNPJLength(digits)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["documento"],
+      message: "CNPJ incompleto. Informe 14 dígitos."
+    });
+  }
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -95,6 +104,11 @@ export default function ClientsPage() {
       address_zip: ""
     }
   });
+  const docType = form.watch("tipo_documento");
+  const docDigits = onlyDigits(form.watch("documento") ?? "");
+  const docValid = docType === "cpf" ? isValidCPFLength(docDigits) : isValidCNPJLength(docDigits);
+  const phoneDigits = onlyDigits(form.watch("phone_mobile") ?? "");
+  const phoneValid = !phoneDigits || isValidPhoneLength(phoneDigits);
 
   const list = useQuery({
     queryKey: ["clients", q],
@@ -186,7 +200,18 @@ export default function ClientsPage() {
             </div>
             <div className="space-y-1 md:col-span-1">
               <Label htmlFor="cliente_tipo">Tipo *</Label>
-              <Select id="cliente_tipo" {...form.register("tipo_documento")}>
+              <Select
+                id="cliente_tipo"
+                {...form.register("tipo_documento", {
+                  onChange: (event) => {
+                    const nextType = event.target.value as "cpf" | "cnpj";
+                    const digits = onlyDigits(form.getValues("documento") ?? "");
+                    const limited = digits.slice(0, nextType === "cpf" ? 11 : 14);
+                    const formatted = nextType === "cpf" ? formatCPF(limited) : formatCNPJ(limited);
+                    form.setValue("documento", formatted, { shouldValidate: true });
+                  }
+                })}
+              >
                 <option value="cpf">CPF</option>
                 <option value="cnpj">CNPJ</option>
               </Select>
@@ -200,11 +225,22 @@ export default function ClientsPage() {
                 placeholder="Somente números"
                 {...form.register("documento", {
                   onChange: (e) => {
-                    form.setValue("documento", onlyDigits(e.target.value), { shouldValidate: true });
+                    const digits = onlyDigits(e.target.value);
+                    const limited = digits.slice(0, docType === "cpf" ? 11 : 14);
+                    const formatted = docType === "cpf" ? formatCPF(limited) : formatCNPJ(limited);
+                    form.setValue("documento", formatted, { shouldValidate: true });
                   }
                 })}
               />
-              {form.formState.errors.documento ? <p className="text-xs text-destructive">{form.formState.errors.documento.message}</p> : null}
+              {form.formState.errors.documento ? (
+                <p className="text-xs text-destructive">{form.formState.errors.documento.message}</p>
+              ) : docDigits && !docValid ? (
+                <p className="text-xs text-destructive">
+                  {docType === "cpf"
+                    ? "CPF incompleto. Informe 11 dígitos."
+                    : "CNPJ incompleto. Informe 14 dígitos."}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-1 md:col-span-3">
@@ -218,10 +254,21 @@ export default function ClientsPage() {
                 id="cliente_celular"
                 inputMode="tel"
                 placeholder="(11) 99999-9999"
-                {...form.register("phone_mobile")}
+                {...form.register("phone_mobile", {
+                  onChange: (event) => {
+                    const digits = onlyDigits(event.target.value);
+                    const limited = digits.slice(0, 11);
+                    const formatted = formatPhoneBR(limited);
+                    form.setValue("phone_mobile", formatted, { shouldValidate: true });
+                  }
+                })}
               />
               {form.formState.errors.phone_mobile ? (
                 <p className="text-xs text-destructive">{form.formState.errors.phone_mobile.message}</p>
+              ) : phoneDigits && !phoneValid ? (
+                <p className="text-xs text-destructive">
+                  Telefone incompleto. Informe DDD + número com 11 dígitos.
+                </p>
               ) : null}
             </div>
 
@@ -266,7 +313,7 @@ export default function ClientsPage() {
             </div>
 
             <div className="flex items-end gap-2 md:col-span-6">
-              <Button disabled={create.isPending} type="submit">
+              <Button disabled={create.isPending || !docValid || !phoneValid} type="submit">
                 {create.isPending ? "Salvando…" : editingId ? "Atualizar" : "Salvar"}
               </Button>
               {editingId ? (
@@ -354,7 +401,8 @@ export default function ClientsPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {c.tipo_documento.toUpperCase()}: {c.documento}
+                        {c.tipo_documento.toUpperCase()}:{" "}
+                        {c.tipo_documento === "cpf" ? formatCPF(c.documento) : formatCNPJ(c.documento)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -370,8 +418,8 @@ export default function ClientsPage() {
                               form.reset({
                                 nome: c.nome,
                                 tipo_documento: c.tipo_documento,
-                                documento: c.documento,
-                                phone_mobile: c.phone_mobile ?? "",
+                                documento: c.tipo_documento === "cpf" ? formatCPF(c.documento) : formatCNPJ(c.documento),
+                                phone_mobile: c.phone_mobile ? formatPhoneBR(c.phone_mobile) : "",
                                 email: c.email ?? "",
                                 address_street: c.address_street ?? "",
                                 address_number: c.address_number ?? "",

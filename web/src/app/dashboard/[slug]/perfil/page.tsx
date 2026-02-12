@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
+import { formatCNPJ, formatCPF } from "@/lib/masks";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -160,7 +161,16 @@ export default function PerfilPage() {
               </div>
               <div className="space-y-1">
                 <Label>CPF/CNPJ</Label>
-                <Input value={tenant ? `${tenant.tipo_documento.toUpperCase()} ${tenant.documento}` : ""} disabled />
+                <Input
+                  value={
+                    tenant
+                      ? `${tenant.tipo_documento.toUpperCase()} ${
+                          tenant.tipo_documento === "cpf" ? formatCPF(tenant.documento) : formatCNPJ(tenant.documento)
+                        }`
+                      : ""
+                  }
+                  disabled
+                />
               </div>
             </div>
 

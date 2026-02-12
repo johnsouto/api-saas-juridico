@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -29,9 +30,30 @@ type BillingStatus = {
   is_plus_effective: boolean;
 };
 
+const DOCUMENT_CATEGORIES = [
+  { value: "despacho", label: "Despacho" },
+  { value: "sentencas", label: "Sentenças" },
+  { value: "acordao", label: "Acordão" },
+  { value: "identidade", label: "Identidade (RG/CPF)" },
+  { value: "comprovante_endereco", label: "Comprovante de Endereço" },
+  { value: "declaracao_pobreza", label: "Declaração de Pobreza" },
+  { value: "contrato", label: "Contrato" },
+  { value: "peticao", label: "Petição" },
+  { value: "procuracao", label: "Procuração" },
+  { value: "comprovante_pagamento", label: "Comprovante de Pagamento" },
+  { value: "outros", label: "Outros" }
+];
+
+function labelForCategory(value?: string | null): string {
+  if (!value) return "—";
+  return DOCUMENT_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+}
+
 export default function DocumentsPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const initializedFromQuery = useRef(false);
   const [linkType, setLinkType] = useState<"none" | "process" | "client" | "honorario">("none");
   const [processId, setProcessId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
@@ -79,6 +101,23 @@ export default function DocumentsPage() {
       return (await api.get<Doc[]>("/v1/documents", { params })).data;
     }
   });
+
+  useEffect(() => {
+    if (initializedFromQuery.current) return;
+    initializedFromQuery.current = true;
+
+    const processQuery = searchParams.get("process_id") ?? "";
+    const categoryQuery = (searchParams.get("category") ?? searchParams.get("categoria") ?? "").toLowerCase();
+
+    if (processQuery) {
+      setLinkType("process");
+      setProcessId(processQuery);
+    }
+    if (categoryQuery) {
+      const match = DOCUMENT_CATEGORIES.find((c) => c.value === categoryQuery);
+      if (match) setCategoria(match.value);
+    }
+  }, [searchParams]);
 
   const upload = useMutation({
     mutationFn: async () => {
@@ -195,14 +234,11 @@ export default function DocumentsPage() {
             <div className="space-y-1">
               <Label htmlFor="doc_categoria">Categoria *</Label>
               <Select id="doc_categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-                <option value="outros">outros</option>
-                <option value="identidade">identidade</option>
-                <option value="comprovante_endereco">comprovante_endereco</option>
-                <option value="declaracao_pobreza">declaracao_pobreza</option>
-                <option value="contrato">contrato</option>
-                <option value="peticao">peticao</option>
-                <option value="procuracao">procuracao</option>
-                <option value="comprovante_pagamento">comprovante_pagamento</option>
+                {DOCUMENT_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
               </Select>
             </div>
 
@@ -325,12 +361,14 @@ export default function DocumentsPage() {
 
           <div className="space-y-1">
             <Label htmlFor="doc_categoria_filtro">Categoria</Label>
-            <Input
-              id="doc_categoria_filtro"
-              placeholder="ex: identidade"
-              value={filterCategoria}
-              onChange={(e) => setFilterCategoria(e.target.value)}
-            />
+            <Select id="doc_categoria_filtro" value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
+              <option value="">Todas</option>
+              {DOCUMENT_CATEGORIES.map((c) => (
+                <option key={`f-${c.value}`} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div className="space-y-1 md:col-span-2">
@@ -403,7 +441,7 @@ export default function DocumentsPage() {
                 {list.data.map((d) => (
                   <TableRow key={d.id}>
                     <TableCell>{d.filename}</TableCell>
-                    <TableCell>{d.categoria ?? "—"}</TableCell>
+                    <TableCell>{labelForCategory(d.categoria)}</TableCell>
                     <TableCell>
                       {d.process_id ? "processo" : d.client_id ? "cliente" : d.honorario_id ? "honorário" : "—"}
                     </TableCell>

@@ -1,6 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileUp } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import { z } from "zod";
@@ -23,6 +26,7 @@ type Proc = {
   status: "ativo" | "inativo" | "outros";
   nicho?: string | null;
   client_id: string;
+  client_nome?: string | null;
   parceria_id?: string | null;
 };
 
@@ -53,8 +57,11 @@ const NICHOS = [
 export default function ProcessesPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [q, setQ] = useState<string>("");
+  const [clientFilterId, setClientFilterId] = useState<string>("");
   const clients = useQuery({
     queryKey: ["clients"],
     queryFn: async () => (await api.get<Client[]>("/v1/clients")).data
@@ -66,8 +73,13 @@ export default function ProcessesPage() {
   });
 
   const list = useQuery({
-    queryKey: ["processes", q],
-    queryFn: async () => (await api.get<Proc[]>("/v1/processes", { params: q ? { q } : {} })).data
+    queryKey: ["processes", q, clientFilterId],
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (q) params.q = q;
+      if (clientFilterId) params.client_id = clientFilterId;
+      return (await api.get<Proc[]>("/v1/processes", { params })).data;
+    }
   });
 
   const form = useForm<FormValues>({
@@ -212,8 +224,21 @@ export default function ProcessesPage() {
           <CardTitle className="text-sm">Lista</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2">
-            <Input placeholder="Buscar por processo ou nicho…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+            <Input
+              className="md:col-span-2"
+              placeholder="Buscar por processo ou nicho…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <Select value={clientFilterId} onChange={(e) => setClientFilterId(e.target.value)}>
+              <option value="">Filtrar por cliente</option>
+              {clients.data?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </Select>
             <Button variant="outline" type="button" onClick={() => setQ("")}>
               Limpar
             </Button>
@@ -238,6 +263,7 @@ export default function ProcessesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Número</TableHead>
+                  <TableHead>Cliente</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Nicho</TableHead>
                   <TableHead>Parceria</TableHead>
@@ -248,6 +274,7 @@ export default function ProcessesPage() {
                 {list.data.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{p.numero}</TableCell>
+                    <TableCell>{p.client_nome ?? clients.data?.find((c) => c.id === p.client_id)?.nome ?? "—"}</TableCell>
                     <TableCell>{p.status}</TableCell>
                     <TableCell>{p.nicho ?? "—"}</TableCell>
                     <TableCell>
@@ -255,6 +282,12 @@ export default function ProcessesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/dashboard/${slug}/documents?process_id=${p.id}&category=despacho`}>
+                            <FileUp className="mr-2 h-4 w-4" />
+                            Despacho
+                          </Link>
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

@@ -8,7 +8,9 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
+import { formatFullAddress } from "@/lib/address";
 import { formatDateTimeBR } from "@/lib/datetime";
+import { formatCNPJ, formatCPF, formatPhoneBR } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -75,6 +77,9 @@ type ClientDetails = {
 };
 
 const CATEGORIAS = [
+  { value: "despacho", label: "Despacho" },
+  { value: "sentencas", label: "Sentenças" },
+  { value: "acordao", label: "Acordão" },
   { value: "identidade", label: "Identidade (RG/CPF)" },
   { value: "comprovante_endereco", label: "Comprovante de Endereço" },
   { value: "declaracao_pobreza", label: "Declaração de Pobreza" },
@@ -344,7 +349,11 @@ export default function ClientDetailPage() {
             <div>
               <CardTitle>Cliente: {client?.nome ?? "—"}</CardTitle>
               <CardDescription>
-                {client ? `${client.tipo_documento.toUpperCase()}: ${client.documento}` : "Carregando…"}
+                {client
+                  ? `${client.tipo_documento.toUpperCase()}: ${
+                      client.tipo_documento === "cpf" ? formatCPF(client.documento) : formatCNPJ(client.documento)
+                    }`
+                  : "Carregando…"}
               </CardDescription>
             </div>
             <Button asChild variant="outline">
@@ -366,16 +375,26 @@ export default function ClientDetailPage() {
           {client ? (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <InfoItem label="Nome" value={client.nome} />
-              <InfoItem label="Documento" value={`${client.tipo_documento.toUpperCase()} ${client.documento}`} />
+              <InfoItem
+                label="Documento"
+                value={`${client.tipo_documento.toUpperCase()} ${
+                  client.tipo_documento === "cpf" ? formatCPF(client.documento) : formatCNPJ(client.documento)
+                }`}
+              />
               <InfoItem label="E-mail" value={client.email ?? null} />
-              <InfoItem label="Celular" value={client.phone_mobile ?? null} />
-              <InfoItem label="Rua" value={client.address_street ?? null} />
-              <InfoItem label="Número" value={client.address_number ?? null} />
-              <InfoItem label="Complemento" value={client.address_complement ?? null} />
-              <InfoItem label="Bairro" value={client.address_neighborhood ?? null} />
-              <InfoItem label="Cidade" value={client.address_city ?? null} />
-              <InfoItem label="UF" value={client.address_state ?? null} />
-              <InfoItem label="CEP" value={client.address_zip ?? null} />
+              <InfoItem label="Celular" value={client.phone_mobile ? formatPhoneBR(client.phone_mobile) : null} />
+              {(() => {
+                const fullAddress = formatFullAddress({
+                  street: client.address_street,
+                  number: client.address_number,
+                  complement: client.address_complement,
+                  neighborhood: client.address_neighborhood,
+                  city: client.address_city,
+                  state: client.address_state,
+                  zip: client.address_zip
+                });
+                return <InfoItem label="Endereço completo" value={fullAddress === "-" ? null : fullAddress} />;
+              })()}
             </div>
           ) : null}
         </CardContent>
@@ -425,8 +444,8 @@ export default function ClientDetailPage() {
                       <TableCell>
                         {p.telefone ? (
                           <div className="flex items-center justify-between gap-2">
-                            <span>{p.telefone}</span>
-                            <CopyButton value={p.telefone} label="Copiar telefone" />
+                            <span>{formatPhoneBR(p.telefone)}</span>
+                            <CopyButton value={formatPhoneBR(p.telefone)} label="Copiar telefone" />
                           </div>
                         ) : (
                           "—"
@@ -445,9 +464,12 @@ export default function ClientDetailPage() {
                       <TableCell className="font-mono text-xs">
                         <div className="flex items-center justify-between gap-2">
                           <span>
-                            {p.tipo_documento}:{p.documento}
+                            {p.tipo_documento}:{p.tipo_documento === "cpf" ? formatCPF(p.documento) : formatCNPJ(p.documento)}
                           </span>
-                          <CopyButton value={p.documento} label="Copiar documento" />
+                          <CopyButton
+                            value={p.tipo_documento === "cpf" ? formatCPF(p.documento) : formatCNPJ(p.documento)}
+                            label="Copiar documento"
+                          />
                         </div>
                       </TableCell>
                     </TableRow>

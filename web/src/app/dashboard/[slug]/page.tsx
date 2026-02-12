@@ -270,7 +270,7 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <div className="flex flex-1 items-center justify-center">
-              <PieChart />
+              <ExcelIcon />
             </div>
 
             <div className="mt-4">
@@ -450,72 +450,34 @@ function AreaChart({
   );
 }
 
-function PieChart() {
-  // Decorative pie chart (donut) – purely visual.
-  // Values are illustrative; they don't represent real analytics yet.
-  const r = 40;
-  const c = 2 * Math.PI * r;
-  const segA = c * 0.55;
-  const segB = c * 0.25;
-  const segC = c - segA - segB;
-
+function ExcelIcon() {
   return (
     <svg
       viewBox="0 0 120 120"
-      className="h-28 w-28 drop-shadow-sm"
+      className="h-20 w-20 sm:h-24 sm:w-24 drop-shadow-sm"
       role="img"
-      aria-label="Gráfico de pizza"
+      aria-label="Ícone do Excel"
     >
       <defs>
-        <radialGradient id="ejDonutGlow" cx="50%" cy="35%" r="70%">
-          <stop offset="0%" stopColor="rgba(35, 64, 102, 0.35)" />
-          <stop offset="100%" stopColor="rgba(35, 64, 102, 0)" />
-        </radialGradient>
+        <linearGradient id="excelGlow" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stopColor="rgba(34, 197, 94, 0.55)" />
+          <stop offset="100%" stopColor="rgba(16, 185, 129, 0.15)" />
+        </linearGradient>
       </defs>
 
-      {/* soft glow */}
-      <circle cx="60" cy="60" r="52" fill="url(#ejDonutGlow)" />
-
-      {/* base ring */}
-      <circle cx="60" cy="60" r={r} fill="none" stroke="rgb(var(--border) / 0.10)" strokeWidth="18" />
-
-      {/* segments */}
-      <g transform="rotate(-90 60 60)">
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          fill="none"
-          stroke="#234066"
-          strokeWidth="18"
-          strokeDasharray={`${segA} ${c}`}
-          strokeDashoffset={0}
-        />
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          fill="none"
-          stroke="#22C55E"
-          strokeWidth="18"
-          strokeDasharray={`${segB} ${c}`}
-          strokeDashoffset={-segA}
-        />
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          fill="none"
-          stroke="#FACC15"
-          strokeWidth="18"
-          strokeDasharray={`${segC} ${c}`}
-          strokeDashoffset={-(segA + segB)}
-        />
-      </g>
-
-      {/* inner hole */}
-      <circle cx="60" cy="60" r="24" fill="rgb(var(--background) / 0.25)" />
-      <circle cx="60" cy="60" r="23" fill="rgb(var(--card) / 0.55)" />
+      <rect x="18" y="20" width="84" height="80" rx="14" fill="url(#excelGlow)" />
+      <rect x="24" y="26" width="72" height="68" rx="10" fill="rgba(15, 23, 42, 0.2)" />
+      <rect x="30" y="32" width="40" height="56" rx="8" fill="#16A34A" />
+      <path
+        d="M42 46 L50 60 L42 74 M58 46 L50 60 L58 74"
+        stroke="white"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="74" y="32" width="16" height="12" rx="3" fill="#22C55E" />
+      <rect x="74" y="50" width="16" height="12" rx="3" fill="#22C55E" />
+      <rect x="74" y="68" width="16" height="12" rx="3" fill="#22C55E" />
     </svg>
   );
 }

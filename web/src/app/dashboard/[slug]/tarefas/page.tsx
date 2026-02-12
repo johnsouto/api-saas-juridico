@@ -252,11 +252,21 @@ export default function TarefasPage() {
                   </div>
                   <Badge variant="secondary">{list.data.filter((t) => t.status === col).length}</Badge>
                 </div>
-                <div className="mt-2 space-y-2">
+                        <div className="mt-2 space-y-2">
                   {list.data
                     .filter((t) => t.status === col)
                     .map((t) => (
-                      <div key={t.id} className="space-y-2 rounded-lg border border-border/15 bg-card/40 p-3 text-sm">
+                      <div
+                        key={t.id}
+                        className={[
+                          "space-y-2 rounded-lg border bg-card/40 p-3 text-sm",
+                          t.status === "pendente"
+                            ? "border-orange-500/60"
+                            : t.status === "em_andamento"
+                              ? "border-yellow-400/60"
+                              : "border-green-500/60"
+                        ].join(" ")}
+                      >
                         <div className="font-medium">{t.titulo}</div>
                         {t.client_id ? (
                           <div className="text-xs text-muted-foreground">

@@ -11,6 +11,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { cleanupLegacySaaSTokens, loginWithEmailSenha, registerTenant as registerTenantApi } from "@/lib/auth";
 import { passwordPolicyMessage, validatePassword } from "@/lib/password";
+import { formatCNPJ, formatCPF, isValidCNPJLength, isValidCPFLength, onlyDigits } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,10 +43,6 @@ function normalizeSlug(input: string): string {
     .replace(/-+$/, "");
 }
 
-function onlyDigits(input: string): string {
-  return input.replace(/\D+/g, "");
-}
-
 const passwordSchema = z
   .string()
   .min(8, passwordPolicyMessage)
@@ -55,7 +52,7 @@ const registerSchema = z
   .object({
     tenant_nome: z.string().min(2, "Informe o nome do escritório"),
     tenant_tipo_documento: z.enum(["cpf", "cnpj"]).default("cnpj"),
-    tenant_documento: z.string().min(8, "Informe o CPF/CNPJ"),
+    tenant_documento: z.string().min(1, "Informe o CPF/CNPJ"),
     tenant_slug: z
       .string()
       .min(2, "Informe um slug (ex: silva-advocacia)")
@@ -65,6 +62,23 @@ const registerSchema = z
     admin_email: z.string().email("E-mail inválido."),
     admin_senha: passwordSchema,
     admin_senha_confirm: z.string().min(8, "Confirme a senha")
+  })
+  .superRefine((data, ctx) => {
+    const digits = onlyDigits(data.tenant_documento);
+    if (data.tenant_tipo_documento === "cpf" && !isValidCPFLength(digits)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tenant_documento"],
+        message: "CPF incompleto. Informe 11 dígitos."
+      });
+    }
+    if (data.tenant_tipo_documento === "cnpj" && !isValidCNPJLength(digits)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tenant_documento"],
+        message: "CNPJ incompleto. Informe 14 dígitos."
+      });
+    }
   })
   .refine((d) => d.admin_senha === d.admin_senha_confirm, {
     path: ["admin_senha_confirm"],
@@ -149,6 +163,11 @@ export default function LoginPage() {
   });
 
   const watchedTenantNome = registerForm.watch("tenant_nome");
+  const watchedTenantDocType = registerForm.watch("tenant_tipo_documento");
+  const watchedTenantDoc = registerForm.watch("tenant_documento");
+  const tenantDocDigits = onlyDigits(watchedTenantDoc ?? "");
+  const tenantDocValid =
+    watchedTenantDocType === "cpf" ? isValidCPFLength(tenantDocDigits) : isValidCNPJLength(tenantDocDigits);
   const watchedRegisterPassword = registerForm.watch("admin_senha");
   const pwdValidation = validatePassword(watchedRegisterPassword ?? "");
   useEffect(() => {
@@ -325,7 +344,18 @@ export default function LoginPage() {
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                   <div className="space-y-1 md:col-span-1">
                     <Label htmlFor="reg_tipo_doc">Tipo</Label>
-                    <Select id="reg_tipo_doc" {...registerForm.register("tenant_tipo_documento")}>
+                    <Select
+                      id="reg_tipo_doc"
+                      {...registerForm.register("tenant_tipo_documento", {
+                        onChange: (event) => {
+                          const nextType = event.target.value as "cpf" | "cnpj";
+                          const digits = onlyDigits(registerForm.getValues("tenant_documento") ?? "");
+                          const limited = digits.slice(0, nextType === "cpf" ? 11 : 14);
+                          const formatted = nextType === "cpf" ? formatCPF(limited) : formatCNPJ(limited);
+                          registerForm.setValue("tenant_documento", formatted, { shouldValidate: true });
+                        }
+                      })}
+                    >
                       <option value="cnpj">CNPJ</option>
                       <option value="cpf">CPF</option>
                     </Select>
@@ -339,7 +369,10 @@ export default function LoginPage() {
                       placeholder="Somente números"
                       {...registerForm.register("tenant_documento", {
                         onChange: (e) => {
-                          registerForm.setValue("tenant_documento", onlyDigits(e.target.value), {
+                          const digits = onlyDigits(e.target.value);
+                          const limited = digits.slice(0, watchedTenantDocType === "cpf" ? 11 : 14);
+                          const formatted = watchedTenantDocType === "cpf" ? formatCPF(limited) : formatCNPJ(limited);
+                          registerForm.setValue("tenant_documento", formatted, {
                             shouldValidate: true
                           });
                         }
@@ -350,6 +383,12 @@ export default function LoginPage() {
                     </p>
                     {registerForm.formState.errors.tenant_documento?.message ? (
                       <p className="text-xs text-red-600">{registerForm.formState.errors.tenant_documento.message}</p>
+                    ) : tenantDocDigits && !tenantDocValid ? (
+                      <p className="text-xs text-red-600">
+                        {watchedTenantDocType === "cpf"
+                          ? "CPF incompleto. Informe 11 dígitos."
+                          : "CNPJ incompleto. Informe 14 dígitos."}
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -495,7 +534,12 @@ export default function LoginPage() {
 
                 <Button
                   className="w-full"
-                  disabled={registerTenant.isPending || (turnstileEnabled && !turnstileToken) || !pwdValidation.allOk}
+                  disabled={
+                    registerTenant.isPending ||
+                    (turnstileEnabled && !turnstileToken) ||
+                    !pwdValidation.allOk ||
+                    !tenantDocValid
+                  }
                   type="submit"
                 >
                   {registerTenant.isPending ? "Criando..." : "Criar conta"}
