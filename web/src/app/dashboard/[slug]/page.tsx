@@ -188,8 +188,8 @@ export default function DashboardHome() {
         </Card>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <Card>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+        <Card className="md:col-span-3">
           <CardHeader>
             <CardTitle className="text-sm">Clientes</CardTitle>
           </CardHeader>
@@ -204,85 +204,66 @@ export default function DashboardHome() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Processos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats.data?.processes ?? "—"}</div>
-            <Link
-              className="mt-2 inline-block text-sm text-foreground underline decoration-border/20 underline-offset-4 hover:decoration-border/40"
-              href={`/dashboard/${slug}/processes`}
-            >
-              Abrir processos
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="flex flex-col">
+        <Card className="flex min-h-[320px] flex-col md:col-span-6">
           <CardHeader>
             <CardTitle className="text-sm">Tarefas</CardTitle>
             <CardDescription className="text-xs">Resumo do Kanban.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col">
-            <div className="flex flex-1 flex-col gap-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center justify-center md:justify-start">
-                  <TaskPieChart
-                    dueToday={kanban.data?.due_today ?? 0}
-                    pendente={kanban.data?.pendente ?? 0}
-                    emAndamento={kanban.data?.em_andamento ?? 0}
-                    concluido={kanban.data?.concluido ?? 0}
-                  />
-                </div>
+          <CardContent className="flex flex-1 flex-col items-center justify-start gap-4">
+            <div className="flex items-center justify-center">
+              <TaskPieChart
+                dueToday={kanban.data?.due_today ?? 0}
+                pendente={kanban.data?.pendente ?? 0}
+                emAndamento={kanban.data?.em_andamento ?? 0}
+                concluido={kanban.data?.concluido ?? 0}
+              />
+            </div>
 
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted-foreground">Prazo expira hoje</span>
-                    <div className="min-w-[72px] rounded-lg bg-red-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                      {kanban.data ? kanban.data.due_today : "—"}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted-foreground">Pendente</span>
-                    <div className="min-w-[72px] rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                      {kanban.data ? kanban.data.pendente : "—"}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted-foreground">Em andamento</span>
-                    <div className="min-w-[72px] rounded-lg bg-yellow-400 px-3 py-2 text-center text-sm font-semibold tabular-nums text-zinc-950 shadow-sm ring-1 ring-border/25">
-                      {kanban.data ? kanban.data.em_andamento : "—"}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span
-                      className={[
-                        "text-xs",
-                        (kanban.data?.concluido ?? 0) > 0 ? "font-medium text-emerald-600" : "text-muted-foreground"
-                      ].join(" ")}
-                      title="Concluídas"
-                    >
-                      Sem pendências
-                      <span className="ml-1 text-[10px] font-normal text-muted-foreground">(concluídas)</span>
-                    </span>
-                    <div className="min-w-[72px] rounded-lg bg-green-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                      {kanban.data ? kanban.data.concluido : "—"}
-                    </div>
-                  </div>
+            <div className="flex w-full max-w-[240px] flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">Prazo expira hoje</span>
+                <div className="min-w-[84px] rounded-lg bg-red-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                  {kanban.data ? kanban.data.due_today : "—"}
                 </div>
               </div>
-
-              <Button asChild className="w-full" size="sm" variant="outline">
-                <Link href={`/dashboard/${slug}/tarefas`}>Kanban</Link>
-              </Button>
-
-              {kanban.isError ? <p className="text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">Pendente</span>
+                <div className="min-w-[84px] rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                  {kanban.data ? kanban.data.pendente : "—"}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">Em andamento</span>
+                <div className="min-w-[84px] rounded-lg bg-yellow-400 px-3 py-2 text-center text-sm font-semibold tabular-nums text-zinc-950 shadow-sm ring-1 ring-border/25">
+                  {kanban.data ? kanban.data.em_andamento : "—"}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className={[
+                    "text-xs",
+                    (kanban.data?.concluido ?? 0) > 0 ? "font-medium text-emerald-600" : "text-muted-foreground"
+                  ].join(" ")}
+                  title="Concluídas"
+                >
+                  Sem pendências
+                  <span className="ml-1 text-[10px] font-normal text-muted-foreground">(concluídas)</span>
+                </span>
+                <div className="min-w-[84px] rounded-lg bg-green-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                  {kanban.data ? kanban.data.concluido : "—"}
+                </div>
+              </div>
             </div>
+
+            <Button asChild className="w-full" size="sm" variant="outline">
+              <Link href={`/dashboard/${slug}/tarefas`}>Kanban</Link>
+            </Button>
+
+            {kanban.isError ? <p className="text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col">
+        <Card className="flex flex-col md:col-span-3">
           <CardHeader>
             <CardTitle className="text-sm">Relatório</CardTitle>
             <CardDescription className="text-xs">Exporte seus dados em Excel.</CardDescription>
