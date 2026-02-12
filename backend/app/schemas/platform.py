@@ -135,6 +135,33 @@ class PlatformOverviewOut(APIModel):
     recent_tenants: list[PlatformOverviewRecentTenant] = []
 
 
+class PlatformRevenueMonthlyPoint(APIModel):
+    month: str
+    value: float
+
+
+class PlatformRevenueOverviewOut(APIModel):
+    currency: str = "BRL"
+    plan_price_monthly: float = 47.0
+    active_plus_tenants: int = 0
+    mrr: float = 0
+    arr_estimated: float = 0
+    revenue_ytd: float = 0
+    monthly_series: list[PlatformRevenueMonthlyPoint] = []
+
+
+class PlatformRevenueTenantOut(APIModel):
+    tenant_id: uuid.UUID
+    tenant_name: str
+    tenant_slug: str
+    plan: str = "plus"
+    status: str = "ACTIVE"
+    started_at: datetime | None = None
+    next_billing_at: datetime | None = None
+    last_payment_at: datetime | None = None
+    price_monthly: float = 47.0
+
+
 class PlatformTenantSubscriptionUpdate(APIModel):
     plan_code: PlanCode | None = None
     status: SubscriptionStatus | None = None
