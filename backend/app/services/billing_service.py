@@ -6,18 +6,18 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import BackgroundTasks
-from sqlalchemy import Select, and_, select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.billing_event import BillingEvent
-from app.models.enums import BillingPeriod, BillingProvider, PlanCode, SubscriptionStatus, UserRole
+from app.models.enums import BillingProvider, PlanCode, SubscriptionStatus, UserRole
 from app.models.plan import Plan
 from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.billing import BillingCheckoutOut, BillingLimits, BillingStatusOut
 from app.services.email_service import EmailService
-from app.services.payment_service import CheckoutResult, PaymentProvider, ProviderEvent
+from app.services.payment_service import PaymentProvider, ProviderEvent
 
 
 def _utcnow() -> datetime:
