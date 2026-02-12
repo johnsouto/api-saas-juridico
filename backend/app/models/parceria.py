@@ -11,6 +11,7 @@ from app.db.base import Base, UUIDBaseMixin
 from app.models.enums import TenantDocumentoTipo
 
 if TYPE_CHECKING:
+    from app.models.client_partnership import ClientPartnership
     from app.models.process import Process
 
 
@@ -41,4 +42,5 @@ class Parceria(UUIDBaseMixin, Base):
     )
     documento: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
 
+    client_links: Mapped[list["ClientPartnership"]] = relationship(back_populates="parceria")
     processos: Mapped[list["Process"]] = relationship(back_populates="parceria")

@@ -13,6 +13,7 @@ from app.models.enums import TenantDocumentoTipo
 
 if TYPE_CHECKING:
     from app.models.client_case import ClientCase
+    from app.models.client_partnership import ClientPartnership
     from app.models.document import Document
     from app.models.honorario import Honorario
     from app.models.process import Process
@@ -49,5 +50,6 @@ class Client(UUIDBaseMixin, Base):
 
     processos: Mapped[list["Process"]] = relationship(back_populates="client")
     cases: Mapped[list["ClientCase"]] = relationship(back_populates="client")
+    partnership_links: Mapped[list["ClientPartnership"]] = relationship(back_populates="client")
     honorarios: Mapped[list["Honorario"]] = relationship(back_populates="client")
     documentos: Mapped[list["Document"]] = relationship(back_populates="client")
