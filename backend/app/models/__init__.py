@@ -10,6 +10,7 @@ from app.models.parceria import Parceria
 from app.models.password_reset import PasswordReset
 from app.models.plan import Plan
 from app.models.process import Process
+from app.models.process_movement import ProcessMovement
 from app.models.subscription import Subscription
 from app.models.tarefa import Tarefa
 from app.models.tenant import Tenant
@@ -32,6 +33,7 @@ __all__ = [
     "Plan",
     "PlanCode",
     "Process",
+    "ProcessMovement",
     "Subscription",
     "SubscriptionStatus",
     "Tarefa",

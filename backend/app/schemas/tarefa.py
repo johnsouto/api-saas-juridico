@@ -35,5 +35,9 @@ class TarefaOut(APIModel):
     status: TarefaStatus
     responsavel_id: uuid.UUID | None
     client_id: uuid.UUID | None
+    related_process_id: uuid.UUID | None
+    attachment_document_id: uuid.UUID | None
+    source: str | None
+    attachment_is_temporary: bool
     prazo_em: datetime | None
     criado_em: datetime
