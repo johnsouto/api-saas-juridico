@@ -22,7 +22,6 @@ class PlanCode(str, enum.Enum):
     FREE = "FREE"
     PLUS_MONTHLY_CARD = "PLUS_MONTHLY_CARD"
     PLUS_ANNUAL_PIX = "PLUS_ANNUAL_PIX"
-    PLUS_ANNUAL_PIX_TEST = "PLUS_ANNUAL_PIX_TEST"
 
 
 class BillingPeriod(str, enum.Enum):

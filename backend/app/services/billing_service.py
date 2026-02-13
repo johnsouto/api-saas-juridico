@@ -175,6 +175,15 @@ class BillingService:
         now = now or _utcnow()
 
         tenant_id = uuid.UUID(event.tenant_id)
+        if await self._is_duplicate_event(
+            db,
+            tenant_id=tenant_id,
+            provider=event.provider.value,
+            event_type=event.event_type,
+            external_id=event.external_id,
+        ):
+            return
+
         sub = await self._get_or_create_subscription(db, tenant_id=tenant_id)
 
         await self._add_event(
@@ -190,20 +199,15 @@ class BillingService:
             if not event.plan_code:
                 raise ValueError("plan_code ausente")
 
-            paid_plan_code = event.plan_code
-            if paid_plan_code == PlanCode.PLUS_ANNUAL_PIX_TEST:
-                # Test checkout upgrades to the real annual plan after approval.
-                paid_plan_code = PlanCode.PLUS_ANNUAL_PIX
-
             sub.provider = event.provider
-            sub.plan_code = paid_plan_code
+            sub.plan_code = event.plan_code
             sub.status = SubscriptionStatus.active
             sub.cancel_at_period_end = False
             sub.grace_period_end = None
             sub.current_period_start = now
-            if paid_plan_code == PlanCode.PLUS_MONTHLY_CARD:
+            if event.plan_code == PlanCode.PLUS_MONTHLY_CARD:
                 sub.current_period_end = now + timedelta(days=30)
-            elif paid_plan_code == PlanCode.PLUS_ANNUAL_PIX:
+            elif event.plan_code == PlanCode.PLUS_ANNUAL_PIX:
                 sub.current_period_end = now + timedelta(days=365)
             else:
                 raise ValueError("plan_code inválido")
@@ -233,6 +237,27 @@ class BillingService:
 
         db.add(sub)
         await db.commit()
+
+    async def _is_duplicate_event(
+        self,
+        db: AsyncSession,
+        *,
+        tenant_id: uuid.UUID,
+        provider: str,
+        event_type: str,
+        external_id: str | None,
+    ) -> bool:
+        if not external_id:
+            return False
+        stmt = (
+            select(BillingEvent.id)
+            .where(BillingEvent.tenant_id == tenant_id)
+            .where(BillingEvent.provider == provider)
+            .where(BillingEvent.event_type == event_type)
+            .where(BillingEvent.external_id == external_id)
+            .limit(1)
+        )
+        return (await db.execute(stmt)).scalar_one_or_none() is not None
 
     async def run_scheduled_maintenance(
         self,
