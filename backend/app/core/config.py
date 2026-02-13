@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     MERCADOPAGO_ACCESS_TOKEN_CHECKOUT_PRO: str | None = None
     # Webhook secret from Mercado Pago "Webhooks" settings (used to validate x-signature).
     MERCADOPAGO_WEBHOOK_SECRET: str | None = None
+    # Optional split webhook secrets by flow/app (fallbacks to MERCADOPAGO_WEBHOOK_SECRET if empty).
+    MERCADOPAGO_WEBHOOK_SECRET_SUBSCRIPTIONS: str | None = None
+    MERCADOPAGO_WEBHOOK_SECRET_CHECKOUT_PRO: str | None = None
     MERCADOPAGO_API_BASE_URL: str = "https://api.mercadopago.com"
 
     # Cloudflare Turnstile (anti-bot)

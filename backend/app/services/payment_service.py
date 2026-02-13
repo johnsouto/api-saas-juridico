@@ -284,8 +284,17 @@ class MercadoPagoPaymentProvider:
             raise ValueError("Invalid x-signature header")
         return ts, v1
 
+    def _webhook_secret_for_topic(self, *, topic: str | None) -> str | None:
+        topic_norm = (topic or "").strip().lower()
+        if topic_norm in {"subscription_preapproval", "preapproval", "subscription_authorized_payment", "authorized_payment"}:
+            return (settings.MERCADOPAGO_WEBHOOK_SECRET_SUBSCRIPTIONS or settings.MERCADOPAGO_WEBHOOK_SECRET or "").strip() or None
+        if topic_norm in {"payment", "merchant_order"}:
+            return (settings.MERCADOPAGO_WEBHOOK_SECRET_CHECKOUT_PRO or settings.MERCADOPAGO_WEBHOOK_SECRET or "").strip() or None
+        return (settings.MERCADOPAGO_WEBHOOK_SECRET or "").strip() or None
+
     def _verify_webhook_signature(self, *, headers: dict[str, str], query_params: dict[str, str]) -> None:
-        secret = (settings.MERCADOPAGO_WEBHOOK_SECRET or "").strip()
+        topic = query_params.get("type") or query_params.get("topic")
+        secret = self._webhook_secret_for_topic(topic=topic)
         if not secret:
             return
 
