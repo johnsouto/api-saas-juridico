@@ -66,10 +66,6 @@ class PaymentProvider(Protocol):
 def get_payment_provider() -> PaymentProvider:
     """
     Factory for the configured billing provider.
-
-    NOTE: For now we only implement the fake provider. Stripe/Mercado Pago are
-    intentionally left as stubs so the architecture is ready for real
-    integrations later.
     """
     raw = (settings.BILLING_PROVIDER or "FAKE").strip().upper()
     if raw == BillingProvider.FAKE.value:
@@ -178,6 +174,9 @@ class StripePaymentProvider:
 @dataclass(frozen=True)
 class MercadoPagoPaymentProvider:
     provider: BillingProvider = BillingProvider.MERCADOPAGO
+
+    _SUCCESS_STATUSES = {"approved", "authorized", "paid"}
+    _FAILURE_STATUSES = {"rejected", "cancelled", "canceled", "refunded", "charged_back"}
 
     def _require_token(self) -> str:
         token = (settings.MERCADOPAGO_ACCESS_TOKEN or "").strip()
@@ -312,6 +311,14 @@ class MercadoPagoPaymentProvider:
             raise ValueError("Invalid Mercado Pago webhook payload (missing topic/id)")
         return topic, data_id
 
+    def _payment_event_type(self, *, status: str, source: str) -> str:
+        normalized = (status or "").strip().lower()
+        if normalized in self._SUCCESS_STATUSES:
+            return "payment_succeeded"
+        if normalized in self._FAILURE_STATUSES:
+            return "payment_failed"
+        return f"{source}_{normalized or 'updated'}"
+
     def create_checkout(
         self,
         *,
@@ -321,40 +328,77 @@ class MercadoPagoPaymentProvider:
         success_url: str,
         cancel_url: str,
     ) -> CheckoutResult:
-        if plan_code != PlanCode.PLUS_MONTHLY_CARD:
-            raise ValueError("Unsupported plan_code for Mercado Pago (only PLUS_MONTHLY_CARD for now)")
-        if not payer_email:
-            raise ValueError("payer_email is required for Mercado Pago subscriptions")
-
-        payload: dict[str, Any] = {
-            "reason": "Elemento Juris — Plus Mensal (Cartão)",
-            "external_reference": self._external_reference(tenant_id=tenant_id, plan_code=plan_code),
-            "payer_email": payer_email,
-            "auto_recurring": {
-                "frequency": 1,
-                "frequency_type": "months",
-                "transaction_amount": 47.00,
-                "currency_id": "BRL",
-            },
-            # Redirect after the buyer confirms the subscription.
-            "back_url": success_url,
-            # Let the buyer choose the payment method via Mercado Pago checkout.
-            "status": "pending",
-        }
-
-        # Optional: force notifications to our endpoint (still recommended to configure webhooks in the MP panel).
         public_url = (settings.PUBLIC_APP_URL or "").strip().rstrip("/")
-        if public_url.startswith("http"):
-            payload["notification_url"] = f"{public_url}/api/v1/billing/webhook/mercadopago"
+        notification_url = f"{public_url}/api/v1/billing/webhook/mercadopago" if public_url.startswith("http") else None
+        external_reference = self._external_reference(tenant_id=tenant_id, plan_code=plan_code)
 
-        data = self._post_json(path="/preapproval", payload=payload)
+        if plan_code == PlanCode.PLUS_MONTHLY_CARD:
+            if not payer_email:
+                raise ValueError("payer_email is required for Mercado Pago subscriptions")
 
-        preapproval_id = str(data.get("id") or "").strip()
-        init_point = str(data.get("init_point") or data.get("sandbox_init_point") or "").strip()
-        if not preapproval_id or not init_point:
-            raise ValueError("Mercado Pago did not return preapproval id/init_point")
+            payload: dict[str, Any] = {
+                "reason": "Elemento Juris — Plus Mensal (Cartão)",
+                "external_reference": external_reference,
+                "payer_email": payer_email,
+                "auto_recurring": {
+                    "frequency": 1,
+                    "frequency_type": "months",
+                    "transaction_amount": 47.00,
+                    "currency_id": "BRL",
+                },
+                # Redirect after the buyer confirms the subscription.
+                "back_url": success_url,
+                # Let the buyer choose the payment method via Mercado Pago checkout.
+                "status": "pending",
+            }
+            if notification_url:
+                payload["notification_url"] = notification_url
 
-        return CheckoutResult(checkout_url=init_point, provider_subscription_id=preapproval_id)
+            data = self._post_json(path="/preapproval", payload=payload)
+
+            preapproval_id = str(data.get("id") or "").strip()
+            init_point = str(data.get("init_point") or data.get("sandbox_init_point") or "").strip()
+            if not preapproval_id or not init_point:
+                raise ValueError("Mercado Pago did not return preapproval id/init_point")
+            return CheckoutResult(checkout_url=init_point, provider_subscription_id=preapproval_id)
+
+        if plan_code == PlanCode.PLUS_ANNUAL_PIX:
+            payload = {
+                "items": [
+                    {
+                        "title": "Elemento Juris — Plus Anual (Pix)",
+                        "quantity": 1,
+                        "currency_id": "BRL",
+                        "unit_price": 499.00,
+                    }
+                ],
+                "external_reference": external_reference,
+                "back_urls": {
+                    "success": success_url,
+                    "pending": success_url,
+                    "failure": cancel_url,
+                },
+                "auto_return": "approved",
+                # Pix remains available and pre-selected in Checkout Pro.
+                "payment_methods": {
+                    "default_payment_method_id": "pix",
+                    "installments": 1,
+                    "default_installments": 1,
+                },
+            }
+            if payer_email:
+                payload["payer"] = {"email": payer_email}
+            if notification_url:
+                payload["notification_url"] = notification_url
+
+            data = self._post_json(path="/checkout/preferences", payload=payload)
+            preference_id = str(data.get("id") or "").strip()
+            init_point = str(data.get("init_point") or data.get("sandbox_init_point") or "").strip()
+            if not preference_id or not init_point:
+                raise ValueError("Mercado Pago did not return preference id/init_point")
+            return CheckoutResult(checkout_url=init_point, provider_payment_id=preference_id)
+
+        raise ValueError("Unsupported plan_code for Mercado Pago")
 
     def handle_webhook(self, *, headers: dict[str, str], body: bytes, query_params: dict[str, str]) -> ProviderEvent:
         self._verify_webhook_signature(headers=headers, query_params=query_params)
@@ -438,8 +482,7 @@ class MercadoPagoPaymentProvider:
                 "external_reference": str(auth.get("external_reference") or ""),
             }
 
-            succeeded = status in {"approved", "authorized", "paid"}
-            event_type = "payment_succeeded" if succeeded else "payment_failed"
+            event_type = self._payment_event_type(status=status, source="authorized_payment")
             return ProviderEvent(
                 provider=self.provider,
                 event_type=event_type,
@@ -470,8 +513,7 @@ class MercadoPagoPaymentProvider:
             }
 
             if tenant_id:
-                succeeded = status in {"approved", "authorized", "paid"}
-                event_type = "payment_succeeded" if succeeded else "payment_failed"
+                event_type = self._payment_event_type(status=status, source="payment")
                 return ProviderEvent(
                     provider=self.provider,
                     event_type=event_type,

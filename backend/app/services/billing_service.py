@@ -207,16 +207,19 @@ class BillingService:
             sub.last_payment_status = event.payment_status or "succeeded"
 
         elif event.event_type == "payment_failed":
-            # Monthly card renewal failed: keep access during grace period.
+            failed_plan = event.plan_code or PlanCode.PLUS_MONTHLY_CARD
             sub.provider = event.provider
-            sub.plan_code = PlanCode.PLUS_MONTHLY_CARD
-            sub.status = SubscriptionStatus.past_due
-            sub.grace_period_end = now + timedelta(days=7)
             sub.last_payment_at = now
             sub.last_payment_status = event.payment_status or "failed"
 
-            if background:
-                await self._send_past_due_email(db, background, tenant_id=tenant_id, sub=sub, now=now)
+            if failed_plan == PlanCode.PLUS_MONTHLY_CARD:
+                # Monthly card renewal failed: keep access during grace period.
+                sub.plan_code = PlanCode.PLUS_MONTHLY_CARD
+                sub.status = SubscriptionStatus.past_due
+                sub.grace_period_end = now + timedelta(days=7)
+
+                if background:
+                    await self._send_past_due_email(db, background, tenant_id=tenant_id, sub=sub, now=now)
 
         elif event.event_type == "subscription_canceled":
             # Provider acknowledged cancellation. We keep access until period end.

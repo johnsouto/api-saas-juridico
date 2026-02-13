@@ -106,7 +106,8 @@ export function BillingClient() {
       const url = data.checkout_url;
       if (url) {
         const provider = url.includes("mercadopago.com") ? "mercadopago" : url.startsWith("/billing/fake") ? "fake" : "unknown";
-        trackEvent("ej_billing_checkout_redirect", { provider, flow: "card" });
+        const flow = plan === "plus_annual_pix" ? "annual_pix" : "card";
+        trackEvent("ej_billing_checkout_redirect", { provider, flow });
 
         if (url.startsWith("http://") || url.startsWith("https://")) {
           window.location.assign(url);
