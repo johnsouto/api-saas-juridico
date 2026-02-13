@@ -31,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <meta name="google-site-verification" content="F-sPEqGn6thnG8bjQLrMjViE7rpvQ7ip-YO-9noE644" />
         <link rel="icon" href="/images/favicon_google.png" sizes="96x96" type="image/png" />
         <link rel="shortcut icon" href="/images/favicon_google.png" />
         {/* Theme (dark/light) - apply before paint to avoid flash. */}
