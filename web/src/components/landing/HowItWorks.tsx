@@ -1,7 +1,7 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
 import { cn } from "@/lib/utils";
@@ -38,9 +38,13 @@ export function HowItWorks() {
           </div>
 
           <Button asChild variant="outline" className="border-white/15 bg-white/5 text-foreground/90 hover:bg-white/10">
-            <Link href="/login?mode=register&next=/dashboard">
+            <TrackedLink
+              href="/login?mode=register&next=/dashboard"
+              eventName="ej_landing_cta_click"
+              eventPayload={{ cta_name: "comecar_gratis", cta_location: "how_it_works" }}
+            >
               Começar grátis <ArrowRight className="h-4 w-4" />
-            </Link>
+            </TrackedLink>
           </Button>
         </div>
 

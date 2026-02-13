@@ -10,6 +10,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { cleanupLegacySaaSTokens, loginWithEmailSenha, registerTenant as registerTenantApi } from "@/lib/auth";
+import { trackEvent } from "@/lib/gtm";
 import { passwordPolicyMessage, validatePassword } from "@/lib/password";
 import { formatCNPJ, formatCPF, isValidCNPJLength, isValidCPFLength, onlyDigits } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,11 @@ type RegisterValues = z.infer<typeof registerSchema>;
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
+function getStatusCode(error: unknown): number | "unknown" {
+  const maybeStatus = (error as { response?: { status?: number } })?.response?.status;
+  return typeof maybeStatus === "number" ? maybeStatus : "unknown";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const initializedFromQuery = useRef(false);
@@ -137,6 +143,12 @@ export default function LoginPage() {
       });
   }, [router, nextPath]);
 
+  useEffect(() => {
+    trackEvent("ej_auth_view", {
+      auth_mode: showRegister ? "register" : showReset ? "reset" : "login"
+    });
+  }, [showRegister, showReset]);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: "", senha: "" }
@@ -182,7 +194,15 @@ export default function LoginPage() {
   const login = useMutation({
     mutationFn: async (values: FormValues) => {
       await loginWithEmailSenha(values);
+    },
+    onSuccess: () => {
+      trackEvent("ej_login_success", { next_path: nextPath });
       router.replace(nextPath);
+    },
+    onError: (error) => {
+      trackEvent("ej_login_error", {
+        status_code: getStatusCode(error)
+      });
     }
   });
 
@@ -191,7 +211,13 @@ export default function LoginPage() {
       await api.post("/v1/auth/reset-password", { email: values.email });
     },
     onSuccess: async () => {
+      trackEvent("ej_reset_password_success");
       resetForm.reset({ email: "" });
+    },
+    onError: (error) => {
+      trackEvent("ej_reset_password_error", {
+        status_code: getStatusCode(error)
+      });
     }
   });
 
@@ -210,7 +236,15 @@ export default function LoginPage() {
       };
 
       await registerTenantApi(payload);
+    },
+    onSuccess: () => {
+      trackEvent("ej_register_success", { next_path: nextPath });
       router.replace(nextPath);
+    },
+    onError: (error) => {
+      trackEvent("ej_register_error", {
+        status_code: getStatusCode(error)
+      });
     }
   });
 
@@ -222,7 +256,13 @@ export default function LoginPage() {
           <CardDescription>Seu escritório seguro em qualquer lugar</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-3" onSubmit={form.handleSubmit((v) => login.mutate(v))}>
+          <form
+            className="space-y-3"
+            onSubmit={form.handleSubmit((v) => {
+              trackEvent("ej_login_submit");
+              login.mutate(v);
+            })}
+          >
             <div className="space-y-1">
               <Label htmlFor="login_email">E-mail</Label>
               <Input id="login_email" autoComplete="email" type="email" {...form.register("email")} />
@@ -276,13 +316,20 @@ export default function LoginPage() {
               onClick={() => {
                 setShowReset((v) => !v);
                 setShowRegister(false);
+                trackEvent("ej_auth_toggle", { target_mode: showReset ? "login" : "reset" });
               }}
             >
               {showReset ? "Fechar" : "Esqueci minha senha"}
             </Button>
 
             {showReset ? (
-              <form className="mt-3 space-y-2" onSubmit={resetForm.handleSubmit((v) => reset.mutate(v))}>
+              <form
+                className="mt-3 space-y-2"
+                onSubmit={resetForm.handleSubmit((v) => {
+                  trackEvent("ej_reset_password_submit");
+                  reset.mutate(v);
+                })}
+              >
                 <div className="space-y-1">
                   <Label>E-mail para redefinição</Label>
                   <Input type="email" placeholder="seuemail@dominio.com" {...resetForm.register("email")} />
@@ -317,6 +364,7 @@ export default function LoginPage() {
                 setShowReset(false);
                 setTurnstileToken(null);
                 setTurnstileError(null);
+                trackEvent("ej_auth_toggle", { target_mode: showRegister ? "login" : "register" });
               }}
             >
               {showRegister ? "Fechar cadastro" : "Criar conta grátis"}
@@ -328,8 +376,12 @@ export default function LoginPage() {
                 onSubmit={registerForm.handleSubmit((v) => {
                   if (turnstileEnabled && !turnstileToken) {
                     setTurnstileError("Confirme que você não é um robô.");
+                    trackEvent("ej_register_blocked", { reason: "turnstile_missing" });
                     return;
                   }
+                  trackEvent("ej_register_submit", {
+                    tenant_doc_type: watchedTenantDocType
+                  });
                   registerTenant.mutate(v);
                 })}
               >

@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { Check, Crown, Sparkles } from "lucide-react";
 
+import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,13 @@ export function Pricing() {
                 variant="outline"
                 className="w-full border-white/15 bg-white/5 text-foreground/90 hover:bg-white/10"
               >
-                <Link href="/login?mode=register&next=/dashboard">Criar conta</Link>
+                <TrackedLink
+                  href="/login?mode=register&next=/dashboard"
+                  eventName="ej_landing_cta_click"
+                  eventPayload={{ cta_name: "criar_conta", cta_location: "pricing_free" }}
+                >
+                  Criar conta
+                </TrackedLink>
               </Button>
             </div>
           </div>
@@ -103,7 +109,13 @@ export function Pricing() {
 
             <div className="relative mt-7">
               <Button asChild className="w-full">
-                <Link href="/billing?plan=plus&next=/dashboard">Assinar Plus</Link>
+                <TrackedLink
+                  href="/billing?plan=plus&next=/dashboard"
+                  eventName="ej_landing_cta_click"
+                  eventPayload={{ cta_name: "assinar_plus", cta_location: "pricing_plus" }}
+                >
+                  Assinar Plus
+                </TrackedLink>
               </Button>
               <p className="mt-3 text-center text-xs text-white/65">
                 Checkout com Stripe e Mercado Pago (cartão de crédito e outras formas disponíveis).

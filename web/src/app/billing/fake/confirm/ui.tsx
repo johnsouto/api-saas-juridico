@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Container } from "@/components/landing/Container";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/gtm";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,10 @@ export default function FakeCheckoutConfirmUI() {
   const externalId = search.get("sub");
   const nextTarget = useMemo(() => resolveNext(search.get("next")), [search]);
 
+  useEffect(() => {
+    trackEvent("ej_fake_checkout_view", { flow });
+  }, [flow]);
+
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => (await api.get("/v1/auth/me")).data as { nome: string; email: string; role: string },
@@ -43,12 +48,19 @@ export default function FakeCheckoutConfirmUI() {
         params: { plan: "plus_monthly_card", result: "succeeded", external_id: externalId ?? undefined }
       });
     },
+    onMutate: () => {
+      trackEvent("ej_fake_checkout_approve_submit");
+    },
     onSuccess: () => {
+      trackEvent("ej_fake_checkout_approve_success");
       if (nextTarget.kind === "url") {
         window.location.href = nextTarget.value;
       } else {
         router.replace(nextTarget.value);
       }
+    },
+    onError: () => {
+      trackEvent("ej_fake_checkout_approve_error");
     }
   });
 
@@ -58,8 +70,15 @@ export default function FakeCheckoutConfirmUI() {
         params: { plan: "plus_monthly_card", result: "failed", external_id: externalId ?? undefined }
       });
     },
+    onMutate: () => {
+      trackEvent("ej_fake_checkout_fail_submit");
+    },
     onSuccess: () => {
+      trackEvent("ej_fake_checkout_fail_success");
       router.replace("/billing?plan=plus_monthly_card&next=/dashboard");
+    },
+    onError: () => {
+      trackEvent("ej_fake_checkout_fail_error");
     }
   });
 
@@ -153,4 +172,3 @@ export default function FakeCheckoutConfirmUI() {
     </div>
   );
 }
-

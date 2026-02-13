@@ -1,7 +1,7 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
+import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
 import { cn } from "@/lib/utils";
@@ -35,9 +35,13 @@ export function Hero() {
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button asChild size="lg" className="h-auto px-5 py-3">
-                <Link href="/login?mode=register&next=/dashboard">
+                <TrackedLink
+                  href="/login?mode=register&next=/dashboard"
+                  eventName="ej_landing_cta_click"
+                  eventPayload={{ cta_name: "comecar_gratis", cta_location: "hero" }}
+                >
                   Começar grátis <ArrowRight className="h-4 w-4" />
-                </Link>
+                </TrackedLink>
               </Button>
               <Button
                 asChild
@@ -45,7 +49,13 @@ export function Hero() {
                 variant="outline"
                 className="h-auto border-white/15 bg-white/5 px-5 py-3 text-foreground/90 hover:bg-white/8 hover:border-white/25"
               >
-                <Link href="#planos">Ver planos</Link>
+                <TrackedLink
+                  href="#planos"
+                  eventName="ej_landing_cta_click"
+                  eventPayload={{ cta_name: "ver_planos", cta_location: "hero" }}
+                >
+                  Ver planos
+                </TrackedLink>
               </Button>
             </div>
 

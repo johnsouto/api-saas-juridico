@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/gtm";
 import { Container } from "@/components/landing/Container";
 import { Button } from "@/components/ui/button";
 
@@ -50,10 +51,24 @@ export function LandingHeader() {
 
         <nav className="hidden items-center gap-3 md:flex">
           <Button asChild variant="ghost" className="px-3 py-2 text-sm font-medium text-foreground/85 hover:text-foreground">
-            <Link href="/login?next=/dashboard">Login</Link>
+            <Link
+              href="/login?next=/dashboard"
+              onClick={() =>
+                trackEvent("ej_landing_cta_click", { cta_name: "login", cta_location: "header_desktop" })
+              }
+            >
+              Login
+            </Link>
           </Button>
           <Button asChild className="px-4 py-2 text-sm font-semibold">
-            <Link href="/login?mode=register&next=/dashboard">Criar conta</Link>
+            <Link
+              href="/login?mode=register&next=/dashboard"
+              onClick={() =>
+                trackEvent("ej_landing_cta_click", { cta_name: "criar_conta", cta_location: "header_desktop" })
+              }
+            >
+              Criar conta
+            </Link>
           </Button>
         </nav>
 
@@ -84,14 +99,29 @@ export function LandingHeader() {
         <Container className="py-3">
           <div className="flex flex-col gap-2">
             <Button asChild variant="ghost" className="justify-start" onClick={() => setOpen(false)}>
-              <Link href="/login?next=/dashboard">Login</Link>
+              <Link
+                href="/login?next=/dashboard"
+                onClick={() => trackEvent("ej_landing_cta_click", { cta_name: "login", cta_location: "menu_mobile" })}
+              >
+                Login
+              </Link>
             </Button>
             <Button asChild className="justify-start" onClick={() => setOpen(false)}>
-              <Link href="/login?mode=register&next=/dashboard">Criar conta</Link>
+              <Link
+                href="/login?mode=register&next=/dashboard"
+                onClick={() =>
+                  trackEvent("ej_landing_cta_click", { cta_name: "criar_conta", cta_location: "menu_mobile" })
+                }
+              >
+                Criar conta
+              </Link>
             </Button>
             <Link
               href="#planos"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                trackEvent("ej_landing_cta_click", { cta_name: "ver_planos", cta_location: "menu_mobile" });
+              }}
               className={cn(
                 "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors duration-200",
                 focusRing

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Container } from "@/components/landing/Container";
 import { api } from "@/lib/api";
 import { formatDateTimeBR } from "@/lib/datetime";
+import { trackEvent } from "@/lib/gtm";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +57,10 @@ export function BillingClient() {
 
   const [pixInfo, setPixInfo] = useState<BillingCheckout | null>(null);
 
+  useEffect(() => {
+    trackEvent("ej_billing_view", { plan_param: planParam });
+  }, [planParam]);
+
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
@@ -79,12 +84,20 @@ export function BillingClient() {
       });
       return r.data;
     },
+    onMutate: (plan) => {
+      trackEvent("ej_billing_checkout_start", { plan });
+    },
     onSuccess: (data) => {
       if (data.checkout_url) {
+        trackEvent("ej_billing_checkout_redirect", { provider: "fake", flow: "card" });
         router.push(data.checkout_url);
         return;
       }
+      trackEvent("ej_billing_pix_generated", { flow: "annual_pix" });
       setPixInfo(data);
+    },
+    onError: () => {
+      trackEvent("ej_billing_checkout_error");
     }
   });
 
@@ -96,17 +109,31 @@ export function BillingClient() {
         params: { plan: "plus_annual_pix", result: "succeeded" }
       });
     },
+    onMutate: () => {
+      trackEvent("ej_billing_pix_confirm_submit");
+    },
     onSuccess: async () => {
+      trackEvent("ej_billing_pix_confirm_success");
       setPixInfo(null);
       await status.refetch();
       router.replace(nextPath);
+    },
+    onError: () => {
+      trackEvent("ej_billing_pix_confirm_error");
     }
   });
 
   const cancel = useMutation({
     mutationFn: async () => (await api.post("/v1/billing/cancel")).data,
+    onMutate: () => {
+      trackEvent("ej_billing_cancel_submit");
+    },
     onSuccess: async () => {
+      trackEvent("ej_billing_cancel_success");
       await status.refetch();
+    },
+    onError: () => {
+      trackEvent("ej_billing_cancel_error");
     }
   });
 
@@ -156,7 +183,9 @@ export function BillingClient() {
             </CardHeader>
             <CardContent>
               <Button asChild className={cn("w-full sm:w-auto", focusRing)}>
-                <Link href={loginHref}>Ir para login</Link>
+                <Link href={loginHref} onClick={() => trackEvent("ej_billing_login_click")}>
+                  Ir para login
+                </Link>
               </Button>
             </CardContent>
           </Card>

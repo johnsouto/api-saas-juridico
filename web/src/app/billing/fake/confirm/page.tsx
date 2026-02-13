@@ -2,6 +2,8 @@ import { Suspense } from "react";
 
 import FakeCheckoutConfirmUI from "./ui";
 
+export const dynamic = "force-dynamic";
+
 export default function FakeCheckoutConfirmPage() {
   return (
     <Suspense
@@ -15,4 +17,3 @@ export default function FakeCheckoutConfirmPage() {
     </Suspense>
   );
 }
-
