@@ -17,7 +17,7 @@ const faqs = [
   },
   {
     q: "Como funciona o Plano Plus?",
-    a: "O Plus (R$47/mês) oferece limites maiores, prioridade no suporte e recursos avançados. Você pode começar no Free e ativar o Plus quando quiser."
+    a: "O Plus está em oferta limitada: de R$97 por R$47/mês. Ele oferece limites maiores, prioridade no suporte e recursos avançados. Você pode começar no Free e ativar o Plus quando quiser."
   },
   {
     q: "Posso cancelar quando quiser?",
@@ -104,4 +104,3 @@ export function FAQ() {
     </Section>
   );
 }
-

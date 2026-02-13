@@ -7,17 +7,15 @@ import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
+import { PlusOnly } from "@/components/billing/PlusOnly";
+import { PlusPriceOffer } from "@/components/billing/PlusPriceOffer";
+import { usePlan } from "@/hooks/usePlan";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskPieChart } from "@/components/dashboard/TaskPieChart";
 
 type Proc = { id: string; status: "ativo" | "inativo" | "outros"; criado_em: string };
-type BillingStatus = {
-  plan_code: "FREE" | "PLUS_MONTHLY_CARD" | "PLUS_ANNUAL_PIX";
-  is_plus_effective: boolean;
-  limits?: { max_users: number; max_storage_mb: number };
-};
 type DocumentsUsage = { used_bytes: number };
 type KanbanSummary = { due_today: number; pendente: number; em_andamento: number; concluido: number };
 type AgendaEvent = { id: string; titulo: string; inicio_em: string };
@@ -25,6 +23,7 @@ type AgendaEvent = { id: string; titulo: string; inicio_em: string };
 export default function DashboardHome() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
+  const { isFree, isPlus, isLoading: isPlanLoading } = usePlan();
 
   const me = useQuery({
     queryKey: ["me"],
@@ -34,18 +33,10 @@ export default function DashboardHome() {
     }
   });
 
-  const billing = useQuery({
-    queryKey: ["billing-status"],
-    queryFn: async () => (await api.get<BillingStatus>("/v1/billing/status")).data,
-    retry: false
-  });
-
-  const isFreePlan = billing.isSuccess && billing.data.plan_code === "FREE" && !billing.data.is_plus_effective;
-
   const storageUsage = useQuery({
     queryKey: ["documents-usage"],
     queryFn: async () => (await api.get<DocumentsUsage>("/v1/documents/usage")).data,
-    enabled: isFreePlan,
+    enabled: !isPlanLoading && isFree,
     retry: false
   });
 
@@ -57,13 +48,15 @@ export default function DashboardHome() {
         processes: processes.length,
         processesData: processes
       };
-    }
+    },
+    enabled: isPlus
   });
 
   const kanban = useQuery({
     queryKey: ["kanban-summary"],
     queryFn: async () => (await api.get<KanbanSummary>("/v1/kanban/summary")).data,
-    retry: false
+    retry: false,
+    enabled: isPlus
   });
 
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthStart(new Date()));
@@ -78,7 +71,8 @@ export default function DashboardHome() {
           params: { from: monthBounds.from, to: monthBounds.to }
         })
       ).data,
-    retry: false
+    retry: false,
+    enabled: isPlus
   });
 
   const eventsByDay = useMemo(() => {
@@ -148,6 +142,21 @@ export default function DashboardHome() {
     return { year, months };
   })();
 
+  if (isPlanLoading) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Dashboard</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Carregando plano…</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -172,7 +181,7 @@ export default function DashboardHome() {
         </CardContent>
       </Card>
 
-      {isFreePlan ? (
+      {isFree ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Armazenamento</CardTitle>
@@ -206,9 +215,10 @@ export default function DashboardHome() {
                 })()}
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Faça upgrade para aumentar limites e enviar mais documentos.
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Faça upgrade para aumentar limites e enviar mais documentos.</p>
+                    <PlusPriceOffer variant="compact" />
+                  </div>
                   <Button asChild size="sm" className="shadow-glow">
                     <Link href="/billing?plan=plus&next=/dashboard">Assinar Plus</Link>
                   </Button>
@@ -220,218 +230,238 @@ export default function DashboardHome() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-        <Card className="flex min-h-[320px] flex-col md:col-span-4">
-          <CardHeader>
-            <CardTitle className="text-sm">Calendário</CardTitle>
-            <CardDescription className="text-xs">Eventos da sua agenda.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  setCalendarMonth((current) => shiftMonth(current, -1));
-                  setSelectedDay(1);
-                }}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <p className="text-sm font-medium capitalize">{formatMonthLabel(calendarMonth)}</p>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  setCalendarMonth((current) => shiftMonth(current, 1));
-                  setSelectedDay(1);
-                }}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
-              {["D", "S", "T", "Q", "Q", "S", "S"].map((label, index) => (
-                <span key={`${label}-${index}`}>{label}</span>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {buildMonthGrid(calendarMonth).map((day, index) =>
-                day === null ? (
-                  <span key={`blank-${index}`} className="h-9 rounded-md" />
-                ) : (
-                  <button
-                    key={`day-${day}`}
-                    type="button"
-                    onClick={() => setSelectedDay(day)}
-                    className={[
-                      "relative flex h-9 items-center justify-center rounded-md text-sm transition-colors",
-                      day === safeSelectedDay ? "bg-primary text-primary-foreground" : "hover:bg-card/40",
-                      eventsByDay.has(day) ? "font-semibold" : "text-muted-foreground"
-                    ].join(" ")}
-                  >
-                    {day}
-                    {eventsByDay.has(day) ? (
-                      <span
-                        className={[
-                          "absolute bottom-1 h-1.5 w-1.5 rounded-full",
-                          day === safeSelectedDay ? "bg-primary-foreground" : "bg-emerald-400"
-                        ].join(" ")}
-                      />
-                    ) : null}
-                  </button>
-                )
-              )}
-            </div>
-
-            <div className="min-h-[92px] rounded-lg border border-border/15 bg-card/20 p-2">
-              {agenda.isLoading ? <p className="text-xs text-muted-foreground">Carregando eventos…</p> : null}
-              {!agenda.isLoading && (agenda.data?.length ?? 0) === 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhum evento cadastrado.</p>
-              ) : null}
-              {selectedDayEvents.length > 0 ? (
-                <div className="space-y-1">
-                  {selectedDayEvents.map((event) => (
-                    <div key={event.id} className="rounded-md border border-border/10 bg-card/40 px-2 py-1.5">
-                      <p className="truncate text-xs font-medium">{event.titulo}</p>
-                      <p className="text-[11px] text-muted-foreground">{formatTimeInSaoPaulo(event.inicio_em)}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : agenda.data && agenda.data.length > 0 ? (
-                <p className="text-xs text-muted-foreground">Nenhum evento neste dia.</p>
-              ) : null}
-            </div>
-
-            {agenda.isError ? <p className="text-xs text-destructive">Erro ao carregar agenda.</p> : null}
-
-            <div className="mt-auto flex flex-wrap items-center gap-2">
-              <Button asChild className="h-10 w-full" variant="outline">
-                <Link href={`/dashboard/${slug}/agenda`}>Abrir agenda</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="flex min-h-[300px] flex-col md:col-span-4">
-          <CardHeader>
-            <CardTitle className="text-sm">Tarefas</CardTitle>
-            <CardDescription className="text-xs">Resumo do Kanban.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col items-center justify-start gap-4">
-            <div className="flex items-center justify-center">
-              <TaskPieChart
-                dueToday={kanban.data?.due_today ?? 0}
-                pendente={kanban.data?.pendente ?? 0}
-                emAndamento={kanban.data?.em_andamento ?? 0}
-                concluido={kanban.data?.concluido ?? 0}
-              />
-            </div>
-
-            <div className="flex w-full max-w-[240px] flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">Prazo expira hoje</span>
-                <div className="min-w-[84px] rounded-lg bg-red-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                  {kanban.data ? kanban.data.due_today : "—"}
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">Pendente</span>
-                <div className="min-w-[84px] rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                  {kanban.data ? kanban.data.pendente : "—"}
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">Em andamento</span>
-                <div className="min-w-[84px] rounded-lg bg-yellow-400 px-3 py-2 text-center text-sm font-semibold tabular-nums text-zinc-950 shadow-sm ring-1 ring-border/25">
-                  {kanban.data ? kanban.data.em_andamento : "—"}
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span
-                  className={[
-                    "text-xs",
-                    (kanban.data?.concluido ?? 0) > 0 ? "font-medium text-emerald-600" : "text-muted-foreground"
-                  ].join(" ")}
-                  title="Concluídas"
+        <PlusOnly
+          enabled={isPlus}
+          className="md:col-span-4"
+          title="Agenda no Plano Plus"
+          description="Desbloqueie o calendário completo para acompanhar compromissos e prazos."
+        >
+          <Card className="flex min-h-[320px] flex-col">
+            <CardHeader>
+              <CardTitle className="text-sm">Calendário</CardTitle>
+              <CardDescription className="text-xs">Eventos da sua agenda.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setCalendarMonth((current) => shiftMonth(current, -1));
+                    setSelectedDay(1);
+                  }}
                 >
-                  Sem pendências
-                  <span className="ml-1 text-[10px] font-normal text-muted-foreground">(concluídas)</span>
-                </span>
-                <div className="min-w-[84px] rounded-lg bg-green-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                  {kanban.data ? kanban.data.concluido : "—"}
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <p className="text-sm font-medium capitalize">{formatMonthLabel(calendarMonth)}</p>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setCalendarMonth((current) => shiftMonth(current, 1));
+                    setSelectedDay(1);
+                  }}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
+                {["D", "S", "T", "Q", "Q", "S", "S"].map((label, index) => (
+                  <span key={`${label}-${index}`}>{label}</span>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {buildMonthGrid(calendarMonth).map((day, index) =>
+                  day === null ? (
+                    <span key={`blank-${index}`} className="h-9 rounded-md" />
+                  ) : (
+                    <button
+                      key={`day-${day}`}
+                      type="button"
+                      onClick={() => setSelectedDay(day)}
+                      className={[
+                        "relative flex h-9 items-center justify-center rounded-md text-sm transition-colors",
+                        day === safeSelectedDay ? "bg-primary text-primary-foreground" : "hover:bg-card/40",
+                        eventsByDay.has(day) ? "font-semibold" : "text-muted-foreground"
+                      ].join(" ")}
+                    >
+                      {day}
+                      {eventsByDay.has(day) ? (
+                        <span
+                          className={[
+                            "absolute bottom-1 h-1.5 w-1.5 rounded-full",
+                            day === safeSelectedDay ? "bg-primary-foreground" : "bg-emerald-400"
+                          ].join(" ")}
+                        />
+                      ) : null}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <div className="min-h-[92px] rounded-lg border border-border/15 bg-card/20 p-2">
+                {agenda.isLoading ? <p className="text-xs text-muted-foreground">Carregando eventos…</p> : null}
+                {!agenda.isLoading && (agenda.data?.length ?? 0) === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum evento cadastrado.</p>
+                ) : null}
+                {selectedDayEvents.length > 0 ? (
+                  <div className="space-y-1">
+                    {selectedDayEvents.map((event) => (
+                      <div key={event.id} className="rounded-md border border-border/10 bg-card/40 px-2 py-1.5">
+                        <p className="truncate text-xs font-medium">{event.titulo}</p>
+                        <p className="text-[11px] text-muted-foreground">{formatTimeInSaoPaulo(event.inicio_em)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : agenda.data && agenda.data.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum evento neste dia.</p>
+                ) : null}
+              </div>
+
+              {agenda.isError ? <p className="text-xs text-destructive">Erro ao carregar agenda.</p> : null}
+
+              <div className="mt-auto flex flex-wrap items-center gap-2">
+                <Button asChild className="h-10 w-full" variant="outline">
+                  <Link href={`/dashboard/${slug}/agenda`}>Abrir agenda</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </PlusOnly>
+
+        <PlusOnly
+          enabled={isPlus}
+          className="md:col-span-4"
+          title="Tarefas no Plano Plus"
+          description="Ative o Plus para usar o Kanban e manter os prazos em dia."
+        >
+          <Card className="flex min-h-[300px] flex-col">
+            <CardHeader>
+              <CardTitle className="text-sm">Tarefas</CardTitle>
+              <CardDescription className="text-xs">Resumo do Kanban.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col items-center justify-start gap-4">
+              <div className="flex items-center justify-center">
+                <TaskPieChart
+                  dueToday={kanban.data?.due_today ?? 0}
+                  pendente={kanban.data?.pendente ?? 0}
+                  emAndamento={kanban.data?.em_andamento ?? 0}
+                  concluido={kanban.data?.concluido ?? 0}
+                />
+              </div>
+
+              <div className="flex w-full max-w-[240px] flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">Prazo expira hoje</span>
+                  <div className="min-w-[84px] rounded-lg bg-red-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                    {kanban.data ? kanban.data.due_today : "—"}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">Pendente</span>
+                  <div className="min-w-[84px] rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                    {kanban.data ? kanban.data.pendente : "—"}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">Em andamento</span>
+                  <div className="min-w-[84px] rounded-lg bg-yellow-400 px-3 py-2 text-center text-sm font-semibold tabular-nums text-zinc-950 shadow-sm ring-1 ring-border/25">
+                    {kanban.data ? kanban.data.em_andamento : "—"}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className={[
+                      "text-xs",
+                      (kanban.data?.concluido ?? 0) > 0 ? "font-medium text-emerald-600" : "text-muted-foreground"
+                    ].join(" ")}
+                    title="Concluídas"
+                  >
+                    Sem pendências
+                    <span className="ml-1 text-[10px] font-normal text-muted-foreground">(concluídas)</span>
+                  </span>
+                  <div className="min-w-[84px] rounded-lg bg-green-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                    {kanban.data ? kanban.data.concluido : "—"}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mt-auto flex w-full flex-wrap items-center gap-2">
-              <Button asChild className="h-10 w-full" variant="outline">
-                <Link href={`/dashboard/${slug}/tarefas`}>Abrir kanban</Link>
-              </Button>
-            </div>
+              <div className="mt-auto flex w-full flex-wrap items-center gap-2">
+                <Button asChild className="h-10 w-full" variant="outline">
+                  <Link href={`/dashboard/${slug}/tarefas`}>Abrir kanban</Link>
+                </Button>
+              </div>
 
-            {kanban.isError ? <p className="text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
-          </CardContent>
-        </Card>
+              {kanban.isError ? <p className="text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
+            </CardContent>
+          </Card>
+        </PlusOnly>
 
-        <Card className="flex flex-col md:col-span-4">
-          <CardHeader>
-            <CardTitle className="text-sm">Relatório</CardTitle>
-            <CardDescription className="text-xs">Exporte seus dados em Excel.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col">
-            <div className="flex flex-1 items-center justify-center">
-              <ExcelIcon />
-            </div>
+        <PlusOnly enabled={isPlus} className="md:col-span-4" title="Relatórios no Plano Plus">
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle className="text-sm">Relatório</CardTitle>
+              <CardDescription className="text-xs">Exporte seus dados em Excel.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col">
+              <div className="flex flex-1 items-center justify-center">
+                <ExcelIcon />
+              </div>
 
-            <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-              <Button
-                className="h-10 w-full"
-                variant="outline"
-                type="button"
-                disabled={exportXlsx.isPending}
-                onClick={() => exportXlsx.mutate()}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                {exportXlsx.isPending ? "Gerando..." : "Baixar relatório"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+                <Button
+                  className="h-10 w-full"
+                  variant="outline"
+                  type="button"
+                  disabled={exportXlsx.isPending || !isPlus}
+                  onClick={() => exportXlsx.mutate()}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {exportXlsx.isPending ? "Gerando..." : "Baixar relatório"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </PlusOnly>
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Distribuição de Status (Processos)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StackedProgressBar
-              segments={[
-                { label: `Ativos (${processDistribution.counts.ativo})`, pct: processDistribution.pct.ativo, className: "bg-emerald-500" },
-                { label: `Inativos (${processDistribution.counts.inativo})`, pct: processDistribution.pct.inativo, className: "bg-red-500" },
-                { label: `Outros (${processDistribution.counts.outros})`, pct: processDistribution.pct.outros, className: "bg-zinc-400" }
-              ]}
-            />
-          </CardContent>
-        </Card>
+        <PlusOnly enabled={isPlus}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Distribuição de Status (Processos)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StackedProgressBar
+                segments={[
+                  { label: `Ativos (${processDistribution.counts.ativo})`, pct: processDistribution.pct.ativo, className: "bg-emerald-500" },
+                  { label: `Inativos (${processDistribution.counts.inativo})`, pct: processDistribution.pct.inativo, className: "bg-red-500" },
+                  { label: `Outros (${processDistribution.counts.outros})`, pct: processDistribution.pct.outros, className: "bg-zinc-400" }
+                ]}
+              />
+            </CardContent>
+          </Card>
+        </PlusOnly>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Processos por Mês ({processesByMonth.year})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AreaChart
-              months={processesByMonth.months}
-              stroke="#FACC15"
-              fillFrom="#F59E0B"
-              fillTo="#FACC15"
-            />
-          </CardContent>
-        </Card>
+        <PlusOnly enabled={isPlus}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Processos por Mês ({processesByMonth.year})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AreaChart
+                months={processesByMonth.months}
+                stroke="#FACC15"
+                fillFrom="#F59E0B"
+                fillTo="#FACC15"
+              />
+            </CardContent>
+          </Card>
+        </PlusOnly>
       </div>
 
       {stats.isError ? (

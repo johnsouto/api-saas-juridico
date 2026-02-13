@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Container } from "@/components/landing/Container";
+import { PlusPriceOffer } from "@/components/billing/PlusPriceOffer";
 import { api } from "@/lib/api";
 import { formatDateTimeBR } from "@/lib/datetime";
 import { trackEvent } from "@/lib/gtm";
@@ -318,10 +319,12 @@ export function BillingClient() {
             <CardHeader>
               <CardTitle>Plus Mensal (Cartão)</CardTitle>
               <CardDescription className="text-white/70">
-                R$47/mês com renovação automática. Em caso de falha, há carência de 7 dias.
+                Renovação automática mensal no cartão. Em caso de falha, há carência de 7 dias.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <PlusPriceOffer variant="full" />
+
               <ul className="list-disc space-y-2 pl-5 text-sm text-white/70">
                 <li>Mais limites de usuários e armazenamento</li>
                 <li>Prioridade no suporte</li>

@@ -5,7 +5,7 @@ import { BillingClient } from "@/app/billing/BillingClient";
 
 export const metadata: Metadata = {
   title: "Billing — Elemento Juris",
-  description: "Escolha e gerencie o Plano Plus (R$47/mês ou R$499/ano via Pix)."
+  description: "Escolha e gerencie o Plano Plus (de R$97 por R$47/mês em oferta limitada ou R$499/ano via Pix)."
 };
 
 export default function BillingPage() {

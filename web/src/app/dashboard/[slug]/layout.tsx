@@ -119,7 +119,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       return { label: "Regularizar pagamento", href: "/billing?plan=plus_monthly_card&next=/dashboard" };
     }
     if (planCode === "FREE") {
-      return { label: "Ativar Plus (R$47)", href: "/billing?plan=plus&next=/dashboard" };
+      return { label: "Ativar Plus", href: "/billing?plan=plus&next=/dashboard" };
     }
     if (planCode === "PLUS_ANNUAL_PIX") {
       return { label: "Renovar Plus anual (Pix)", href: "/billing?plan=plus_annual_pix&next=/dashboard" };

@@ -9,6 +9,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
+import { PlusPriceOffer } from "@/components/billing/PlusPriceOffer";
 import {
   formatCEP,
   formatCNPJ,
@@ -439,10 +440,11 @@ export default function ClientsPage() {
               </p>
               {(create.error as any)?.response?.data?.code === "PLAN_LIMIT_REACHED" &&
               (create.error as any)?.response?.data?.resource === "clients" ? (
-                <div className="mt-2">
+                <div className="mt-2 space-y-2">
                   <Button asChild size="sm">
                     <Link href="/billing?plan=plus&next=/dashboard">Assinar Plus</Link>
                   </Button>
+                  <PlusPriceOffer variant="compact" />
                 </div>
               ) : null}
             </div>

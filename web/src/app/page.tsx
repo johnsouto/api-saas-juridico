@@ -14,11 +14,11 @@ import { Footer } from "@/components/landing/Footer";
 export const metadata: Metadata = {
   title: "Elemento Juris — Plataforma Jurídica para advogados e escritórios",
   description:
-    "Organize clientes, parcerias, processos, documentos e tarefas em um painel moderno e seguro. Plano Free e Plus por R$47/mês.",
+    "Organize clientes, parcerias, processos, documentos e tarefas em um painel moderno e seguro. Plano Free e Plus com oferta limitada: de R$97 por R$47/mês.",
   openGraph: {
     title: "Elemento Juris — Plataforma Jurídica para advogados e escritórios",
     description:
-      "Organize clientes, parcerias, processos, documentos e tarefas em um painel moderno e seguro. Plano Free e Plus por R$47/mês.",
+      "Organize clientes, parcerias, processos, documentos e tarefas em um painel moderno e seguro. Plano Free e Plus com oferta limitada: de R$97 por R$47/mês.",
     url: "https://elementojuris.cloud/",
     siteName: "Elemento Juris",
     locale: "pt_BR",

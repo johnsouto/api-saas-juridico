@@ -1,20 +1,23 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { PlusPriceOffer } from "@/components/billing/PlusPriceOffer";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeBR } from "@/lib/datetime";
+import { usePlan } from "@/hooks/usePlan";
 import { useToast } from "@/components/ui/toast";
 
 type Client = { id: string; nome: string };
@@ -52,14 +55,17 @@ const KANBAN_STATUS_LABEL: Record<string, string> = {
 export default function TarefasPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { isFree, isPlus, isLoading: isPlanLoading } = usePlan();
   const [editingId, setEditingId] = useState<string | null>(null);
   const clients = useQuery({
     queryKey: ["clients"],
-    queryFn: async () => (await api.get<Client[]>("/v1/clients")).data
+    queryFn: async () => (await api.get<Client[]>("/v1/clients")).data,
+    enabled: isPlus
   });
   const list = useQuery({
     queryKey: ["tarefas"],
-    queryFn: async () => (await api.get<Tarefa[]>("/v1/tarefas")).data
+    queryFn: async () => (await api.get<Tarefa[]>("/v1/tarefas")).data,
+    enabled: isPlus
   });
 
   const form = useForm<FormValues>({
@@ -144,6 +150,43 @@ export default function TarefasPage() {
       toast("Não foi possível baixar o anexo da tarefa.", { variant: "error" });
     }
   });
+
+  if (isPlanLoading) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tarefas</CardTitle>
+            <CardDescription>Carregando plano…</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isFree) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Disponível no Plano Plus</CardTitle>
+            <CardDescription>Ative o Plus para usar Tarefas e manter seus prazos em dia.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <PlusPriceOffer variant="full" />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button asChild className="shadow-glow">
+                <Link href="/billing?plan=plus&next=/dashboard">Assinar Plus</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/dashboard">Voltar ao Dashboard</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

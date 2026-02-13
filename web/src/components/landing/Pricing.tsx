@@ -1,6 +1,7 @@
 import { Check, Crown, Sparkles } from "lucide-react";
 
 import { TrackedLink } from "@/components/analytics/TrackedLink";
+import { PlusPriceOffer } from "@/components/billing/PlusPriceOffer";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
 import { cn } from "@/lib/utils";
@@ -92,9 +93,8 @@ export function Pricing() {
                 <p className="mt-3 text-sm font-semibold text-white">Plano Plus</p>
                 <p className="mt-1 text-sm text-white/70">Limites maiores e recursos avançados para o escritório crescer.</p>
               </div>
-              <div className="text-right">
-                <div className="text-3xl font-semibold text-white">R$47</div>
-                <div className="text-xs text-white/60">por mês</div>
+              <div className="text-right text-white">
+                <PlusPriceOffer variant="full" />
               </div>
             </div>
 
