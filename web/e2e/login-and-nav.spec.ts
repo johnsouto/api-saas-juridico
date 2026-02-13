@@ -97,12 +97,20 @@ test.describe("E2E smoke (read-only)", () => {
     });
 
     await nav("Tarefas");
-    await assertPageLoadedOrEmpty({
-      page,
-      title: "Tarefas",
-      emptyText: "Nenhuma tarefa cadastrada ainda.",
-      nonEmptyIndicator: page.locator("div.text-xs.font-semibold", { hasText: "pendente" }),
-    });
+    const tarefasHeading = page.getByRole("heading", { name: "Tarefas", exact: true });
+    const tarefasPlusLockHeading = page.getByRole("heading", { name: "Disponível no Plano Plus", exact: true });
+    await expect(tarefasHeading.or(tarefasPlusLockHeading)).toBeVisible();
+
+    if (await tarefasPlusLockHeading.isVisible()) {
+      await expect(page.getByRole("link", { name: "Assinar Plus", exact: true })).toBeVisible();
+    } else {
+      await assertPageLoadedOrEmpty({
+        page,
+        title: "Tarefas",
+        emptyText: "Nenhuma tarefa cadastrada ainda.",
+        nonEmptyIndicator: page.locator("div.text-xs.font-semibold", { hasText: "pendente" }),
+      });
+    }
 
     await nav("Documentos");
     await assertPageLoadedOrEmpty({
