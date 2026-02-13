@@ -88,9 +88,17 @@ export function BillingClient() {
       trackEvent("ej_billing_checkout_start", { plan });
     },
     onSuccess: (data) => {
-      if (data.checkout_url) {
-        trackEvent("ej_billing_checkout_redirect", { provider: "fake", flow: "card" });
-        router.push(data.checkout_url);
+      const url = data.checkout_url;
+      if (url) {
+        const provider = url.includes("mercadopago.com") ? "mercadopago" : url.startsWith("/billing/fake") ? "fake" : "unknown";
+        trackEvent("ej_billing_checkout_redirect", { provider, flow: "card" });
+
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+          window.location.assign(url);
+          return;
+        }
+
+        router.push(url);
         return;
       }
       trackEvent("ej_billing_pix_generated", { flow: "annual_pix" });
@@ -301,7 +309,7 @@ export function BillingClient() {
                 {startCheckout.isPending ? "Iniciando…" : showPlanChoice || planParam.includes("monthly") || planParam.includes("card") ? "Assinar mensal (Cartão)" : "Assinar"}
               </Button>
               <p className="text-xs text-white/55">
-                Checkout: Stripe e Mercado Pago (em integração). Por enquanto, o fluxo é simulado.
+                Checkout via provider (Mercado Pago/Stripe). Se estiver em FAKE, o fluxo é simulado.
               </p>
             </CardContent>
           </Card>

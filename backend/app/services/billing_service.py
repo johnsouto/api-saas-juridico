@@ -116,6 +116,7 @@ class BillingService:
         *,
         tenant_id: uuid.UUID,
         plan_code: PlanCode,
+        payer_email: str | None,
         success_url: str,
         cancel_url: str,
     ) -> BillingCheckoutOut:
@@ -127,6 +128,7 @@ class BillingService:
         result = self.provider.create_checkout(
             tenant_id=str(tenant_id),
             plan_code=plan_code,
+            payer_email=payer_email,
             success_url=success_url,
             cancel_url=cancel_url,
         )

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.services.billing_service import BillingService
 from app.services.email_service import EmailService
-from app.services.payment_service import FakePaymentProvider
+from app.services.payment_service import FakePaymentProvider, MercadoPagoPaymentProvider
 
 
 router = APIRouter()
@@ -32,8 +32,9 @@ async def fake_webhook(
     """
     body = await request.body()
     headers = {k.lower(): v for k, v in request.headers.items()}
+    query = dict(request.query_params)
     try:
-        event = _billing.provider.handle_webhook(headers=headers, body=body)
+        event = _billing.provider.handle_webhook(headers=headers, body=body, query_params=query)
         await _billing.process_provider_event(db, background, event=event)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -50,5 +51,24 @@ async def stripe_webhook():
 
 
 @router.post("/webhook/mercadopago")
-async def mercadopago_webhook():
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented")
+async def mercadopago_webhook(
+    request: Request,
+    background: BackgroundTasks,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    body = await request.body()
+    headers = {k.lower(): v for k, v in request.headers.items()}
+    query = dict(request.query_params)
+
+    provider = MercadoPagoPaymentProvider()
+    billing = BillingService(provider=provider, email_service=EmailService())
+    try:
+        event = provider.handle_webhook(headers=headers, body=body, query_params=query)
+        await billing.process_provider_event(db, background, event=event)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("mercadopago webhook error: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook inválido") from exc
+
+    return {"ok": True}

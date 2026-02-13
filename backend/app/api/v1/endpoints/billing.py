@@ -81,6 +81,7 @@ async def start_checkout(
         db,
         tenant_id=user.tenant_id,
         plan_code=plan_code,
+        payer_email=user.email,
         success_url=success_url,
         cancel_url=cancel_url,
     )

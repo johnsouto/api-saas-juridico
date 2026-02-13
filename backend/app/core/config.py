@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     BILLING_PROVIDER: str = "FAKE"  # FAKE | STRIPE | MERCADOPAGO
     BILLING_WEBHOOK_SECRET: str | None = None
 
+    # Mercado Pago (used when BILLING_PROVIDER=MERCADOPAGO)
+    MERCADOPAGO_ACCESS_TOKEN: str | None = None
+    # Webhook secret from Mercado Pago "Webhooks" settings (used to validate x-signature).
+    MERCADOPAGO_WEBHOOK_SECRET: str | None = None
+    MERCADOPAGO_API_BASE_URL: str = "https://api.mercadopago.com"
+
     # Cloudflare Turnstile (anti-bot)
     # If TURNSTILE_SECRET_KEY is empty/None, verification is disabled.
     TURNSTILE_SECRET_KEY: str | None = None
