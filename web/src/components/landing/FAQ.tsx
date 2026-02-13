@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
+import { RevealOnScroll } from "@/components/ui/RevealOnScroll";
 import { cn } from "@/lib/utils";
 
 const focusRing =
@@ -33,7 +34,7 @@ const faqs = [
   },
   {
     q: "Quais formas de pagamento são aceitas?",
-    a: "No checkout, você encontra cartão de crédito e outras formas disponíveis via Stripe e Mercado Pago."
+    a: "No checkout, você encontra opções via Mercado Pago, incluindo Pix e cartão."
   }
 ];
 
@@ -58,45 +59,47 @@ export function FAQ() {
             const panelId = `${uid}-faq-panel-${idx}`;
 
             return (
-              <div key={item.q} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur">
-                <button
-                  id={buttonId}
-                  type="button"
-                  aria-expanded={isOpen}
-                  aria-controls={panelId}
-                  onClick={() => setOpenIndex((cur) => (cur === idx ? null : idx))}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-4 px-5 py-4 text-left",
-                    "text-sm font-semibold text-white hover:bg-white/5 transition-colors duration-200",
-                    focusRing
-                  )}
-                >
-                  <span>{item.q}</span>
-                  <ChevronDown
+              <RevealOnScroll key={item.q} delayMs={idx * 70}>
+                <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur">
+                  <button
+                    id={buttonId}
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    onClick={() => setOpenIndex((cur) => (cur === idx ? null : idx))}
                     className={cn(
-                      "h-5 w-5 shrink-0 text-white/70 transition-transform duration-300",
-                      isOpen ? "rotate-180" : "rotate-0",
-                      "motion-reduce:transition-none"
+                      "flex w-full items-center justify-between gap-4 px-5 py-4 text-left",
+                      "text-sm font-semibold text-white hover:bg-white/5 transition-colors duration-200",
+                      focusRing
                     )}
-                  />
-                </button>
+                  >
+                    <span>{item.q}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-5 w-5 shrink-0 text-white/70 transition-transform duration-300",
+                        isOpen ? "rotate-180" : "rotate-0",
+                        "motion-reduce:transition-none"
+                      )}
+                    />
+                  </button>
 
-                <div
-                  id={panelId}
-                  role="region"
-                  aria-labelledby={buttonId}
-                  className={cn(
-                    "grid overflow-hidden px-5",
-                    "transition-[grid-template-rows] duration-300 ease-out",
-                    "motion-reduce:transition-none",
-                    isOpen ? "grid-rows-[1fr] pb-4" : "grid-rows-[0fr] pb-0"
-                  )}
-                >
-                  <div className="min-h-0">
-                    <p className="text-sm leading-relaxed text-white/70">{item.a}</p>
+                  <div
+                    id={panelId}
+                    role="region"
+                    aria-labelledby={buttonId}
+                    className={cn(
+                      "grid overflow-hidden px-5",
+                      "transition-[grid-template-rows] duration-300 ease-out",
+                      "motion-reduce:transition-none",
+                      isOpen ? "grid-rows-[1fr] pb-4" : "grid-rows-[0fr] pb-0"
+                    )}
+                  >
+                    <div className="min-h-0">
+                      <p className="text-sm leading-relaxed text-white/70">{item.a}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </RevealOnScroll>
             );
           })}
         </div>

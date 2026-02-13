@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 type PlusPriceOfferProps = {
   variant?: "compact" | "full";
   showPerMonth?: boolean;
+  emphasis?: "default" | "large";
 };
 
 const BRL_FORMATTER = new Intl.NumberFormat("pt-BR", {
@@ -13,7 +14,7 @@ const BRL_FORMATTER = new Intl.NumberFormat("pt-BR", {
   currency: PRICING.plus.currency
 });
 
-export function PlusPriceOffer({ variant = "full", showPerMonth = true }: PlusPriceOfferProps) {
+export function PlusPriceOffer({ variant = "full", showPerMonth = true, emphasis = "default" }: PlusPriceOfferProps) {
   const original = BRL_FORMATTER.format(PRICING.plus.originalMonthly);
   const current = BRL_FORMATTER.format(PRICING.plus.priceMonthly);
 
@@ -23,7 +24,11 @@ export function PlusPriceOffer({ variant = "full", showPerMonth = true }: PlusPr
       <div
         className={cn(
           "flex flex-wrap items-center gap-2",
-          variant === "compact" ? "text-sm font-semibold" : "text-lg font-bold"
+          variant === "compact"
+            ? "text-sm font-semibold"
+            : emphasis === "large"
+              ? "text-3xl font-bold leading-none sm:text-4xl"
+              : "text-lg font-bold"
         )}
       >
         <span>

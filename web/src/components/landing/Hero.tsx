@@ -23,7 +23,7 @@ export function Hero() {
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur">
-              Premium • Jurídico • Multi-tenant
+              Premium • Jurídico • Cloud Nativo
             </p>
             <h1 className="mt-5 text-3xl font-semibold leading-tight text-white sm:text-5xl">
               Gestão jurídica simples, segura e moderna para o seu escritório.
@@ -81,8 +81,8 @@ export function Hero() {
                 )}
               >
                 <Image
-                  src="/images/hero-lawyer.svg"
-                  alt="Elemento Juris: painel e segurança para seu escritório"
+                  src="/images/fotoprincipal.jpg"
+                  alt="Elemento Juris - Gestão jurídica simples e moderna"
                   fill
                   priority
                   sizes="(max-width: 1024px) 100vw, 50vw"
