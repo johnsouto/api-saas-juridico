@@ -400,13 +400,6 @@ class MercadoPagoPaymentProvider:
                     "pending": success_url,
                     "failure": cancel_url,
                 },
-                "auto_return": "approved",
-                # Pix remains available and pre-selected in Checkout Pro.
-                "payment_methods": {
-                    "default_payment_method_id": "pix",
-                    "installments": 1,
-                    "default_installments": 1,
-                },
             }
             if payer_email:
                 payload["payer"] = {"email": payer_email}
