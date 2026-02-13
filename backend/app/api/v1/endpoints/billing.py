@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -20,6 +21,7 @@ from app.services.payment_service import ProviderEvent, get_payment_provider
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _app_base_url(request: Request) -> str:
@@ -77,14 +79,24 @@ async def start_checkout(
     cancel_url = f"{base}/billing?plan=plus&next={next_path}"
 
     billing = BillingService(provider=get_payment_provider(), email_service=EmailService())
-    return await billing.start_checkout(
-        db,
-        tenant_id=user.tenant_id,
-        plan_code=plan_code,
-        payer_email=user.email,
-        success_url=success_url,
-        cancel_url=cancel_url,
-    )
+    try:
+        return await billing.start_checkout(
+            db,
+            tenant_id=user.tenant_id,
+            plan_code=plan_code,
+            payer_email=user.email,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+    except ValueError as exc:
+        logger.warning(
+            "billing checkout rejected tenant=%s plan=%s provider=%s reason=%s",
+            user.tenant_id,
+            plan_code.value,
+            billing.provider.provider.value,
+            str(exc),
+        )
+        raise BadRequestError(str(exc)) from exc
 
 
 @router.post("/cancel", response_model=BillingCancelOut)

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/toast";
 
 type BillingStatus = {
   tenant_id: string;
@@ -48,14 +49,25 @@ function planLabel(plan: BillingStatus["plan_code"]): string {
   return "Free";
 }
 
+function apiDetail(error: unknown, fallback: string): string {
+  const maybe = error as { response?: { data?: { detail?: unknown } } };
+  const detail = maybe?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail.trim();
+  }
+  return fallback;
+}
+
 export function BillingClient() {
   const router = useRouter();
   const search = useSearchParams();
+  const { toast } = useToast();
 
   const nextPath = useMemo(() => safeNext(search.get("next")), [search]);
   const planParam = useMemo(() => (search.get("plan") ?? "plus").toLowerCase(), [search]);
 
   const [pixInfo, setPixInfo] = useState<BillingCheckout | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     trackEvent("ej_billing_view", { plan_param: planParam });
@@ -69,6 +81,8 @@ export function BillingClient() {
     },
     retry: false
   });
+
+  const isTenantAdmin = me.data?.role === "admin";
 
   const status = useQuery({
     queryKey: ["billing-status"],
@@ -85,9 +99,10 @@ export function BillingClient() {
       return r.data;
     },
     onMutate: (plan) => {
+      setCheckoutError(null);
       trackEvent("ej_billing_checkout_start", { plan });
     },
-    onSuccess: (data) => {
+    onSuccess: (data, plan) => {
       const url = data.checkout_url;
       if (url) {
         const provider = url.includes("mercadopago.com") ? "mercadopago" : url.startsWith("/billing/fake") ? "fake" : "unknown";
@@ -101,11 +116,23 @@ export function BillingClient() {
         router.push(url);
         return;
       }
+
+      if (plan === "plus_monthly_card") {
+        const message = "Checkout não retornou URL de pagamento. Verifique a configuração do provider.";
+        setCheckoutError(message);
+        toast(message, { variant: "error" });
+        trackEvent("ej_billing_checkout_error", { reason: "missing_checkout_url" });
+        return;
+      }
+
       trackEvent("ej_billing_pix_generated", { flow: "annual_pix" });
       setPixInfo(data);
     },
-    onError: () => {
-      trackEvent("ej_billing_checkout_error");
+    onError: (error: unknown) => {
+      const message = apiDetail(error, "Não foi possível iniciar o checkout agora.");
+      setCheckoutError(message);
+      toast(message, { variant: "error" });
+      trackEvent("ej_billing_checkout_error", { reason: "request_failed" });
     }
   });
 
@@ -273,7 +300,7 @@ export function BillingClient() {
                     variant="outline"
                     className="border-white/15 bg-white/5 text-foreground/90 hover:bg-white/10"
                     onClick={() => cancel.mutate()}
-                    disabled={cancel.isPending}
+                    disabled={cancel.isPending || !isTenantAdmin}
                     type="button"
                   >
                     {cancel.isPending ? "Cancelando…" : "Cancelar ao fim do período"}
@@ -303,11 +330,15 @@ export function BillingClient() {
               <Button
                 className={cn("w-full shadow-glow", focusRing)}
                 onClick={() => startCheckout.mutate("plus_monthly_card")}
-                disabled={!me.isSuccess || startCheckout.isPending}
+                disabled={!me.isSuccess || !isTenantAdmin || startCheckout.isPending}
                 type="button"
               >
                 {startCheckout.isPending ? "Iniciando…" : showPlanChoice || planParam.includes("monthly") || planParam.includes("card") ? "Assinar mensal (Cartão)" : "Assinar"}
               </Button>
+              {checkoutError ? <p className="text-xs text-red-300">{checkoutError}</p> : null}
+              {me.isSuccess && !isTenantAdmin ? (
+                <p className="text-xs text-amber-300">Apenas usuários admin do escritório podem assinar ou cancelar plano.</p>
+              ) : null}
               <p className="text-xs text-white/55">
                 Checkout via provider (Mercado Pago/Stripe). Se estiver em FAKE, o fluxo é simulado.
               </p>
@@ -333,7 +364,7 @@ export function BillingClient() {
                 variant="outline"
                 className={cn("w-full border-white/15 bg-white/5 text-foreground/90 hover:bg-white/10", focusRing)}
                 onClick={() => startCheckout.mutate("plus_annual_pix")}
-                disabled={!me.isSuccess || startCheckout.isPending}
+                disabled={!me.isSuccess || !isTenantAdmin || startCheckout.isPending}
                 type="button"
               >
                 {startCheckout.isPending ? "Gerando Pix…" : "Gerar cobrança Pix anual"}
