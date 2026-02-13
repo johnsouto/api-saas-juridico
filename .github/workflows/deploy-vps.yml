@@ -18,6 +18,8 @@ jobs:
       - name: Configure SSH
         shell: bash
         env:
+          # In direct mode, VPS_HOST is the app server.
+          # In bastion mode, VPS_HOST is the bastion host.
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PATH: ${{ secrets.VPS_PATH }}
@@ -81,28 +83,56 @@ jobs:
       - name: Deploy
         shell: bash
         env:
+          # In direct mode, VPS_HOST is the app server.
+          # In bastion mode, VPS_HOST is the bastion host.
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PATH: ${{ secrets.VPS_PATH }}
+          VPS_TARGET_HOST: ${{ secrets.VPS_TARGET_HOST }}
+          VPS_TARGET_USER: ${{ secrets.VPS_TARGET_USER }}
+          VPS_TARGET_PORT: ${{ secrets.VPS_TARGET_PORT }}
         run: |
           set -euo pipefail
 
-          # Note: this deploy job does not need to checkout the repository locally.
-          # We deploy by SSH and pull the repository on the VPS itself.
-          ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
-            cd '${VPS_PATH}'; \
-            echo '--- git pull (with retries) ---'; \
-            for i in 1 2 3; do \
-              if git pull --ff-only; then break; fi; \
-              echo \"git pull failed (attempt \${i}/3). Retrying in 10s...\"; \
-              sleep 10; \
-            done; \
-            # Final attempt (will fail the deploy if it still can't pull).
-            git pull --ff-only; \
-            echo '--- docker compose up ---'; \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build traefik api web; \
-            echo '--- docker compose ps ---'; \
-            docker compose ps"
+          TARGET_HOST="${VPS_TARGET_HOST:-}"
+          TARGET_USER="${VPS_TARGET_USER:-${VPS_USER}}"
+          TARGET_PORT="${VPS_TARGET_PORT:-22}"
+
+          if [ -n "${TARGET_HOST}" ]; then
+            echo "Deploy mode: bastion (${VPS_USER}@${VPS_HOST}) -> target (${TARGET_USER}@${TARGET_HOST}:${TARGET_PORT})"
+            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+              ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -p ${TARGET_PORT} ${TARGET_USER}@${TARGET_HOST} \"set -euo pipefail; \
+                cd '${VPS_PATH}'; \
+                echo '--- git pull (with retries) ---'; \
+                for i in 1 2 3; do \
+                  if git pull --ff-only; then break; fi; \
+                  echo \\\"git pull failed (attempt \\\${i}/3). Retrying in 10s...\\\"; \
+                  sleep 10; \
+                done; \
+                git pull --ff-only; \
+                echo '--- docker compose up ---'; \
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build traefik api web; \
+                echo '--- docker compose ps ---'; \
+                docker compose ps\""
+          else
+            echo "Deploy mode: direct (${VPS_USER}@${VPS_HOST})"
+            # Note: this deploy job does not need to checkout the repository locally.
+            # We deploy by SSH and pull the repository on the VPS itself.
+            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+              cd '${VPS_PATH}'; \
+              echo '--- git pull (with retries) ---'; \
+              for i in 1 2 3; do \
+                if git pull --ff-only; then break; fi; \
+                echo \"git pull failed (attempt \${i}/3). Retrying in 10s...\"; \
+                sleep 10; \
+              done; \
+              # Final attempt (will fail the deploy if it still can't pull).
+              git pull --ff-only; \
+              echo '--- docker compose up ---'; \
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build traefik api web; \
+              echo '--- docker compose ps ---'; \
+              docker compose ps"
+          fi
 
       - name: Health check (API)
         id: health
@@ -137,28 +167,54 @@ jobs:
         if: steps.health.outcome == 'failure'
         shell: bash
         env:
+          # In direct mode, VPS_HOST is the app server.
+          # In bastion mode, VPS_HOST is the bastion host.
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PATH: ${{ secrets.VPS_PATH }}
+          VPS_TARGET_HOST: ${{ secrets.VPS_TARGET_HOST }}
+          VPS_TARGET_USER: ${{ secrets.VPS_TARGET_USER }}
+          VPS_TARGET_PORT: ${{ secrets.VPS_TARGET_PORT }}
         run: |
           set -euo pipefail
 
           echo "Collecting docker compose logs from VPS..."
+          TARGET_HOST="${VPS_TARGET_HOST:-}"
+          TARGET_USER="${VPS_TARGET_USER:-${VPS_USER}}"
+          TARGET_PORT="${VPS_TARGET_PORT:-22}"
 
-          ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
-            cd '${VPS_PATH}'; \
-            echo '--- docker compose ps ---'; \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true; \
-            echo '--- traefik logs (tail=200) ---'; \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 traefik || true; \
-            echo '--- api logs (tail=200) ---'; \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 api || true; \
-            echo '--- web logs (tail=200) ---'; \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 web || true; \
-            echo '--- postgres logs (tail=200) ---'; \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 postgres || true; \
-            echo '--- minio logs (tail=200) ---'; \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 minio || true"
+          if [ -n "${TARGET_HOST}" ]; then
+            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+              ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -p ${TARGET_PORT} ${TARGET_USER}@${TARGET_HOST} \"set -euo pipefail; \
+                cd '${VPS_PATH}'; \
+                echo '--- docker compose ps ---'; \
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true; \
+                echo '--- traefik logs (tail=200) ---'; \
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 traefik || true; \
+                echo '--- api logs (tail=200) ---'; \
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 api || true; \
+                echo '--- web logs (tail=200) ---'; \
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 web || true; \
+                echo '--- postgres logs (tail=200) ---'; \
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 postgres || true; \
+                echo '--- minio logs (tail=200) ---'; \
+                docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 minio || true\""
+          else
+            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+              cd '${VPS_PATH}'; \
+              echo '--- docker compose ps ---'; \
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true; \
+              echo '--- traefik logs (tail=200) ---'; \
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 traefik || true; \
+              echo '--- api logs (tail=200) ---'; \
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 api || true; \
+              echo '--- web logs (tail=200) ---'; \
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 web || true; \
+              echo '--- postgres logs (tail=200) ---'; \
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 postgres || true; \
+              echo '--- minio logs (tail=200) ---'; \
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 minio || true"
+          fi
 
       - name: Fail deploy if API is unhealthy
         if: steps.health.outcome == 'failure'
