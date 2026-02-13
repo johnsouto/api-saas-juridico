@@ -109,10 +109,45 @@
     animation: ej-cta-pulse 2.2s ease-in-out infinite;
   }
 
+  @keyframes shineDiagonal {
+    0% {
+      transform: translate(-120%, -120%) rotate(18deg);
+      opacity: 0;
+    }
+    20% {
+      opacity: 0.15;
+    }
+    50% {
+      opacity: 0.45;
+    }
+    80% {
+      opacity: 0.15;
+    }
+    100% {
+      transform: translate(120%, 120%) rotate(18deg);
+      opacity: 0;
+    }
+  }
+
+  .cl-shine {
+    pointer-events: none;
+    position: absolute;
+    inset: -40%;
+    width: 220%;
+    background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
+    mix-blend-mode: screen;
+    animation: shineDiagonal 3s ease-in-out infinite;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-ej-cockpit-pop,
-    .ej-cta-pulse {
+    .ej-cta-pulse,
+    .cl-shine {
       animation: none !important;
+    }
+
+    .cl-shine {
+      opacity: 0;
     }
   }
 }
