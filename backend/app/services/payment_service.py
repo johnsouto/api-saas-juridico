@@ -178,46 +178,57 @@ class MercadoPagoPaymentProvider:
     _SUCCESS_STATUSES = {"approved", "authorized", "paid"}
     _FAILURE_STATUSES = {"rejected", "cancelled", "canceled", "refunded", "charged_back"}
 
-    def _require_token(self) -> str:
-        token = (settings.MERCADOPAGO_ACCESS_TOKEN or "").strip()
-        if not token:
-            raise ValueError("MERCADOPAGO_ACCESS_TOKEN is required")
-        return token
+    def _require_token(self, *, token: str | None, label: str) -> str:
+        resolved = (token or "").strip()
+        if not resolved:
+            raise ValueError(f"{label} is required")
+        return resolved
+
+    def _subscriptions_token(self) -> str:
+        return self._require_token(
+            token=settings.MERCADOPAGO_ACCESS_TOKEN_SUBSCRIPTIONS or settings.MERCADOPAGO_ACCESS_TOKEN,
+            label="MERCADOPAGO_ACCESS_TOKEN_SUBSCRIPTIONS (or MERCADOPAGO_ACCESS_TOKEN)",
+        )
+
+    def _checkout_pro_token(self) -> str:
+        return self._require_token(
+            token=settings.MERCADOPAGO_ACCESS_TOKEN_CHECKOUT_PRO or settings.MERCADOPAGO_ACCESS_TOKEN,
+            label="MERCADOPAGO_ACCESS_TOKEN_CHECKOUT_PRO (or MERCADOPAGO_ACCESS_TOKEN)",
+        )
 
     def _api_base(self) -> str:
         return (settings.MERCADOPAGO_API_BASE_URL or "https://api.mercadopago.com").rstrip("/")
 
-    def _headers(self) -> dict[str, str]:
-        token = self._require_token()
+    def _headers(self, *, token: str) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
 
-    def _post_json(self, *, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post_json(self, *, path: str, payload: dict[str, Any], token: str) -> dict[str, Any]:
         base = self._api_base()
         url = f"{base}{path}"
-        headers = {**self._headers(), "X-Idempotency-Key": str(uuid.uuid4())}
+        headers = {**self._headers(token=token), "X-Idempotency-Key": str(uuid.uuid4())}
         with httpx.Client(timeout=20.0) as client:
             r = client.post(url, headers=headers, json=payload)
         if r.status_code < 200 or r.status_code >= 300:
             raise ValueError(f"Mercado Pago API error ({r.status_code}): {r.text[:500]}")
         return dict(r.json())
 
-    def _get_json(self, *, path: str) -> dict[str, Any]:
+    def _get_json(self, *, path: str, token: str) -> dict[str, Any]:
         base = self._api_base()
         url = f"{base}{path}"
         with httpx.Client(timeout=20.0) as client:
-            r = client.get(url, headers=self._headers())
+            r = client.get(url, headers=self._headers(token=token))
         if r.status_code < 200 or r.status_code >= 300:
             raise ValueError(f"Mercado Pago API error ({r.status_code}): {r.text[:500]}")
         return dict(r.json())
 
-    def _put_json(self, *, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _put_json(self, *, path: str, payload: dict[str, Any], token: str) -> dict[str, Any]:
         base = self._api_base()
         url = f"{base}{path}"
-        headers = {**self._headers(), "X-Idempotency-Key": str(uuid.uuid4())}
+        headers = {**self._headers(token=token), "X-Idempotency-Key": str(uuid.uuid4())}
         with httpx.Client(timeout=20.0) as client:
             r = client.put(url, headers=headers, json=payload)
         if r.status_code < 200 or r.status_code >= 300:
@@ -333,6 +344,7 @@ class MercadoPagoPaymentProvider:
         external_reference = self._external_reference(tenant_id=tenant_id, plan_code=plan_code)
 
         if plan_code == PlanCode.PLUS_MONTHLY_CARD:
+            token = self._subscriptions_token()
             if not payer_email:
                 raise ValueError("payer_email is required for Mercado Pago subscriptions")
 
@@ -354,7 +366,7 @@ class MercadoPagoPaymentProvider:
             if notification_url:
                 payload["notification_url"] = notification_url
 
-            data = self._post_json(path="/preapproval", payload=payload)
+            data = self._post_json(path="/preapproval", payload=payload, token=token)
 
             preapproval_id = str(data.get("id") or "").strip()
             init_point = str(data.get("init_point") or data.get("sandbox_init_point") or "").strip()
@@ -363,6 +375,7 @@ class MercadoPagoPaymentProvider:
             return CheckoutResult(checkout_url=init_point, provider_subscription_id=preapproval_id)
 
         if plan_code == PlanCode.PLUS_ANNUAL_PIX:
+            token = self._checkout_pro_token()
             payload = {
                 "items": [
                     {
@@ -391,7 +404,7 @@ class MercadoPagoPaymentProvider:
             if notification_url:
                 payload["notification_url"] = notification_url
 
-            data = self._post_json(path="/checkout/preferences", payload=payload)
+            data = self._post_json(path="/checkout/preferences", payload=payload, token=token)
             preference_id = str(data.get("id") or "").strip()
             init_point = str(data.get("init_point") or data.get("sandbox_init_point") or "").strip()
             if not preference_id or not init_point:
@@ -410,7 +423,7 @@ class MercadoPagoPaymentProvider:
         topic_norm = topic.strip().lower()
 
         if topic_norm in {"subscription_preapproval", "preapproval"}:
-            pre = self._get_json(path=f"/preapproval/{data_id}")
+            pre = self._get_json(path=f"/preapproval/{data_id}", token=self._subscriptions_token())
             tenant_id, plan_code = self._parse_external_reference(pre.get("external_reference"))
             status = str(pre.get("status") or "").strip().lower()
 
@@ -457,7 +470,7 @@ class MercadoPagoPaymentProvider:
             )
 
         if topic_norm in {"subscription_authorized_payment", "authorized_payment"}:
-            auth = self._get_json(path=f"/authorized_payments/{data_id}")
+            auth = self._get_json(path=f"/authorized_payments/{data_id}", token=self._subscriptions_token())
             status = str(auth.get("status") or "").strip().lower()
 
             # Try to correlate with the subscription.
@@ -469,7 +482,7 @@ class MercadoPagoPaymentProvider:
                 or ""
             ).strip()
             if preapproval_id:
-                pre = self._get_json(path=f"/preapproval/{preapproval_id}")
+                pre = self._get_json(path=f"/preapproval/{preapproval_id}", token=self._subscriptions_token())
                 tenant_id, plan_code = self._parse_external_reference(pre.get("external_reference"))
             else:
                 tenant_id, plan_code = self._parse_external_reference(auth.get("external_reference"))
@@ -494,7 +507,18 @@ class MercadoPagoPaymentProvider:
             )
 
         if topic_norm == "payment":
-            pay = self._get_json(path=f"/v1/payments/{data_id}")
+            checkout_token = self._checkout_pro_token()
+            pay: dict[str, Any]
+            try:
+                pay = self._get_json(path=f"/v1/payments/{data_id}", token=checkout_token)
+            except ValueError as first_error:
+                subscriptions_token = self._subscriptions_token()
+                if subscriptions_token == checkout_token:
+                    raise
+                try:
+                    pay = self._get_json(path=f"/v1/payments/{data_id}", token=subscriptions_token)
+                except ValueError:
+                    raise first_error
             status = str(pay.get("status") or "").strip().lower()
 
             try:
@@ -532,4 +556,4 @@ class MercadoPagoPaymentProvider:
         sub_id = (provider_subscription_id or "").strip()
         if not sub_id:
             raise ValueError("provider_subscription_id is required")
-        self._put_json(path=f"/preapproval/{sub_id}", payload={"status": "cancelled"})
+        self._put_json(path=f"/preapproval/{sub_id}", payload={"status": "cancelled"}, token=self._subscriptions_token())

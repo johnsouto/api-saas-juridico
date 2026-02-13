@@ -77,6 +77,12 @@ class Settings(BaseSettings):
 
     # Mercado Pago (used when BILLING_PROVIDER=MERCADOPAGO)
     MERCADOPAGO_ACCESS_TOKEN: str | None = None
+    # Optional split tokens by flow/app:
+    # - subscriptions token for preapproval/authorized_payment
+    # - checkout-pro token for one-time payments (annual pix)
+    # If empty, MERCADOPAGO_ACCESS_TOKEN is used as fallback.
+    MERCADOPAGO_ACCESS_TOKEN_SUBSCRIPTIONS: str | None = None
+    MERCADOPAGO_ACCESS_TOKEN_CHECKOUT_PRO: str | None = None
     # Webhook secret from Mercado Pago "Webhooks" settings (used to validate x-signature).
     MERCADOPAGO_WEBHOOK_SECRET: str | None = None
     MERCADOPAGO_API_BASE_URL: str = "https://api.mercadopago.com"
