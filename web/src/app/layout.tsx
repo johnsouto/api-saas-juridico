@@ -1,8 +1,9 @@
 import "./globals.css";
 
 import type { Metadata } from "next";
-import { GoogleTagManager } from "@next/third-parties/google";
 import { Providers } from "@/app/providers";
+import CookieBanner from "@/components/consent/CookieBanner";
+import { ConsentProvider } from "@/components/consent/ConsentProvider";
 
 export const metadata: Metadata = {
   // Needed so Next resolves Open Graph/Twitter image URLs correctly in production.
@@ -29,8 +30,6 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
-
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
@@ -55,8 +54,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-background text-foreground">
-        {process.env.NODE_ENV === "production" && gtmId ? <GoogleTagManager gtmId={gtmId} /> : null}
-        <Providers>{children}</Providers>
+        <ConsentProvider>
+          <Providers>{children}</Providers>
+          <CookieBanner />
+        </ConsentProvider>
       </body>
     </html>
   );

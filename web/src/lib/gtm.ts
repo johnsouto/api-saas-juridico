@@ -1,3 +1,5 @@
+import { readConsent } from "@/lib/consent";
+
 type DataLayerPrimitive = string | number | boolean | null | undefined;
 type DataLayerValue = DataLayerPrimitive | DataLayerPrimitive[];
 
@@ -13,6 +15,8 @@ declare global {
 
 export function pushToDataLayer(event: Record<string, unknown>) {
   if (!isTrackingEnabled || typeof window === "undefined") return;
+  const consent = readConsent();
+  if (!consent?.analytics) return;
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push(event);
 }
