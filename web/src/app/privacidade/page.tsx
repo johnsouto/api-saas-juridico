@@ -101,7 +101,16 @@ export default function PrivacidadePage() {
           </section>
 
           <section className="space-y-2">
-            <h2 className="text-lg font-semibold">8. Alterações</h2>
+            <h2 className="text-lg font-semibold">8. Analytics e monitoramento de uso</h2>
+            <p className="text-sm leading-relaxed text-white/70">
+              Utilizamos Google Tag Manager (GTM) para gerenciar tags e, por meio dele, ferramentas de analytics como o
+              Microsoft Clarity. Esses recursos são usados para entender navegação, melhorar a experiência e apoiar a
+              evolução do produto. Não configuramos captura intencional de dados sensíveis em campos de formulário.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-lg font-semibold">9. Alterações</h2>
             <p className="text-sm leading-relaxed text-white/70">
               Podemos atualizar esta política periodicamente. Recomendamos a revisão deste documento para acompanhar
               mudanças.
@@ -109,7 +118,7 @@ export default function PrivacidadePage() {
           </section>
 
           <section className="space-y-2">
-            <h2 className="text-lg font-semibold">9. Referências</h2>
+            <h2 className="text-lg font-semibold">10. Referências</h2>
             <p className="text-sm leading-relaxed text-white/70">
               Consulte também os <Link href="/termos" className={cn("underline decoration-white/30 hover:decoration-white/60", focusRing)}>Termos de utilização</Link>.
             </p>
