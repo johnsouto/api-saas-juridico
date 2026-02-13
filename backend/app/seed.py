@@ -48,6 +48,16 @@ async def seed(db: AsyncSession) -> None:
             currency="BRL",
             billing_period=BillingPeriod.YEARLY,
         ),
+        PlanCode.PLUS_ANNUAL_PIX_TEST: dict(
+            nome="Plus Anual (Pix) - Teste",
+            max_users=30,
+            max_clients=None,
+            max_storage_mb=8000,
+            price=Decimal("5.00"),
+            price_cents=500,
+            currency="BRL",
+            billing_period=BillingPeriod.YEARLY,
+        ),
     }
 
     for code, attrs in plans.items():

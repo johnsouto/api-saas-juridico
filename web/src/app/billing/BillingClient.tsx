@@ -92,7 +92,7 @@ export function BillingClient() {
   });
 
   const startCheckout = useMutation({
-    mutationFn: async (plan: "plus_monthly_card" | "plus_annual_pix") => {
+    mutationFn: async (plan: "plus_monthly_card" | "plus_annual_pix" | "plus_annual_pix_test") => {
       const r = await api.post<BillingCheckout>("/v1/billing/checkout", null, {
         params: { plan, next: nextPath }
       });
@@ -106,7 +106,7 @@ export function BillingClient() {
       const url = data.checkout_url;
       if (url) {
         const provider = url.includes("mercadopago.com") ? "mercadopago" : url.startsWith("/billing/fake") ? "fake" : "unknown";
-        const flow = plan === "plus_annual_pix" ? "annual_pix" : "card";
+        const flow = plan === "plus_monthly_card" ? "card" : "annual_pix";
         trackEvent("ej_billing_checkout_redirect", { provider, flow });
 
         if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -179,6 +179,7 @@ export function BillingClient() {
   }, [nextPath, planParam]);
 
   const showPlanChoice = planParam === "plus";
+  const isAnnualTestPlan = planParam.includes("annual_pix_test") || planParam.includes("annual_test") || planParam === "test";
 
   return (
     <div className="theme-premium min-h-screen bg-background text-foreground">
@@ -349,10 +350,12 @@ export function BillingClient() {
           <Card className="border-[#234066]/50 bg-gradient-to-b from-[#234066]/20 to-white/5 backdrop-blur">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
-                <CardTitle>Plus Anual (Pix)</CardTitle>
+                <CardTitle>{isAnnualTestPlan ? "Plus Anual (Pix) — Teste" : "Plus Anual (Pix)"}</CardTitle>
                 <Badge className="bg-[#234066] text-white">Economize</Badge>
               </div>
-              <CardDescription className="text-white/70">R$499/ano. Renovação manual (gera nova cobrança).</CardDescription>
+              <CardDescription className="text-white/70">
+                {isAnnualTestPlan ? "R$5,00/ano (teste). Renovação manual (gera nova cobrança)." : "R$499/ano. Renovação manual (gera nova cobrança)."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="list-disc space-y-2 pl-5 text-sm text-white/70">
@@ -364,11 +367,11 @@ export function BillingClient() {
               <Button
                 variant="outline"
                 className={cn("w-full border-white/15 bg-white/5 text-foreground/90 hover:bg-white/10", focusRing)}
-                onClick={() => startCheckout.mutate("plus_annual_pix")}
+                onClick={() => startCheckout.mutate(isAnnualTestPlan ? "plus_annual_pix_test" : "plus_annual_pix")}
                 disabled={!me.isSuccess || !isTenantAdmin || startCheckout.isPending}
                 type="button"
               >
-                {startCheckout.isPending ? "Gerando Pix…" : "Gerar cobrança Pix anual"}
+                {startCheckout.isPending ? "Gerando Pix…" : isAnnualTestPlan ? "Gerar cobrança Pix anual (teste)" : "Gerar cobrança Pix anual"}
               </Button>
 
               {pixInfo?.pix_copy_paste ? (

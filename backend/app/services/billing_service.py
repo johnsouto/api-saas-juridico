@@ -190,15 +190,20 @@ class BillingService:
             if not event.plan_code:
                 raise ValueError("plan_code ausente")
 
+            paid_plan_code = event.plan_code
+            if paid_plan_code == PlanCode.PLUS_ANNUAL_PIX_TEST:
+                # Test checkout upgrades to the real annual plan after approval.
+                paid_plan_code = PlanCode.PLUS_ANNUAL_PIX
+
             sub.provider = event.provider
-            sub.plan_code = event.plan_code
+            sub.plan_code = paid_plan_code
             sub.status = SubscriptionStatus.active
             sub.cancel_at_period_end = False
             sub.grace_period_end = None
             sub.current_period_start = now
-            if event.plan_code == PlanCode.PLUS_MONTHLY_CARD:
+            if paid_plan_code == PlanCode.PLUS_MONTHLY_CARD:
                 sub.current_period_end = now + timedelta(days=30)
-            elif event.plan_code == PlanCode.PLUS_ANNUAL_PIX:
+            elif paid_plan_code == PlanCode.PLUS_ANNUAL_PIX:
                 sub.current_period_end = now + timedelta(days=365)
             else:
                 raise ValueError("plan_code inválido")

@@ -115,7 +115,7 @@ class FakePaymentProvider:
             checkout_url = f"/billing/fake/confirm?flow=card&sub={provider_subscription_id}&next={success_url}"
             return CheckoutResult(checkout_url=checkout_url, provider_subscription_id=provider_subscription_id)
 
-        if plan_code == PlanCode.PLUS_ANNUAL_PIX:
+        if plan_code in {PlanCode.PLUS_ANNUAL_PIX, PlanCode.PLUS_ANNUAL_PIX_TEST}:
             provider_payment_id = f"fake_pix_{uuid.uuid4()}"
             expires_at = _utcnow() + timedelta(minutes=30)
             copy_paste = f"FAKE-PIX:{provider_payment_id}:{tenant_id}"
@@ -383,15 +383,18 @@ class MercadoPagoPaymentProvider:
                 raise ValueError("Mercado Pago did not return preapproval id/init_point")
             return CheckoutResult(checkout_url=init_point, provider_subscription_id=preapproval_id)
 
-        if plan_code == PlanCode.PLUS_ANNUAL_PIX:
+        if plan_code in {PlanCode.PLUS_ANNUAL_PIX, PlanCode.PLUS_ANNUAL_PIX_TEST}:
             token = self._checkout_pro_token()
+            is_test_plan = plan_code == PlanCode.PLUS_ANNUAL_PIX_TEST
+            annual_amount = 5.00 if is_test_plan else 499.00
+            annual_title = "Elemento Juris — Plus Anual (Pix) [TESTE]" if is_test_plan else "Elemento Juris — Plus Anual (Pix)"
             payload = {
                 "items": [
                     {
-                        "title": "Elemento Juris — Plus Anual (Pix)",
+                        "title": annual_title,
                         "quantity": 1,
                         "currency_id": "BRL",
-                        "unit_price": 499.00,
+                        "unit_price": annual_amount,
                     }
                 ],
                 "external_reference": external_reference,

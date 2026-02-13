@@ -51,6 +51,8 @@ def _parse_plan_param(plan: str) -> PlanCode:
         return PlanCode.PLUS_MONTHLY_CARD
     if p in ("plus_annual_pix", "annual", "pix", "yearly"):
         return PlanCode.PLUS_ANNUAL_PIX
+    if p in ("plus_annual_pix_test", "annual_test", "pix_test", "yearly_test", "test"):
+        return PlanCode.PLUS_ANNUAL_PIX_TEST
     raise BadRequestError("Plano inválido")
 
 
