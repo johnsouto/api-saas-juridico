@@ -31,6 +31,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-5Z7CXLF7');`
+          }}
+        />
         <meta name="google-site-verification" content="F-sPEqGn6thnG8bjQLrMjViE7rpvQ7ip-YO-9noE644" />
         <link rel="icon" href="/images/favicon_google.png" sizes="96x96" type="image/png" />
         <link rel="shortcut icon" href="/images/favicon_google.png" />
@@ -52,6 +61,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-background text-foreground">
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-5Z7CXLF7"
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+          />
+        </noscript>
         <Providers>{children}</Providers>
       </body>
     </html>
