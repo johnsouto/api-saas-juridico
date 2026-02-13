@@ -1,6 +1,6 @@
 import nextConfig from "eslint-config-next/core-web-vitals";
 
-export default [
+const eslintConfig = [
   ...nextConfig,
   {
     rules: {
@@ -8,3 +8,5 @@ export default [
     }
   }
 ];
+
+export default eslintConfig;

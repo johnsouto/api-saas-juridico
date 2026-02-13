@@ -64,7 +64,7 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     }
   }, [gtmId]);
 
-  const acceptAll = () => {
+  const acceptAll = React.useCallback(() => {
     const next: ConsentState = { necessary: true, analytics: true };
     writeConsent(next);
     setConsent(next);
@@ -73,16 +73,16 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     if (process.env.NODE_ENV === "production" && gtmId) {
       loadGTMOnce(gtmId);
     }
-  };
+  }, [gtmId]);
 
-  const rejectAll = () => {
+  const rejectAll = React.useCallback(() => {
     const next: ConsentState = { necessary: true, analytics: false };
     writeConsent(next);
     setConsent(next);
     setManageOpen(false);
-  };
+  }, []);
 
-  const savePreferences = (next: ConsentState) => {
+  const savePreferences = React.useCallback((next: ConsentState) => {
     const normalized: ConsentState = { necessary: true, analytics: !!next.analytics };
     writeConsent(normalized);
     setConsent(normalized);
@@ -91,7 +91,10 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
     if (process.env.NODE_ENV === "production" && normalized.analytics && gtmId) {
       loadGTMOnce(gtmId);
     }
-  };
+  }, [gtmId]);
+
+  const openManage = React.useCallback(() => setManageOpen(true), []);
+  const closeManage = React.useCallback(() => setManageOpen(false), []);
 
   const value = useMemo(
     () => ({
@@ -100,14 +103,13 @@ export function ConsentProvider({ children }: { children: React.ReactNode }) {
       showBanner: initialized && consent === null,
       acceptAll,
       rejectAll,
-      openManage: () => setManageOpen(true),
-      closeManage: () => setManageOpen(false),
+      openManage,
+      closeManage,
       isManageOpen,
       savePreferences
     }),
-    [consent, effective, initialized, isManageOpen]
+    [acceptAll, closeManage, consent, effective, initialized, isManageOpen, openManage, rejectAll, savePreferences]
   );
 
   return <ConsentContext.Provider value={value}>{children}</ConsentContext.Provider>;
 }
-
