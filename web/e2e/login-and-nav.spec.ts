@@ -99,7 +99,7 @@ test.describe("E2E smoke (read-only)", () => {
     await nav("Tarefas");
     const tarefasHeading = page.getByRole("heading", { name: "Tarefas", exact: true });
     const tarefasPlusLockHeading = page.getByRole("heading", { name: "Disponível no Plano Plus", exact: true });
-    await expect(tarefasHeading.or(tarefasPlusLockHeading)).toBeVisible();
+    await expect(tarefasHeading).toBeVisible();
 
     if (await tarefasPlusLockHeading.isVisible()) {
       await expect(page.getByRole("link", { name: "Assinar Plus", exact: true })).toBeVisible();
