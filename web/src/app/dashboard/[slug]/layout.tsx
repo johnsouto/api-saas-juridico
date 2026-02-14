@@ -53,6 +53,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const [theme, setThemeState] = useState<AppTheme>("dark");
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [cockpitOpen, setCockpitOpen] = useState<boolean>(false);
+  const [renderNowMs, setRenderNowMs] = useState<number | null>(null);
 
   const slug = params.slug;
 
@@ -71,6 +72,10 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
   useEffect(() => {
     setThemeState(getEffectiveTheme());
+  }, []);
+
+  useEffect(() => {
+    setRenderNowMs(Date.now());
   }, []);
 
   useEffect(() => {
@@ -109,7 +114,8 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const periodEndDate = currentPeriodEnd ? new Date(currentPeriodEnd) : null;
   const periodEndValid = periodEndDate ? !Number.isNaN(periodEndDate.getTime()) : false;
   const periodEndLabel = periodEndValid ? formatDateBR(periodEndDate) : null;
-  const daysUntilEnd = periodEndValid ? Math.ceil((periodEndDate!.getTime() - Date.now()) / 86_400_000) : null;
+  const daysUntilEnd =
+    periodEndValid && renderNowMs !== null ? Math.ceil((periodEndDate!.getTime() - renderNowMs) / 86_400_000) : null;
   const showDueSoon = daysUntilEnd !== null && daysUntilEnd >= 0 && daysUntilEnd < 15;
   const dueSoonLabel =
     daysUntilEnd === 0 ? "Vence hoje" : daysUntilEnd !== null ? `Vence em ${daysUntilEnd} dias` : "";
