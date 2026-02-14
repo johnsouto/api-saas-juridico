@@ -5,6 +5,7 @@ COMPOSE ?= docker compose
 	lint-web lint-backend format-backend typecheck-backend \
 	semgrep semgrep-strict \
 	check check-api \
+	clean-web-cache clean-backend-cache clean-temp-cache clean-docker-cache clean-cache \
 	zap-baseline \
 	load-smoke load-load load-stress load-upload-smoke
 
@@ -87,6 +88,29 @@ check:
 check-api:
 	$(MAKE) check
 	$(MAKE) test-api
+
+clean-web-cache:
+	npm --prefix web run clean:cache
+
+clean-backend-cache:
+	find backend app \( -path "*/uploads" -o -path "*/uploads/*" \) -prune -o -type d -name "__pycache__" -exec rm -rf {} +
+	find backend app \( -path "*/uploads" -o -path "*/uploads/*" \) -prune -o -type f -name "*.pyc" -delete
+	find backend -type d \( -name ".pytest_cache" -o -name ".mypy_cache" -o -name ".ruff_cache" \) -exec rm -rf {} +
+	find backend -type d \( -name "build" -o -name "dist" -o -name "*.egg-info" \) -exec rm -rf {} +
+	find backend -type f -name ".coverage" -delete
+	find . -maxdepth 1 -type d -name ".ruff_cache" -exec rm -rf {} +
+
+clean-temp-cache:
+	rm -rf web/playwright-report web/test-results web/artifacts
+
+clean-docker-cache:
+	docker image prune -f
+	docker builder prune -f
+
+clean-cache:
+	$(MAKE) clean-web-cache
+	$(MAKE) clean-backend-cache
+	$(MAKE) clean-temp-cache
 
 zap-baseline:
 	python qa/scripts/guard_target.py --require-allow-dangerous
