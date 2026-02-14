@@ -21,10 +21,12 @@ jobs:
           # In direct mode, VPS_HOST is the app server.
           # In bastion mode, VPS_HOST is the bastion host.
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PATH: ${{ secrets.VPS_PATH }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           if [ -z "${VPS_HOST:-}" ] || [ -z "${VPS_USER:-}" ] || [ -z "${VPS_PATH:-}" ]; then
@@ -54,6 +56,7 @@ jobs:
             printf "%s\n" "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           fi
           chmod 600 ~/.ssh/id_ed25519
+          VPS_SSH_PORT="${VPS_SSH_PORT:-22}"
 
           echo "Validating SSH private key format..."
           # Validate the key format early to avoid a confusing ssh exit code 255 later.
@@ -63,22 +66,36 @@ jobs:
             exit 1
           fi
 
-          # Add VPS host key (simple approach).
-          # If you want stricter security, replace this with a pinned known_hosts entry.
-          echo "Fetching VPS host key via ssh-keyscan..."
-          for i in {1..5}; do
-            if ssh-keyscan -T 10 -H "$VPS_HOST" >> ~/.ssh/known_hosts; then
-              break
-            fi
-            echo "ssh-keyscan failed (attempt ${i}/5). Retrying..."
-            sleep 2
-          done
-
-          # Ensure we actually recorded a host key; otherwise SSH will fail with StrictHostKeyChecking=yes.
-          if ! ssh-keygen -F "$VPS_HOST" >/dev/null 2>&1; then
-            echo "Failed to add VPS host key to known_hosts. Check that port 22 is reachable from GitHub Actions."
-            exit 1
+          STRICT_HOST_KEY_CHECKING="yes"
+          KNOWN_HOST_QUERY="${VPS_HOST}"
+          if [ "${VPS_SSH_PORT}" != "22" ]; then
+            KNOWN_HOST_QUERY="[${VPS_HOST}]:${VPS_SSH_PORT}"
           fi
+
+          if [ -n "${VPS_KNOWN_HOSTS:-}" ]; then
+            echo "Using pinned known_hosts from secret."
+            printf "%s\n" "${VPS_KNOWN_HOSTS}" | tr -d '\r' >> ~/.ssh/known_hosts
+          else
+            # Fallback: discover host key on the fly.
+            echo "Fetching VPS host key via ssh-keyscan (port ${VPS_SSH_PORT})..."
+            KEYSCAN_OK=0
+            for i in {1..5}; do
+              if ssh-keyscan -T 10 -p "${VPS_SSH_PORT}" -H "$VPS_HOST" >> ~/.ssh/known_hosts; then
+                KEYSCAN_OK=1
+                break
+              fi
+              echo "ssh-keyscan failed (attempt ${i}/5). Retrying..."
+              sleep 2
+            done
+
+            if [ "${KEYSCAN_OK}" -ne 1 ] || ! ssh-keygen -F "${KNOWN_HOST_QUERY}" >/dev/null 2>&1; then
+              echo "Warning: unable to pin host key automatically. Falling back to StrictHostKeyChecking=accept-new for this run."
+              STRICT_HOST_KEY_CHECKING="accept-new"
+            fi
+          fi
+
+          echo "VPS_SSH_PORT=${VPS_SSH_PORT}" >> "${GITHUB_ENV}"
+          echo "VPS_STRICT_HOST_KEY_CHECKING=${STRICT_HOST_KEY_CHECKING}" >> "${GITHUB_ENV}"
 
       - name: Deploy
         shell: bash
@@ -97,10 +114,12 @@ jobs:
           TARGET_HOST="${VPS_TARGET_HOST:-}"
           TARGET_USER="${VPS_TARGET_USER:-${VPS_USER}}"
           TARGET_PORT="${VPS_TARGET_PORT:-22}"
+          SSH_PORT="${VPS_SSH_PORT:-22}"
+          SSH_STRICT="${VPS_STRICT_HOST_KEY_CHECKING:-yes}"
 
           if [ -n "${TARGET_HOST}" ]; then
             echo "Deploy mode: bastion (${VPS_USER}@${VPS_HOST}) -> target (${TARGET_USER}@${TARGET_HOST}:${TARGET_PORT})"
-            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+            ssh -p "${SSH_PORT}" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking="${SSH_STRICT}" "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
               ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -p ${TARGET_PORT} ${TARGET_USER}@${TARGET_HOST} \"set -euo pipefail; \
                 cd '${VPS_PATH}'; \
                 echo '--- git pull (with retries) ---'; \
@@ -118,7 +137,7 @@ jobs:
             echo "Deploy mode: direct (${VPS_USER}@${VPS_HOST})"
             # Note: this deploy job does not need to checkout the repository locally.
             # We deploy by SSH and pull the repository on the VPS itself.
-            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+            ssh -p "${SSH_PORT}" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking="${SSH_STRICT}" "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
               cd '${VPS_PATH}'; \
               echo '--- git pull (with retries) ---'; \
               for i in 1 2 3; do \
@@ -182,9 +201,11 @@ jobs:
           TARGET_HOST="${VPS_TARGET_HOST:-}"
           TARGET_USER="${VPS_TARGET_USER:-${VPS_USER}}"
           TARGET_PORT="${VPS_TARGET_PORT:-22}"
+          SSH_PORT="${VPS_SSH_PORT:-22}"
+          SSH_STRICT="${VPS_STRICT_HOST_KEY_CHECKING:-yes}"
 
           if [ -n "${TARGET_HOST}" ]; then
-            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+            ssh -p "${SSH_PORT}" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking="${SSH_STRICT}" "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
               ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -p ${TARGET_PORT} ${TARGET_USER}@${TARGET_HOST} \"set -euo pipefail; \
                 cd '${VPS_PATH}'; \
                 echo '--- docker compose ps ---'; \
@@ -200,7 +221,7 @@ jobs:
                 echo '--- minio logs (tail=200) ---'; \
                 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=200 minio || true\""
           else
-            ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
+            ssh -p "${SSH_PORT}" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking="${SSH_STRICT}" "${VPS_USER}@${VPS_HOST}" "set -euo pipefail; \
               cd '${VPS_PATH}'; \
               echo '--- docker compose ps ---'; \
               docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true; \
