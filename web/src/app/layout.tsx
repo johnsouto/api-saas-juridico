@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Providers } from "@/app/providers";
 import CookieBanner from "@/components/consent/CookieBanner";
 import { ConsentProvider } from "@/components/consent/ConsentProvider";
+import { WhatsappSupportButton } from "@/components/ui/WhatsappSupportButton";
 
 export const metadata: Metadata = {
   // Needed so Next resolves Open Graph/Twitter image URLs correctly in production.
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-background text-foreground">
         <ConsentProvider>
           <Providers>{children}</Providers>
+          <WhatsappSupportButton />
           <CookieBanner />
         </ConsentProvider>
       </body>
