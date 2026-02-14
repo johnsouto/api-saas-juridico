@@ -1,1 +1,1 @@
-export const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "suporte@elementojuris.com.br";
+export const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "suporte.elementojuris@gmail.com";
