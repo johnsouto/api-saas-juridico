@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { TrackedLink } from "@/components/analytics/TrackedLink";
 import { Container } from "@/components/landing/Container";
 import { Section } from "@/components/landing/Section";
+import { RevealOnScroll } from "@/components/ui/RevealOnScroll";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -80,6 +81,21 @@ export function HowItWorks() {
             <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
           </div>
         </div>
+
+        <RevealOnScroll className="mt-10" from="bottom">
+          <div className="overflow-hidden rounded-2xl border border-border/10 bg-card/30 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
+            <div className="relative aspect-[16/9] w-full">
+              <Image
+                src="/images/dashboard.png"
+                alt="Tela do dashboard do Elemento Juris"
+                fill
+                sizes="100vw"
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
+            </div>
+          </div>
+        </RevealOnScroll>
       </Container>
     </Section>
   );
