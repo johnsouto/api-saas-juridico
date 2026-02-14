@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDateTimeBR } from "@/lib/datetime";
 import { usePlan } from "@/hooks/usePlan";
 import { useToast } from "@/components/ui/toast";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 
 type Client = { id: string; nome: string };
 type Tarefa = {
@@ -154,6 +155,10 @@ export default function TarefasPage() {
   if (isPlanLoading) {
     return (
       <div className="space-y-4">
+        <PageHeaderCard
+          title="Tarefas"
+          description="Acompanhe demandas e prazos através de visualização em Kanban."
+        />
         <Card>
           <CardHeader>
             <CardTitle>Tarefas</CardTitle>
@@ -167,6 +172,10 @@ export default function TarefasPage() {
   if (isFree) {
     return (
       <div className="space-y-4">
+        <PageHeaderCard
+          title="Tarefas"
+          description="Acompanhe demandas e prazos através de visualização em Kanban."
+        />
         <Card>
           <CardHeader>
             <CardTitle>Disponível no Plano Plus</CardTitle>
@@ -190,11 +199,10 @@ export default function TarefasPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Tarefas</CardTitle>
-        </CardHeader>
-      </Card>
+      <PageHeaderCard
+        title="Tarefas"
+        description="Acompanhe demandas e prazos através de visualização em Kanban."
+      />
 
       <Card>
         <CardHeader>
@@ -211,7 +219,7 @@ export default function TarefasPage() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="tarefa_cliente">Cliente (opcional)</Label>
+              <Label htmlFor="tarefa_cliente">Cliente</Label>
               <Select id="tarefa_cliente" {...form.register("client_id")}>
                 <option value="">(sem cliente)</option>
                 {clients.data?.map((c) => (
@@ -232,7 +240,7 @@ export default function TarefasPage() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="tarefa_prazo">Prazo (opcional)</Label>
+              <Label htmlFor="tarefa_prazo">Prazo</Label>
               <Input id="tarefa_prazo" className="min-w-[260px]" type="datetime-local" {...form.register("prazo_em")} />
               {form.formState.errors.prazo_em ? (
                 <p className="text-xs text-destructive">{form.formState.errors.prazo_em.message}</p>
@@ -240,7 +248,7 @@ export default function TarefasPage() {
             </div>
 
             <div className="space-y-1 md:col-span-4">
-              <Label htmlFor="tarefa_descricao">Descrição (opcional)</Label>
+              <Label htmlFor="tarefa_descricao">Descrição</Label>
               <Textarea id="tarefa_descricao" placeholder="Detalhes da tarefa" {...form.register("descricao")} />
             </div>
 

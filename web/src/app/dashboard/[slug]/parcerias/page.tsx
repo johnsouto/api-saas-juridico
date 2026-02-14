@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
+import { AddressFields } from "@/components/forms/AddressFields";
 
 type Parceria = {
   id: string;
@@ -127,11 +129,18 @@ export default function ParceriasPage() {
   const { toast } = useToast();
   const params = useParams<{ slug: string }>();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
   const list = useQuery({
     queryKey: ["parcerias"],
     queryFn: async () => (await api.get<Parceria[]>("/v1/parcerias")).data
   });
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 250);
+    return () => window.clearTimeout(t);
+  }, [search]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -159,6 +168,39 @@ export default function ParceriasPage() {
   const phoneValid = !phoneDigits || isValidPhoneLength(phoneDigits);
   const zipDigits = onlyDigits(form.watch("address_zip") ?? "");
   const zipValid = !zipDigits || isValidCEPLength(zipDigits);
+
+  const visibleList = useMemo(() => {
+    const data = [...(list.data ?? [])].sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
+    );
+
+    const normalizedSearch = debouncedSearch
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const digitsSearch = onlyDigits(debouncedSearch);
+
+    if (!normalizedSearch && !digitsSearch) return data;
+
+    return data.filter((item) => {
+      const name = item.nome
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      const email = (item.email ?? "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      const documento = onlyDigits(item.documento ?? "");
+
+      if (normalizedSearch && (name.includes(normalizedSearch) || email.includes(normalizedSearch))) return true;
+      if (digitsSearch && documento.includes(digitsSearch)) return true;
+      return false;
+    });
+  }, [debouncedSearch, list.data]);
 
   const save = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -224,14 +266,10 @@ export default function ParceriasPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Parcerias</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Cadastre parceiros e vincule processos a eles (opcional).</p>
-        </CardContent>
-      </Card>
+      <PageHeaderCard
+        title="Parcerias"
+        description="Cadastre advogados parceiros e administre atuações conjuntas."
+      />
 
       <Card>
         <CardHeader>
@@ -245,12 +283,12 @@ export default function ParceriasPage() {
               {form.formState.errors.nome ? <p className="text-xs text-destructive">{form.formState.errors.nome.message}</p> : null}
             </div>
             <div className="space-y-1 md:col-span-3">
-              <Label htmlFor="parceria_email">E-mail (opcional)</Label>
+              <Label htmlFor="parceria_email">E-mail</Label>
               <Input id="parceria_email" type="email" placeholder="email@exemplo.com" {...form.register("email")} />
               {form.formState.errors.email ? <p className="text-xs text-destructive">{form.formState.errors.email.message}</p> : null}
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="parceria_telefone">Telefone (opcional)</Label>
+              <Label htmlFor="parceria_telefone">Telefone</Label>
               <Input
                 id="parceria_telefone"
                 inputMode="tel"
@@ -316,7 +354,7 @@ export default function ParceriasPage() {
               ) : null}
             </div>
             <div className="space-y-1 md:col-span-1">
-              <Label htmlFor="parceria_oab_uf">UF OAB (opcional)</Label>
+              <Label htmlFor="parceria_oab_uf">UF OAB</Label>
               <Select id="parceria_oab_uf" {...form.register("oab_uf")}>
                 <option value="">UF</option>
                 {UFS.map((uf) => (
@@ -327,70 +365,17 @@ export default function ParceriasPage() {
               </Select>
             </div>
             <div className="space-y-1 md:col-span-1">
-              <Label htmlFor="parceria_oab">Nº OAB (opcional)</Label>
+              <Label htmlFor="parceria_oab">Nº OAB</Label>
               <Input id="parceria_oab" placeholder="Ex: 123456" {...form.register("oab_number")} />
             </div>
 
-            <div className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur md:col-span-6">
-              <div className="text-sm font-semibold">Endereço (opcional)</div>
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-6">
-                <div className="space-y-1 md:col-span-4">
-                  <Label htmlFor="parceria_rua">Rua</Label>
-                  <Input id="parceria_rua" {...form.register("address_street")} />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label htmlFor="parceria_numero">Número</Label>
-                  <Input id="parceria_numero" {...form.register("address_number")} />
-                </div>
-                <div className="space-y-1 md:col-span-3">
-                  <Label htmlFor="parceria_complemento">Complemento</Label>
-                  <Input id="parceria_complemento" {...form.register("address_complement")} />
-                </div>
-                <div className="space-y-1 md:col-span-3">
-                  <Label htmlFor="parceria_bairro">Bairro</Label>
-                  <Input id="parceria_bairro" {...form.register("address_neighborhood")} />
-                </div>
-                <div className="space-y-1 md:col-span-3">
-                  <Label htmlFor="parceria_cidade">Cidade</Label>
-                  <Input id="parceria_cidade" {...form.register("address_city")} />
-                </div>
-                <div className="space-y-1 md:col-span-1">
-                  <Label htmlFor="parceria_uf">UF</Label>
-                  <Select id="parceria_uf" {...form.register("address_state")}>
-                    <option value="">UF</option>
-                    {UFS.map((uf) => (
-                      <option key={`addr-${uf}`} value={uf}>
-                        {uf}
-                      </option>
-                    ))}
-                  </Select>
-                  {form.formState.errors.address_state ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.address_state.message}</p>
-                  ) : null}
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label htmlFor="parceria_cep">CEP</Label>
-                  <Input
-                    id="parceria_cep"
-                    inputMode="numeric"
-                    placeholder="00000-000"
-                    {...form.register("address_zip", {
-                      onChange: (event) => {
-                        const digits = onlyDigits(event.target.value);
-                        const limited = digits.slice(0, 8);
-                        const formatted = formatCEP(limited);
-                        form.setValue("address_zip", formatted, { shouldValidate: true });
-                      }
-                    })}
-                  />
-                  {form.formState.errors.address_zip ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.address_zip.message}</p>
-                  ) : zipDigits && !zipValid ? (
-                    <p className="text-xs text-destructive">CEP incompleto. Informe 8 dígitos.</p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            <AddressFields
+              className="md:col-span-6"
+              form={form}
+              idPrefix="parceria"
+              stateOptions={UFS}
+              zipInvalid={Boolean(zipDigits && !zipValid)}
+            />
             <div className="flex items-end gap-2 md:col-span-6">
               <Button disabled={save.isPending || !docValid || !phoneValid || !zipValid} type="submit">
                 {save.isPending ? "Salvando…" : editingId ? "Atualizar" : "Salvar"}
@@ -433,7 +418,20 @@ export default function ParceriasPage() {
           <CardTitle className="text-sm">Lista</CardTitle>
         </CardHeader>
         <CardContent>
-          {list.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <Input
+              placeholder="Buscar parceiro..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {search ? (
+              <Button variant="outline" type="button" onClick={() => setSearch("")}>
+                Limpar
+              </Button>
+            ) : null}
+          </div>
+
+          {list.isLoading ? <p className="mt-3 text-sm text-muted-foreground">Carregando…</p> : null}
           {list.data && list.data.length === 0 ? (
             <div className="mt-3 rounded-xl border border-border/20 bg-card/40 p-6 text-sm text-muted-foreground">
               <p>Nenhuma parceria cadastrada ainda.</p>
@@ -460,7 +458,7 @@ export default function ParceriasPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {list.data.map((p) => (
+                  {visibleList.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell>{p.nome}</TableCell>
                       <TableCell>{p.email ?? "—"}</TableCell>
@@ -516,6 +514,9 @@ export default function ParceriasPage() {
                 </TableBody>
               </Table>
             </div>
+          ) : null}
+          {list.data && list.data.length > 0 && visibleList.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">Nenhum parceiro encontrado com esse filtro.</p>
           ) : null}
           {list.isError ? <p className="mt-2 text-sm text-destructive">Erro ao listar parcerias.</p> : null}
           {remove.isError ? <p className="mt-2 text-sm text-destructive">Erro ao excluir parceria.</p> : null}

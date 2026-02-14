@@ -22,12 +22,14 @@ import {
   onlyDigits
 } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
+import { AddressFields } from "@/components/forms/AddressFields";
 
 type Client = {
   id: string;
@@ -215,12 +217,10 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Clientes</CardTitle>
-          <CardDescription>Busque por documento ou nome. Cadastre e organize seus clientes.</CardDescription>
-        </CardHeader>
-      </Card>
+      <PageHeaderCard
+        title="Clientes"
+        description="Gerencie cadastros, consulte a base completa e vincule parcerias."
+      />
 
       <Card>
         <CardHeader>
@@ -278,12 +278,12 @@ export default function ClientsPage() {
             </div>
 
             <div className="space-y-1 md:col-span-3">
-              <Label htmlFor="cliente_email">E-mail (opcional)</Label>
+              <Label htmlFor="cliente_email">E-mail</Label>
               <Input id="cliente_email" type="email" placeholder="email@exemplo.com" {...form.register("email")} />
               {form.formState.errors.email ? <p className="text-xs text-destructive">{form.formState.errors.email.message}</p> : null}
             </div>
             <div className="space-y-1 md:col-span-3">
-              <Label htmlFor="cliente_celular">Celular (opcional)</Label>
+              <Label htmlFor="cliente_celular">Celular</Label>
               <Input
                 id="cliente_celular"
                 inputMode="tel"
@@ -307,7 +307,7 @@ export default function ClientsPage() {
             </div>
 
             <div className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur md:col-span-6">
-              <div className="text-sm font-semibold">Parcerias vinculadas (opcional)</div>
+              <div className="text-sm font-semibold">Parcerias vinculadas</div>
               <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
                 <Select value={partnershipCandidateId} onChange={(event) => setPartnershipCandidateId(event.target.value)}>
                   <option value="">Selecione uma parceria</option>
@@ -357,59 +357,12 @@ export default function ClientsPage() {
               )}
             </div>
 
-            <div className="rounded-xl border border-border/15 bg-card/20 p-3 backdrop-blur md:col-span-6">
-              <div className="text-sm font-semibold">Endereço (opcional)</div>
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-6">
-                <div className="space-y-1 md:col-span-4">
-                  <Label htmlFor="cliente_rua">Rua</Label>
-                  <Input id="cliente_rua" {...form.register("address_street")} />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label htmlFor="cliente_numero">Número</Label>
-                  <Input id="cliente_numero" {...form.register("address_number")} />
-                </div>
-                <div className="space-y-1 md:col-span-3">
-                  <Label htmlFor="cliente_complemento">Complemento</Label>
-                  <Input id="cliente_complemento" {...form.register("address_complement")} />
-                </div>
-                <div className="space-y-1 md:col-span-3">
-                  <Label htmlFor="cliente_bairro">Bairro</Label>
-                  <Input id="cliente_bairro" {...form.register("address_neighborhood")} />
-                </div>
-                <div className="space-y-1 md:col-span-3">
-                  <Label htmlFor="cliente_cidade">Cidade</Label>
-                  <Input id="cliente_cidade" {...form.register("address_city")} />
-                </div>
-                <div className="space-y-1 md:col-span-1">
-                  <Label htmlFor="cliente_uf">UF</Label>
-                  <Input id="cliente_uf" placeholder="SP" {...form.register("address_state")} />
-                  {form.formState.errors.address_state ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.address_state.message}</p>
-                  ) : null}
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label htmlFor="cliente_cep">CEP</Label>
-                  <Input
-                    id="cliente_cep"
-                    inputMode="numeric"
-                    placeholder="00000-000"
-                    {...form.register("address_zip", {
-                      onChange: (event) => {
-                        const digits = onlyDigits(event.target.value);
-                        const limited = digits.slice(0, 8);
-                        const formatted = formatCEP(limited);
-                        form.setValue("address_zip", formatted, { shouldValidate: true });
-                      }
-                    })}
-                  />
-                  {form.formState.errors.address_zip ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.address_zip.message}</p>
-                  ) : zipDigits && !zipValid ? (
-                    <p className="text-xs text-destructive">CEP incompleto. Informe 8 dígitos.</p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            <AddressFields
+              className="md:col-span-6"
+              form={form}
+              idPrefix="cliente"
+              zipInvalid={Boolean(zipDigits && !zipValid)}
+            />
 
             <div className="flex items-end gap-2 md:col-span-6">
               <Button disabled={create.isPending || !docValid || !phoneValid || !zipValid} type="submit">

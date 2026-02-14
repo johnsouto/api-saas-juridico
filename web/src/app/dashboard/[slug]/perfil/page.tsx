@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AddressFields } from "@/components/forms/AddressFields";
 
 const schema = z.object({
   first_name: z.string().min(2, "Informe o primeiro nome.").max(200),
@@ -176,58 +177,11 @@ export default function PerfilPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border/15 bg-card/30 p-3 backdrop-blur">
-              <div className="text-sm font-semibold">Endereço</div>
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="space-y-1 md:col-span-2">
-                  <Label>Rua</Label>
-                  <Input {...form.register("address_street")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Número</Label>
-                  <Input {...form.register("address_number")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Complemento</Label>
-                  <Input {...form.register("address_complement")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Bairro</Label>
-                  <Input {...form.register("address_neighborhood")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Cidade</Label>
-                  <Input {...form.register("address_city")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Estado (UF)</Label>
-                  <Input placeholder="SP" {...form.register("address_state")} />
-                  {form.formState.errors.address_state ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.address_state.message}</p>
-                  ) : null}
-                </div>
-                <div className="space-y-1">
-                  <Label>CEP</Label>
-                  <Input
-                    inputMode="numeric"
-                    placeholder="00000-000"
-                    {...form.register("address_zip", {
-                      onChange: (event) => {
-                        const digits = onlyDigits(event.target.value);
-                        const limited = digits.slice(0, 8);
-                        const formatted = formatCEP(limited);
-                        form.setValue("address_zip", formatted, { shouldValidate: true });
-                      }
-                    })}
-                  />
-                  {form.formState.errors.address_zip ? (
-                    <p className="text-xs text-destructive">{form.formState.errors.address_zip.message}</p>
-                  ) : zipDigits && !zipValid ? (
-                    <p className="text-xs text-destructive">CEP incompleto. Informe 8 dígitos.</p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            <AddressFields
+              form={form}
+              idPrefix="perfil"
+              zipInvalid={Boolean(zipDigits && !zipValid)}
+            />
 
             {save.isError ? (
               <div className="rounded-xl border border-border/20 bg-card/40 p-3 text-sm text-destructive">

@@ -8,12 +8,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTimeBR } from "@/lib/datetime";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 
 type Client = { id: string; nome: string };
 type Evento = {
@@ -129,12 +130,10 @@ export default function AgendaPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Agenda</CardTitle>
-          <CardDescription>Cadastre seus eventos e receba notificações por E-mail</CardDescription>
-        </CardHeader>
-      </Card>
+      <PageHeaderCard
+        title="Agenda"
+        description="Organize eventos com alertas por e-mail e integração externa."
+      />
 
       <Card>
         <CardHeader>
@@ -143,7 +142,7 @@ export default function AgendaPage() {
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-6" onSubmit={form.handleSubmit((v) => create.mutate(v))}>
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="agenda_atalho">Atalho (opcional)</Label>
+              <Label htmlFor="agenda_atalho">Atalho</Label>
               <Select
                 id="agenda_atalho"
                 value=""
@@ -167,7 +166,6 @@ export default function AgendaPage() {
                 <option value="video_conferencia">Video-conferência</option>
                 <option value="video_novo_cliente">Vídeo com novo cliente</option>
               </Select>
-              <p className="text-xs text-muted-foreground">Atalhos fixos (separei do cliente para não poluir).</p>
             </div>
 
             <div className="space-y-1 md:col-span-2">
@@ -179,7 +177,7 @@ export default function AgendaPage() {
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="agenda_cliente">Cliente (opcional)</Label>
+              <Label htmlFor="agenda_cliente">Cliente</Label>
               <Select
                 id="agenda_cliente"
                 value={form.watch("client_id") ?? ""}
@@ -223,7 +221,7 @@ export default function AgendaPage() {
                 ) : null}
               </div>
               <div className="space-y-1">
-                <Label htmlFor="agenda_fim">Fim (opcional)</Label>
+                <Label htmlFor="agenda_fim">Fim</Label>
                 <Input id="agenda_fim" className="min-w-[260px]" type="datetime-local" {...form.register("fim_em")} />
                 {form.formState.errors.fim_em ? (
                   <p className="text-xs text-destructive">{form.formState.errors.fim_em.message}</p>

@@ -13,12 +13,13 @@ import { api } from "@/lib/api";
 import { NICHOS } from "@/constants/nichos";
 import { formatProcessCNJ, isValidProcessCNJLength, onlyDigits } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 
 type Client = { id: string; nome: string };
 type Parceria = { id: string; nome: string };
@@ -152,12 +153,10 @@ export default function ProcessesPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Processos</CardTitle>
-          <CardDescription>Busca por Processo / Nicho + Cadastre seu processo</CardDescription>
-        </CardHeader>
-      </Card>
+      <PageHeaderCard
+        title="Processos"
+        description="Registre autos, acesse links dos tribunais e monitore o andamento."
+      />
 
       <Card>
         <CardHeader>
@@ -180,7 +179,7 @@ export default function ProcessesPage() {
               ) : null}
             </div>
             <div className="space-y-1">
-              <Label htmlFor="processo_parceria">Parceria (opcional)</Label>
+              <Label htmlFor="processo_parceria">Parceria</Label>
               <Select id="processo_parceria" {...form.register("parceria_id")}>
                 <option value="">Sem parceria</option>
                 {parcerias.data?.map((p) => (
@@ -220,7 +219,7 @@ export default function ProcessesPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="processo_nicho">Nicho (opcional)</Label>
+              <Label htmlFor="processo_nicho">Nicho</Label>
               <Select id="processo_nicho" {...form.register("nicho")}>
                 <option value="">Selecione um nicho</option>
                 {NICHOS.map((n) => (
@@ -231,7 +230,7 @@ export default function ProcessesPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="processo_tribunal">Tribunal (opcional)</Label>
+              <Label htmlFor="processo_tribunal">Tribunal</Label>
               <Input id="processo_tribunal" placeholder="Ex: TJSP" {...form.register("tribunal_code")} />
               {form.formState.errors.tribunal_code ? (
                 <p className="text-xs text-destructive">{form.formState.errors.tribunal_code.message}</p>
@@ -239,7 +238,7 @@ export default function ProcessesPage() {
             </div>
             <div className="space-y-1 md:col-span-2">
               <div className="flex items-center gap-2">
-                <Label htmlFor="processo_login_tribunal">Link de Login do Tribunal (opcional)</Label>
+                <Label htmlFor="processo_login_tribunal">Link de Login do Tribunal</Label>
                 <span title='Cole aqui o link de login do tribunal do processo. Você pode preencher ou alterar quando quiser.'>
                   <CircleHelp className="h-4 w-4 text-muted-foreground" />
                 </span>

@@ -924,7 +924,7 @@ export default function ClientDetailPage() {
                   </header>
                   <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
                     <div className="space-y-1">
-                      <Label htmlFor="case_title">Título (opcional)</Label>
+                      <Label htmlFor="case_title">Título</Label>
                       <Input
                         id="case_title"
                         value={caseTitle}

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
+import { DOCUMENT_ACCEPT, DOCUMENT_FORMATS_LABEL } from "@/constants/upload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FilePicker } from "@/components/ui/FilePicker";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 
 type Doc = {
   id: string;
@@ -213,24 +215,23 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Documentos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isFreePlan ? (
-            <p className="text-sm text-muted-foreground">Armazene e organize seus PDFs. Limite do plano Free: 100 MB.</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Armazene e organize seus PDFs com segurança.</p>
-          )}
-        </CardContent>
-      </Card>
+      <PageHeaderCard
+        title="Documentos"
+        description="Centralize arquivos e vincule-os a clientes, processos ou honorários."
+      />
 
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Upload</CardTitle>
         </CardHeader>
         <CardContent>
+          {isFreePlan ? (
+            <p className="mb-3 text-sm text-muted-foreground">
+              Armazene e organize seus PDFs. Limite do plano Free: 100 MB.
+            </p>
+          ) : (
+            <p className="mb-3 text-sm text-muted-foreground">Armazene e organize seus PDFs com segurança.</p>
+          )}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div className="space-y-1">
               <Label htmlFor="doc_categoria">Categoria *</Label>
@@ -244,7 +245,7 @@ export default function DocumentsPage() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="doc_vinculo">Vínculo (opcional)</Label>
+              <Label htmlFor="doc_vinculo">Vínculo</Label>
               <Select
                 id="doc_vinculo"
                 value={linkType}
@@ -269,8 +270,8 @@ export default function DocumentsPage() {
                 id="doc_arquivo"
                 value={file}
                 onChange={setFile}
-                accept="application/pdf,image/jpeg,image/png"
-                helperText="Formatos suportados: PDF, JPG e PNG."
+                accept={DOCUMENT_ACCEPT}
+                helperText={`Formatos suportados: ${DOCUMENT_FORMATS_LABEL}.`}
               />
             </div>
 
@@ -374,10 +375,10 @@ export default function DocumentsPage() {
           </div>
 
           <div className="space-y-1 md:col-span-2">
-            <Label htmlFor="doc_id">ID (opcional)</Label>
+            <Label htmlFor="doc_id">ID</Label>
             <Input
               id="doc_id"
-              placeholder={filterType === "all" ? "ID (opcional)" : "ID do vínculo"}
+              placeholder={filterType === "all" ? "ID" : "ID do vínculo"}
               value={filterId}
               onChange={(e) => setFilterId(e.target.value)}
               disabled={filterType === "all"}

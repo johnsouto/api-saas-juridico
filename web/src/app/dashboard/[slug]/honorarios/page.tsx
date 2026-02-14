@@ -9,13 +9,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "@/lib/api";
 import { centsToDecimalString, formatDateBR, maskCurrencyBRL, parseCurrencyToCents } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FilePicker } from "@/components/ui/FilePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { PageHeaderCard } from "@/components/ui/PageHeaderCard";
 
 type Client = { id: string; nome: string; tipo_documento: "cpf" | "cnpj"; documento: string };
 type Proc = { id: string; client_id: string; numero: string };
@@ -193,12 +194,10 @@ export default function HonorariosPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Honorários</CardTitle>
-          <CardDescription>Conferência/baixa manual de pagamento + comprovante.</CardDescription>
-        </CardHeader>
-      </Card>
+      <PageHeaderCard
+        title="Honorários"
+        description="Controle pagamentos, repasses a parceiros e o histórico financeiro."
+      />
 
       <Card>
         <CardHeader>
@@ -210,6 +209,7 @@ export default function HonorariosPage() {
               <Label htmlFor="honorario_cliente">Cliente *</Label>
               <Select
                 id="honorario_cliente"
+                className="h-10"
                 {...form.register("client_id")}
                 onChange={(e) => {
                   form.setValue("client_id", e.target.value);
@@ -227,8 +227,13 @@ export default function HonorariosPage() {
             </div>
 
             <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="honorario_processo">Processo (opcional)</Label>
-              <Select id="honorario_processo" {...form.register("process_id")} disabled={!selectedClientId}>
+              <Label htmlFor="honorario_processo">Processo</Label>
+              <Select
+                id="honorario_processo"
+                className="h-10"
+                {...form.register("process_id")}
+                disabled={!selectedClientId}
+              >
                 <option value="">Sem processo</option>
                 {processesForClient.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -243,6 +248,7 @@ export default function HonorariosPage() {
               <Label htmlFor="honorario_valor">Valor Inicial *</Label>
               <Input
                 id="honorario_valor"
+                className="h-10"
                 inputMode="numeric"
                 placeholder="R$ 0,00"
                 value={form.watch("valor")}
@@ -252,17 +258,24 @@ export default function HonorariosPage() {
 
             <div className="space-y-1">
               <Label htmlFor="honorario_inicio">Data de Início do Pagamento *</Label>
-              <Input id="honorario_inicio" type="date" {...form.register("data_vencimento")} />
+              <Input id="honorario_inicio" className="h-10" type="date" {...form.register("data_vencimento")} />
             </div>
 
             <div className="space-y-1">
               <Label htmlFor="honorario_parcelas">Parcelas *</Label>
-              <Input id="honorario_parcelas" type="number" min={1} max={120} {...form.register("qtd_parcelas")} />
+              <Input
+                id="honorario_parcelas"
+                className="h-10"
+                type="number"
+                min={1}
+                max={120}
+                {...form.register("qtd_parcelas")}
+              />
             </div>
 
             <div className="space-y-1">
               <Label htmlFor="honorario_exito">Percentual no êxito *</Label>
-              <Select id="honorario_exito" {...form.register("percentual_exito")}>
+              <Select id="honorario_exito" className="h-10" {...form.register("percentual_exito")}>
                 <option value="10">10%</option>
                 <option value="15">15%</option>
                 <option value="20">20%</option>
@@ -273,7 +286,7 @@ export default function HonorariosPage() {
 
             <div className="space-y-1">
               <Label htmlFor="honorario_parceiro">% do parceiro</Label>
-              <Select id="honorario_parceiro" {...form.register("percentual_parceiro")}>
+              <Select id="honorario_parceiro" className="h-10" {...form.register("percentual_parceiro")}>
                 <option value="0">0%</option>
                 <option value="10">10%</option>
                 <option value="20">20%</option>
@@ -287,13 +300,13 @@ export default function HonorariosPage() {
 
             <div className="space-y-1">
               <Label htmlFor="honorario_status">Status *</Label>
-              <Select id="honorario_status" {...form.register("status")}>
+              <Select id="honorario_status" className="h-10" {...form.register("status")}>
                 <option value="aberto">aberto</option>
                 <option value="pago">pago</option>
               </Select>
             </div>
 
-            <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-2 md:col-span-6 md:flex-row md:items-end">
               <Button disabled={create.isPending} type="submit">
                 {create.isPending ? "Salvando…" : editingId ? "Atualizar" : "Salvar"}
               </Button>

@@ -24,6 +24,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ProductivityCockpitModal } from "@/components/cockpit/ProductivityCockpitModal";
 import { BugReportButton } from "@/components/feedback/BugReportButton";
 import { api } from "@/lib/api";
+import { formatDateBR } from "@/lib/datetime";
 import { setIdleTimeoutMs } from "@/lib/session";
 import { getEffectiveTheme, setTheme, type AppTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -103,6 +104,15 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const planCode = billing.data?.plan_code ?? "FREE";
   const status = billing.data?.status;
   const message = billing.data?.message;
+  const isPlusPlan = planCode !== "FREE" && Boolean(billing.data?.is_plus_effective);
+  const currentPeriodEnd = billing.data?.current_period_end ?? null;
+  const periodEndDate = currentPeriodEnd ? new Date(currentPeriodEnd) : null;
+  const periodEndValid = periodEndDate ? !Number.isNaN(periodEndDate.getTime()) : false;
+  const periodEndLabel = periodEndValid ? formatDateBR(periodEndDate) : null;
+  const daysUntilEnd = periodEndValid ? Math.ceil((periodEndDate!.getTime() - Date.now()) / 86_400_000) : null;
+  const showDueSoon = daysUntilEnd !== null && daysUntilEnd >= 0 && daysUntilEnd < 15;
+  const dueSoonLabel =
+    daysUntilEnd === 0 ? "Vence hoje" : daysUntilEnd !== null ? `Vence em ${daysUntilEnd} dias` : "";
 
   useEffect(() => {
     // Persist idle timeout policy based on tenant plan.
@@ -163,6 +173,22 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
             <Badge variant="secondary" className="border border-border/15 bg-card/40">
               {planBadgeLabel(planCode)}
             </Badge>
+            {isPlusPlan ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/15 bg-card/40 px-2 py-1 text-xs">
+                <span className="text-muted-foreground">Vencimento:</span>
+                <span>{periodEndLabel ?? "não informado"}</span>
+                {showDueSoon ? (
+                  <Badge className="border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200">
+                    {dueSoonLabel}
+                  </Badge>
+                ) : null}
+                {!periodEndLabel ? (
+                  <Button asChild size="sm" variant="ghost" className="h-6 px-2 text-xs">
+                    <Link href={cta.href}>Verificar assinatura</Link>
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             <Button asChild size="sm" variant="outline" className="gap-2">
               <Link href="/dashboard/perfil" aria-label="Perfil">
                 <User className="h-4 w-4" />
