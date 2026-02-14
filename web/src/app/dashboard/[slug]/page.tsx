@@ -229,100 +229,101 @@ export default function DashboardHome() {
         </Card>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+      <div className="grid grid-cols-1 gap-6 items-stretch md:grid-cols-2 xl:grid-cols-3">
         <PlusOnly
           enabled={isPlus}
-          className="md:col-span-4"
           title="Agenda no Plano Plus"
           description="Desbloqueie o calendário completo para acompanhar compromissos e prazos."
         >
-          <Card className="flex min-h-[320px] flex-col">
+          <Card className="h-full flex flex-col">
             <CardHeader>
               <CardTitle className="text-sm">Calendário</CardTitle>
               <CardDescription className="text-xs">Eventos da sua agenda.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => {
-                    setCalendarMonth((current) => shiftMonth(current, -1));
-                    setSelectedDay(1);
-                  }}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <p className="text-sm font-medium capitalize">{formatMonthLabel(calendarMonth)}</p>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => {
-                    setCalendarMonth((current) => shiftMonth(current, 1));
-                    setSelectedDay(1);
-                  }}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+            <CardContent className="flex flex-1 flex-col min-h-0 gap-3">
+              <div className="flex-1 min-h-0 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setCalendarMonth((current) => shiftMonth(current, -1));
+                      setSelectedDay(1);
+                    }}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <p className="text-sm font-medium capitalize">{formatMonthLabel(calendarMonth)}</p>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setCalendarMonth((current) => shiftMonth(current, 1));
+                      setSelectedDay(1);
+                    }}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
 
-              <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
-                {["D", "S", "T", "Q", "Q", "S", "S"].map((label, index) => (
-                  <span key={`${label}-${index}`}>{label}</span>
-                ))}
-              </div>
+                <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
+                  {["D", "S", "T", "Q", "Q", "S", "S"].map((label, index) => (
+                    <span key={`${label}-${index}`}>{label}</span>
+                  ))}
+                </div>
 
-              <div className="grid grid-cols-7 gap-1">
-                {buildMonthGrid(calendarMonth).map((day, index) =>
-                  day === null ? (
-                    <span key={`blank-${index}`} className="h-9 rounded-md" />
-                  ) : (
-                    <button
-                      key={`day-${day}`}
-                      type="button"
-                      onClick={() => setSelectedDay(day)}
-                      className={[
-                        "relative flex h-9 items-center justify-center rounded-md text-sm transition-colors",
-                        day === safeSelectedDay ? "bg-primary text-primary-foreground" : "hover:bg-card/40",
-                        eventsByDay.has(day) ? "font-semibold" : "text-muted-foreground"
-                      ].join(" ")}
-                    >
-                      {day}
-                      {eventsByDay.has(day) ? (
-                        <span
-                          className={[
-                            "absolute bottom-1 h-1.5 w-1.5 rounded-full",
-                            day === safeSelectedDay ? "bg-primary-foreground" : "bg-emerald-400"
-                          ].join(" ")}
-                        />
-                      ) : null}
-                    </button>
-                  )
-                )}
-              </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {buildMonthGrid(calendarMonth).map((day, index) =>
+                    day === null ? (
+                      <span key={`blank-${index}`} className="h-9 rounded-md" />
+                    ) : (
+                      <button
+                        key={`day-${day}`}
+                        type="button"
+                        onClick={() => setSelectedDay(day)}
+                        className={[
+                          "relative flex h-9 items-center justify-center rounded-md text-sm transition-colors",
+                          day === safeSelectedDay ? "bg-primary text-primary-foreground" : "hover:bg-card/40",
+                          eventsByDay.has(day) ? "font-semibold" : "text-muted-foreground"
+                        ].join(" ")}
+                      >
+                        {day}
+                        {eventsByDay.has(day) ? (
+                          <span
+                            className={[
+                              "absolute bottom-1 h-1.5 w-1.5 rounded-full",
+                              day === safeSelectedDay ? "bg-primary-foreground" : "bg-emerald-400"
+                            ].join(" ")}
+                          />
+                        ) : null}
+                      </button>
+                    )
+                  )}
+                </div>
 
-              <div className="min-h-[92px] rounded-lg border border-border/15 bg-card/20 p-2">
-                {agenda.isLoading ? <p className="text-xs text-muted-foreground">Carregando eventos…</p> : null}
-                {!agenda.isLoading && (agenda.data?.length ?? 0) === 0 ? (
-                  <p className="text-xs text-muted-foreground">Nenhum evento cadastrado.</p>
-                ) : null}
-                {selectedDayEvents.length > 0 ? (
-                  <div className="space-y-1">
-                    {selectedDayEvents.map((event) => (
-                      <div key={event.id} className="rounded-md border border-border/10 bg-card/40 px-2 py-1.5">
-                        <p className="truncate text-xs font-medium">{event.titulo}</p>
-                        <p className="text-[11px] text-muted-foreground">{formatTimeInSaoPaulo(event.inicio_em)}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : agenda.data && agenda.data.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">Nenhum evento neste dia.</p>
-                ) : null}
-              </div>
+                <div className="min-h-[92px] rounded-lg border border-border/15 bg-card/20 p-2">
+                  {agenda.isLoading ? <p className="text-xs text-muted-foreground">Carregando eventos…</p> : null}
+                  {!agenda.isLoading && (agenda.data?.length ?? 0) === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum evento cadastrado.</p>
+                  ) : null}
+                  {selectedDayEvents.length > 0 ? (
+                    <div className="space-y-1">
+                      {selectedDayEvents.map((event) => (
+                        <div key={event.id} className="rounded-md border border-border/10 bg-card/40 px-2 py-1.5">
+                          <p className="truncate text-xs font-medium">{event.titulo}</p>
+                          <p className="text-[11px] text-muted-foreground">{formatTimeInSaoPaulo(event.inicio_em)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : agenda.data && agenda.data.length > 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum evento neste dia.</p>
+                  ) : null}
+                </div>
 
-              {agenda.isError ? <p className="text-xs text-destructive">Erro ao carregar agenda.</p> : null}
+                {agenda.isError ? <p className="text-xs text-destructive">Erro ao carregar agenda.</p> : null}
+              </div>
 
               <div className="mt-auto flex flex-wrap items-center gap-2">
                 <Button asChild className="h-10 w-full" variant="outline">
@@ -335,57 +336,58 @@ export default function DashboardHome() {
 
         <PlusOnly
           enabled={isPlus}
-          className="md:col-span-4"
           title="Tarefas no Plano Plus"
           description="Ative o Plus para usar o Kanban e manter os prazos em dia."
         >
-          <Card className="flex min-h-[300px] flex-col">
+          <Card className="h-full flex flex-col">
             <CardHeader>
               <CardTitle className="text-sm">Tarefas</CardTitle>
               <CardDescription className="text-xs">Resumo do Kanban.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col items-center justify-start gap-4">
-              <div className="flex items-center justify-center">
-                <TaskPieChart
-                  dueToday={kanban.data?.due_today ?? 0}
-                  pendente={kanban.data?.pendente ?? 0}
-                  emAndamento={kanban.data?.em_andamento ?? 0}
-                  concluido={kanban.data?.concluido ?? 0}
-                />
-              </div>
+            <CardContent className="flex flex-1 flex-col min-h-0">
+              <div className="flex-1 min-h-0 flex flex-col items-center justify-start gap-4">
+                <div className="flex items-center justify-center">
+                  <TaskPieChart
+                    dueToday={kanban.data?.due_today ?? 0}
+                    pendente={kanban.data?.pendente ?? 0}
+                    emAndamento={kanban.data?.em_andamento ?? 0}
+                    concluido={kanban.data?.concluido ?? 0}
+                  />
+                </div>
 
-              <div className="flex w-full max-w-[240px] flex-col gap-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">Prazo expira hoje</span>
-                  <div className="min-w-[84px] rounded-lg bg-red-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                    {kanban.data ? kanban.data.due_today : "—"}
+                <div className="flex w-full max-w-[240px] flex-col gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">Prazo expira hoje</span>
+                    <div className="min-w-[84px] rounded-lg bg-red-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.due_today : "—"}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">Pendente</span>
-                  <div className="min-w-[84px] rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                    {kanban.data ? kanban.data.pendente : "—"}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">Pendente</span>
+                    <div className="min-w-[84px] rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.pendente : "—"}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-muted-foreground">Em andamento</span>
-                  <div className="min-w-[84px] rounded-lg bg-yellow-400 px-3 py-2 text-center text-sm font-semibold tabular-nums text-zinc-950 shadow-sm ring-1 ring-border/25">
-                    {kanban.data ? kanban.data.em_andamento : "—"}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">Em andamento</span>
+                    <div className="min-w-[84px] rounded-lg bg-yellow-400 px-3 py-2 text-center text-sm font-semibold tabular-nums text-zinc-950 shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.em_andamento : "—"}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span
-                    className={[
-                      "text-xs",
-                      (kanban.data?.concluido ?? 0) > 0 ? "font-medium text-emerald-600" : "text-muted-foreground"
-                    ].join(" ")}
-                    title="Concluídas"
-                  >
-                    Sem pendências
-                    <span className="ml-1 text-[10px] font-normal text-muted-foreground">(concluídas)</span>
-                  </span>
-                  <div className="min-w-[84px] rounded-lg bg-green-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
-                    {kanban.data ? kanban.data.concluido : "—"}
+                  <div className="flex items-center justify-between gap-3">
+                    <span
+                      className={[
+                        "text-xs",
+                        (kanban.data?.concluido ?? 0) > 0 ? "font-medium text-emerald-600" : "text-muted-foreground"
+                      ].join(" ")}
+                      title="Concluídas"
+                    >
+                      Sem pendências
+                      <span className="ml-1 text-[10px] font-normal text-muted-foreground">(concluídas)</span>
+                    </span>
+                    <div className="min-w-[84px] rounded-lg bg-green-500 px-3 py-2 text-center text-sm font-semibold tabular-nums text-white shadow-sm ring-1 ring-border/25">
+                      {kanban.data ? kanban.data.concluido : "—"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -396,19 +398,19 @@ export default function DashboardHome() {
                 </Button>
               </div>
 
-              {kanban.isError ? <p className="text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
+              {kanban.isError ? <p className="mt-2 text-xs text-destructive">Erro ao carregar resumo de tarefas.</p> : null}
             </CardContent>
           </Card>
         </PlusOnly>
 
-        <PlusOnly enabled={isPlus} className="md:col-span-4" title="Relatórios no Plano Plus">
-          <Card className="flex flex-col">
+        <PlusOnly enabled={isPlus} title="Relatórios no Plano Plus">
+          <Card className="h-full flex flex-col min-h-[360px]">
             <CardHeader>
               <CardTitle className="text-sm">Relatório</CardTitle>
               <CardDescription className="text-xs">Exporte seus dados em Excel.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col">
-              <div className="flex flex-1 items-center justify-center">
+            <CardContent className="flex flex-1 flex-col min-h-0">
+              <div className="flex flex-1 min-h-0 items-center justify-center">
                 <ExcelIcon />
               </div>
 
