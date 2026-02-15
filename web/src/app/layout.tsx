@@ -57,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-background text-foreground">
         <ConsentProvider>
           <Providers>{children}</Providers>
-          <WhatsappSupportButton />
+          <WhatsappSupportButton hideOnDashboard />
           <CookieBanner />
         </ConsentProvider>
       </body>

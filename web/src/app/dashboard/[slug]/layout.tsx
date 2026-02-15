@@ -30,6 +30,7 @@ import { getEffectiveTheme, setTheme, type AppTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { WhatsappSupportButton } from "@/components/ui/WhatsappSupportButton";
 
 type BillingStatus = {
   plan_code: "FREE" | "PLUS_MONTHLY_CARD" | "PLUS_ANNUAL_PIX";
@@ -232,6 +233,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
             >
               Sair
             </Button>
+            <WhatsappSupportButton variant="inline" />
           </div>
         </div>
       </header>

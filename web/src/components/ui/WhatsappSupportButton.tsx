@@ -1,9 +1,24 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 const WHATSAPP_SUPPORT_URL =
   "https://api.whatsapp.com/send?phone=5521976818750&text=Ol%C3%A1!%20Preciso%20de%20suporte%20no%20Elemento%20Juris.";
 
-export function WhatsappSupportButton() {
+type WhatsappSupportButtonProps = {
+  variant?: "floating" | "inline";
+  hideOnDashboard?: boolean;
+};
+
+export function WhatsappSupportButton({ variant = "floating", hideOnDashboard = false }: WhatsappSupportButtonProps) {
+  const pathname = usePathname();
+
+  if (hideOnDashboard && pathname.startsWith("/dashboard")) {
+    return null;
+  }
+
+  const isFloating = variant === "floating";
+
   return (
     <a
       href={WHATSAPP_SUPPORT_URL}
@@ -12,12 +27,13 @@ export function WhatsappSupportButton() {
       aria-label="Suporte WhatsApp Elemento Juris"
       title="Falar com suporte no WhatsApp"
       className={[
-        "fixed bottom-6 right-6 z-[999]",
-        "inline-flex h-12 w-12 items-center justify-center rounded-full p-3",
+        isFloating ? "fixed bottom-6 right-6 z-[999]" : "relative z-10",
+        "inline-flex items-center justify-center rounded-full text-white",
+        isFloating ? "h-12 w-12 p-3 sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-3" : "h-9 w-9 gap-2 p-2 sm:h-10 sm:w-auto sm:px-3",
         "bg-[#25D366] text-white shadow-[0_0_20px_rgba(37,211,102,0.35)]",
         "transition-all duration-300 hover:scale-105 hover:bg-[#20bf5d]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        "sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-3"
+        !isFloating ? "sm:font-semibold sm:text-sm" : null
       ].join(" ")}
     >
       <svg viewBox="0 0 24 24" className="h-6 w-6 shrink-0 fill-current" aria-hidden="true" focusable="false">
