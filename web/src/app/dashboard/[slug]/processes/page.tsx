@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleHelp, ExternalLink, FileUp } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -97,7 +97,7 @@ export default function ProcessesPage() {
       tribunal_login_url: ""
     }
   });
-  const numeroDigits = onlyDigits(form.watch("numero") ?? "");
+  const numeroDigits = onlyDigits(useWatch({ control: form.control, name: "numero" }) ?? "");
   const numeroValid = isValidProcessCNJLength(numeroDigits);
 
   const create = useMutation({

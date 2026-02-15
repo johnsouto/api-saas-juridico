@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -120,12 +120,12 @@ export default function ClientsPage() {
       address_zip: ""
     }
   });
-  const docType = form.watch("tipo_documento");
-  const docDigits = onlyDigits(form.watch("documento") ?? "");
+  const docType = useWatch({ control: form.control, name: "tipo_documento" });
+  const docDigits = onlyDigits(useWatch({ control: form.control, name: "documento" }) ?? "");
   const docValid = docType === "cpf" ? isValidCPFLength(docDigits) : isValidCNPJLength(docDigits);
-  const phoneDigits = onlyDigits(form.watch("phone_mobile") ?? "");
+  const phoneDigits = onlyDigits(useWatch({ control: form.control, name: "phone_mobile" }) ?? "");
   const phoneValid = !phoneDigits || isValidPhoneLength(phoneDigits);
-  const zipDigits = onlyDigits(form.watch("address_zip") ?? "");
+  const zipDigits = onlyDigits(useWatch({ control: form.control, name: "address_zip" }) ?? "");
   const zipValid = !zipDigits || isValidCEPLength(zipDigits);
 
   const list = useQuery({

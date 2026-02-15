@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -39,7 +39,7 @@ export default function ResetPasswordUI() {
     defaultValues: { nova_senha: "", confirmar: "" }
   });
 
-  const watchedPwd = form.watch("nova_senha") ?? "";
+  const watchedPwd = useWatch({ control: form.control, name: "nova_senha" }) ?? "";
   const pwdValidation = validatePassword(watchedPwd);
 
   const confirm = useMutation({

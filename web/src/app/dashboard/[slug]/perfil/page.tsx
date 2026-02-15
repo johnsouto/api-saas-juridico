@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -126,7 +126,7 @@ export default function PerfilPage() {
       address_zip: ""
     }
   });
-  const zipDigits = onlyDigits(form.watch("address_zip") ?? "");
+  const zipDigits = onlyDigits(useWatch({ control: form.control, name: "address_zip" }) ?? "");
   const zipValid = !zipDigits || isValidCEPLength(zipDigits);
 
   const billing = useQuery({

@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -43,7 +43,7 @@ export default function AcceptInviteClient() {
     defaultValues: { senha: "", senha2: "" }
   });
 
-  const watchedPwd = form.watch("senha") ?? "";
+  const watchedPwd = useWatch({ control: form.control, name: "senha" }) ?? "";
   const pwdValidation = validatePassword(watchedPwd);
 
   const accept = useMutation({

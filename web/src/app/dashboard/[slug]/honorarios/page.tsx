@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -189,7 +189,8 @@ export default function HonorariosPage() {
     }
   });
 
-  const selectedClientId = form.watch("client_id");
+  const selectedClientId = useWatch({ control: form.control, name: "client_id" });
+  const watchedValor = useWatch({ control: form.control, name: "valor" }) ?? "";
   const processesForClient = (processes.data ?? []).filter((p) => p.client_id === selectedClientId);
 
   return (
@@ -251,7 +252,7 @@ export default function HonorariosPage() {
                 className="h-10"
                 inputMode="numeric"
                 placeholder="R$ 0,00"
-                value={form.watch("valor")}
+                value={watchedValor}
                 onChange={(e) => form.setValue("valor", maskCurrencyBRL(e.target.value))}
               />
             </div>

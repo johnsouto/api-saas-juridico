@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -75,6 +75,7 @@ export default function AgendaPage() {
     resolver: zodResolver(schema),
     defaultValues: { titulo: "", tipo: "reuniao", client_id: "", inicio_em: "", fim_em: "" }
   });
+  const selectedClientId = useWatch({ control: form.control, name: "client_id" });
 
   const create = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -180,7 +181,7 @@ export default function AgendaPage() {
               <Label htmlFor="agenda_cliente">Cliente</Label>
               <Select
                 id="agenda_cliente"
-                value={form.watch("client_id") ?? ""}
+                value={selectedClientId ?? ""}
                 onChange={(e) => {
                   const id = e.target.value;
                   form.setValue("client_id", id, { shouldValidate: true });

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -161,12 +161,12 @@ export default function ParceriasPage() {
       address_zip: ""
     }
   });
-  const docType = form.watch("tipo_documento");
-  const docDigits = onlyDigits(form.watch("documento") ?? "");
+  const docType = useWatch({ control: form.control, name: "tipo_documento" });
+  const docDigits = onlyDigits(useWatch({ control: form.control, name: "documento" }) ?? "");
   const docValid = docType === "cpf" ? isValidCPFLength(docDigits) : isValidCNPJLength(docDigits);
-  const phoneDigits = onlyDigits(form.watch("telefone") ?? "");
+  const phoneDigits = onlyDigits(useWatch({ control: form.control, name: "telefone" }) ?? "");
   const phoneValid = !phoneDigits || isValidPhoneLength(phoneDigits);
-  const zipDigits = onlyDigits(form.watch("address_zip") ?? "");
+  const zipDigits = onlyDigits(useWatch({ control: form.control, name: "address_zip" }) ?? "");
   const zipValid = !zipDigits || isValidCEPLength(zipDigits);
 
   const visibleList = useMemo(() => {

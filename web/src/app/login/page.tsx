@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
@@ -174,13 +174,13 @@ export default function LoginPage() {
     }
   });
 
-  const watchedTenantNome = registerForm.watch("tenant_nome");
-  const watchedTenantDocType = registerForm.watch("tenant_tipo_documento");
-  const watchedTenantDoc = registerForm.watch("tenant_documento");
+  const watchedTenantNome = useWatch({ control: registerForm.control, name: "tenant_nome" });
+  const watchedTenantDocType = useWatch({ control: registerForm.control, name: "tenant_tipo_documento" });
+  const watchedTenantDoc = useWatch({ control: registerForm.control, name: "tenant_documento" });
   const tenantDocDigits = onlyDigits(watchedTenantDoc ?? "");
   const tenantDocValid =
     watchedTenantDocType === "cpf" ? isValidCPFLength(tenantDocDigits) : isValidCNPJLength(tenantDocDigits);
-  const watchedRegisterPassword = registerForm.watch("admin_senha");
+  const watchedRegisterPassword = useWatch({ control: registerForm.control, name: "admin_senha" });
   const pwdValidation = validatePassword(watchedRegisterPassword ?? "");
   useEffect(() => {
     if (registerSlugEdited) return;
