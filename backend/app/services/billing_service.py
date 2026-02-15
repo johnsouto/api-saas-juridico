@@ -56,6 +56,8 @@ class BillingService:
             current_period_end=None,
             grace_period_end=None,
             cancel_at_period_end=False,
+            cancellation_requested_at=None,
+            refund_status="NONE",
             last_payment_at=None,
             last_payment_status=None,
         )

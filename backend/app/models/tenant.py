@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Enum, String
+from sqlalchemy import Boolean, DateTime, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDBaseMixin
@@ -14,6 +15,12 @@ class Tenant(UUIDBaseMixin, Base):
 
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="ACTIVE", index=True)
+    delete_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delete_scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delete_reason_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    delete_reason_text: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    delete_access_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Legacy (kept for backward-compatibility / existing DBs). New tenants may not have CNPJ.
     cnpj: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True, index=True)
     tipo_documento: Mapped[TenantDocumentoTipo] = mapped_column(

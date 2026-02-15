@@ -64,6 +64,8 @@ class Subscription(UUIDBaseMixin, Base):
     grace_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    cancellation_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    refund_status: Mapped[str] = mapped_column(String(40), nullable=False, default="NONE")
 
     last_payment_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_payment_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
