@@ -39,3 +39,15 @@ class BillingCheckoutOut(APIModel):
 class BillingCancelOut(APIModel):
     ok: bool = True
     message: str = Field(default="Assinatura cancelada (ou marcada para cancelamento)")
+    cancel_at_period_end: bool = True
+    access_until: datetime | None = None
+    refund_status: str = "NONE"
+    export_requested: bool = False
+    export_id: uuid.UUID | None = None
+    export_rate_limited: bool = False
+    export_retry_after_seconds: int | None = None
+    latest_export_id: uuid.UUID | None = None
+
+
+class BillingCancelIn(APIModel):
+    generate_export_now: bool = False

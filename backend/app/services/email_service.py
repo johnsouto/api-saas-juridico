@@ -93,6 +93,32 @@ class EmailService:
             return
         self._enqueue_or_log(background, subject, recipients, body)
 
+    def send_generic_email_sync(self, *, to_emails: list[str], subject: str, body: str) -> bool:
+        """
+        Synchronous transactional email helper.
+
+        Useful for async jobs that run outside request/response lifecycle.
+        """
+        recipients = [e for e in to_emails if e]
+        if not recipients:
+            return False
+
+        if not _is_smtp_configured():
+            print(f"[email] To={recipients} Subject={subject}\n{body}\n")
+            return True
+
+        try:
+            message = EmailMessage()
+            message["Subject"] = subject
+            message["From"] = formataddr((settings.EMAIL_FROM_NAME, settings.EMAIL_FROM))
+            message["To"] = ", ".join(recipients)
+            message.set_content(body)
+            self._smtp_send(message)
+            return True
+        except Exception:
+            logger.exception("Falha ao enviar e-mail síncrono")
+            return False
+
     def send_agenda_event_created_email(
         self,
         *,

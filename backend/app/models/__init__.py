@@ -17,6 +17,7 @@ from app.models.process_movement import ProcessMovement
 from app.models.subscription import Subscription
 from app.models.tarefa import Tarefa
 from app.models.tenant import Tenant
+from app.models.tenant_export import TenantExport
 from app.models.user import User
 from app.models.user_invitation import UserInvitation
 
@@ -45,6 +46,7 @@ __all__ = [
     "Tarefa",
     "TarefaStatus",
     "Tenant",
+    "TenantExport",
     "User",
     "UserInvitation",
     "UserRole",

@@ -4,6 +4,7 @@ from fastapi import Depends
 from app.api.deps import get_tenant_context
 from app.api.deps import require_platform_admin
 from app.api.v1.endpoints import (
+    account,
     agenda_eventos,
     auth,
     billing,
@@ -11,6 +12,7 @@ from app.api.v1.endpoints import (
     kanban,
     clients,
     documents,
+    exports,
     feedback,
     honorarios,
     parcerias,
@@ -45,3 +47,6 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"], dependencies=[Depends(get_tenant_context)])
 api_router.include_router(profile.router, prefix="/profile", tags=["profile"], dependencies=[Depends(get_tenant_context)])
+api_router.include_router(account.router, prefix="/account", tags=["account"], dependencies=[Depends(get_tenant_context)])
+# Keep this router without global tenant dependency because `/confirm-email` is intentionally public.
+api_router.include_router(exports.router, prefix="/exports", tags=["exports"])

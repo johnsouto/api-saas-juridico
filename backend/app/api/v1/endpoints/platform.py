@@ -60,6 +60,7 @@ from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
 from app.services.platform_service import PlatformService
 from app.services.payment_service import get_payment_provider
+from app.services.export_service import TenantExportService
 from app.services.s3_service import S3Service
 
 
@@ -844,7 +845,9 @@ async def billing_maintenance(
     so a cron job can call it.
     """
     billing = BillingService(provider=get_payment_provider(), email_service=EmailService())
-    return await billing.run_scheduled_maintenance(db, background)
+    billing_result = await billing.run_scheduled_maintenance(db, background)
+    exports_expired = await TenantExportService().cleanup_expired_exports(db)
+    return {**billing_result, "exports_expired": exports_expired}
 
 
 @router.post("/tenants", response_model=PlatformTenantCreatedOut)
