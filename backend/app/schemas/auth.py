@@ -17,6 +17,11 @@ class TenantRegisterRequest(APIModel):
     last_name: str = Field(min_length=2, max_length=200)
     admin_email: EmailStr
     admin_senha: str = Field(min_length=8, max_length=128)
+    accept_terms: bool
+    marketing_opt_in: bool = False
+    terms_version: str = Field(min_length=1, max_length=40)
+    privacy_version: str = Field(min_length=1, max_length=40)
+    consent_source: str = Field(min_length=1, max_length=80)
 
     # Cloudflare Turnstile token (anti-bot). Required when TURNSTILE_SECRET_KEY is enabled.
     cf_turnstile_response: str | None = Field(default=None, min_length=1)

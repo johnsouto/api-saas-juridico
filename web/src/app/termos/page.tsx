@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { Container } from "@/components/landing/Container";
+import { LEGAL_VERSIONS } from "@/constants/legal";
 import { SUPPORT_EMAIL } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
@@ -16,12 +17,13 @@ const focusRing =
 const SUPPORT_WHATSAPP_URL =
   "https://api.whatsapp.com/send?phone=5521976818750&text=Ol%C3%A1!%20Preciso%20de%20suporte%20no%20Elemento%20Juris.";
 
-const LAST_UPDATED_BR = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  timeZone: "America/Sao_Paulo"
-}).format(new Date());
+function legalVersionToBr(version: string): string {
+  const [year, month, day] = version.split("-");
+  if (!year || !month || !day) return version;
+  return `${day}/${month}/${year}`;
+}
+
+const LAST_UPDATED_BR = legalVersionToBr(LEGAL_VERSIONS.terms);
 
 export default function TermosPage() {
   return (

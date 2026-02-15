@@ -27,6 +27,7 @@ from app.models.plan import Plan
 from app.models.subscription import Subscription
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.user_consent import UserConsent
 from app.models.user_invitation import UserInvitation
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
@@ -318,6 +319,13 @@ class AuthService:
         admin_first_name: str | None = None,
         admin_last_name: str | None = None,
         admin_nome: str | None = None,
+        consent_accept_terms: bool | None = None,
+        consent_marketing_opt_in: bool = False,
+        consent_terms_version: str | None = None,
+        consent_privacy_version: str | None = None,
+        consent_source: str | None = None,
+        consent_ip_address: str | None = None,
+        consent_user_agent: str | None = None,
     ) -> tuple[Tenant, User, str, str]:
         tenant_slug = normalize_slug(tenant_slug)
         tenant_documento = only_digits(tenant_documento)
@@ -442,6 +450,23 @@ class AuthService:
         db.add_all([admin, sub])
 
         try:
+            await db.flush()
+
+            if consent_accept_terms is not None:
+                db.add(
+                    UserConsent(
+                        user_id=admin.id,
+                        tenant_id=tenant.id,
+                        accept_terms=bool(consent_accept_terms),
+                        marketing_opt_in=bool(consent_marketing_opt_in),
+                        terms_version=(consent_terms_version or "").strip(),
+                        privacy_version=(consent_privacy_version or "").strip(),
+                        consent_source=(consent_source or "").strip(),
+                        ip_address=(consent_ip_address or None),
+                        user_agent=(consent_user_agent or None),
+                    )
+                )
+
             await db.commit()
         except IntegrityError as exc:
             await db.rollback()

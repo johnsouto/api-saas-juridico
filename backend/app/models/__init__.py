@@ -19,6 +19,7 @@ from app.models.tarefa import Tarefa
 from app.models.tenant import Tenant
 from app.models.tenant_export import TenantExport
 from app.models.user import User
+from app.models.user_consent import UserConsent
 from app.models.user_invitation import UserInvitation
 
 __all__ = [
@@ -48,6 +49,7 @@ __all__ = [
     "Tenant",
     "TenantExport",
     "User",
+    "UserConsent",
     "UserInvitation",
     "UserRole",
 ]

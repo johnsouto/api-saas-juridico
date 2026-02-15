@@ -13,6 +13,7 @@ import { cleanupLegacySaaSTokens, loginWithEmailSenha, registerTenant as registe
 import { trackEvent } from "@/lib/gtm";
 import { passwordPolicyMessage, validatePassword } from "@/lib/password";
 import { formatCNPJ, formatCPF, isValidCNPJLength, isValidCPFLength, onlyDigits } from "@/lib/masks";
+import { LEGAL_VERSIONS } from "@/constants/legal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -62,7 +63,13 @@ const registerSchema = z
     last_name: z.string().min(2, "Informe seu sobrenome"),
     admin_email: z.string().email("E-mail inválido."),
     admin_senha: passwordSchema,
-    admin_senha_confirm: z.string().min(8, "Confirme a senha")
+    admin_senha_confirm: z.string().min(8, "Confirme a senha"),
+    accept_terms: z
+      .boolean()
+      .refine((value) => value === true, {
+        message: "Você precisa aceitar os Termos de Uso e a Política de Privacidade para continuar."
+      }),
+    marketing_opt_in: z.boolean().default(false)
   })
   .superRefine((data, ctx) => {
     const digits = onlyDigits(data.tenant_documento);
@@ -170,7 +177,9 @@ export default function LoginPage() {
       last_name: "",
       admin_email: "",
       admin_senha: "",
-      admin_senha_confirm: ""
+      admin_senha_confirm: "",
+      accept_terms: false,
+      marketing_opt_in: false
     }
   });
 
@@ -181,6 +190,7 @@ export default function LoginPage() {
   const tenantDocValid =
     watchedTenantDocType === "cpf" ? isValidCPFLength(tenantDocDigits) : isValidCNPJLength(tenantDocDigits);
   const watchedRegisterPassword = useWatch({ control: registerForm.control, name: "admin_senha" });
+  const watchedAcceptTerms = useWatch({ control: registerForm.control, name: "accept_terms" });
   const pwdValidation = validatePassword(watchedRegisterPassword ?? "");
   useEffect(() => {
     if (registerSlugEdited) return;
@@ -232,6 +242,11 @@ export default function LoginPage() {
         last_name: values.last_name,
         admin_email: values.admin_email,
         admin_senha: values.admin_senha,
+        accept_terms: values.accept_terms,
+        marketing_opt_in: values.marketing_opt_in,
+        terms_version: LEGAL_VERSIONS.terms,
+        privacy_version: LEGAL_VERSIONS.privacy,
+        consent_source: "register_form",
         cf_turnstile_response: turnstileToken ?? undefined
       };
 
@@ -564,6 +579,50 @@ export default function LoginPage() {
                   ) : null}
                 </div>
 
+                <div className="space-y-2 rounded-xl border border-border/20 bg-card/40 p-3">
+                  <label className="flex items-start gap-2 text-sm leading-relaxed text-foreground">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-border/40"
+                      {...registerForm.register("accept_terms")}
+                    />
+                    <span>
+                      Li e concordo com os{" "}
+                      <a
+                        href="/termos"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline decoration-border/40 underline-offset-2 hover:decoration-border/70"
+                      >
+                        Termos de Uso
+                      </a>{" "}
+                      e com a{" "}
+                      <a
+                        href="/privacidade"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline decoration-border/40 underline-offset-2 hover:decoration-border/70"
+                      >
+                        Política de Privacidade
+                      </a>
+                      .
+                    </span>
+                  </label>
+                  {registerForm.formState.errors.accept_terms?.message ? (
+                    <p className="text-xs text-red-600">{registerForm.formState.errors.accept_terms.message}</p>
+                  ) : null}
+
+                  <label className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-border/40"
+                      {...registerForm.register("marketing_opt_in")}
+                    />
+                    <span>Quero receber novidades, dicas de uso e ofertas exclusivas por e-mail.</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground">Você poderá cancelar a qualquer momento.</p>
+                </div>
+
                 {turnstileEnabled ? (
                   <div className="pt-2">
                     <Turnstile
@@ -590,7 +649,8 @@ export default function LoginPage() {
                     registerTenant.isPending ||
                     (turnstileEnabled && !turnstileToken) ||
                     !pwdValidation.allOk ||
-                    !tenantDocValid
+                    !tenantDocValid ||
+                    !watchedAcceptTerms
                   }
                   type="submit"
                 >

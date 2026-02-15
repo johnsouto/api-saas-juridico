@@ -35,6 +35,11 @@ export async function registerTenant(input: {
   last_name: string;
   admin_email: string;
   admin_senha: string;
+  accept_terms: boolean;
+  marketing_opt_in: boolean;
+  terms_version: string;
+  privacy_version: string;
+  consent_source: string;
   cf_turnstile_response?: string;
 }): Promise<void> {
   await api.post("/v1/auth/register-tenant", input);

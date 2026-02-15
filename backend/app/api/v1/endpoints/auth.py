@@ -25,6 +25,7 @@ from app.schemas.token import RefreshRequest
 from app.schemas.user import UserOut
 from app.services.auth_service import AuthService
 from app.services.auth_security_service import AuthSecurityService
+from app.services.action_audit_service import extract_client_ip, extract_user_agent
 from app.services.email_service import EmailService
 from app.services.plan_limit_service import PlanLimitService
 from app.services.telegram_service import send_telegram_alert
@@ -146,6 +147,11 @@ async def register_tenant(
     background: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    if payload.accept_terms is not True:
+        raise BadRequestError("É necessário aceitar os Termos de Uso e a Política de Privacidade.")
+    if not payload.terms_version.strip() or not payload.privacy_version.strip() or not payload.consent_source.strip():
+        raise BadRequestError("Versões legais e origem do consentimento são obrigatórias.")
+
     _auth_security.enforce_rate_limit(
         request=request,
         action="register-tenant",
@@ -194,6 +200,13 @@ async def register_tenant(
             admin_senha=payload.admin_senha,
             admin_first_name=payload.first_name,
             admin_last_name=payload.last_name,
+            consent_accept_terms=payload.accept_terms,
+            consent_marketing_opt_in=payload.marketing_opt_in,
+            consent_terms_version=payload.terms_version,
+            consent_privacy_version=payload.privacy_version,
+            consent_source=payload.consent_source,
+            consent_ip_address=extract_client_ip(request),
+            consent_user_agent=extract_user_agent(request),
         )
     except BadRequestError as exc:
         reason = str(exc)
@@ -226,6 +239,11 @@ async def register_tenant(
     response = JSONResponse({"ok": True})
     _set_auth_cookies(response=response, access_token=access, refresh_token=refresh)
     return response
+
+
+# TODO(marketing): implementar endpoint de descadastro:
+# GET /api/v1/marketing/unsubscribe?token=...
+# Validar token assinado, marcar marketing_opt_in=False e registrar auditoria.
 
 
 @router.post("/login")
